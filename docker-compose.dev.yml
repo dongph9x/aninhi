@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  discord-bot-dev:
+    build: .
+    container_name: aninhi-discord-bot-dev
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+      - BOT_TOKEN=${BOT_TOKEN}
+      - DEBUG=bot:*
+    volumes:
+      # Mount source code để hot reload
+      - .:/app
+      - /app/node_modules
+      # Mount thư mục data
+      - ./data:/app/data
+      # Mount logs
+      - ./logs:/app/logs
+    networks:
+      - bot-network-dev
+    command: ["yarn", "dev"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "console.log('Dev bot is running')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  bot-network-dev:
+    driver: bridge
+
+volumes:
+  data:
+  logs: 
