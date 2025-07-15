@@ -1,0 +1,135 @@
+{
+    "prefix": "Prefix của mình là `%s`.",
+    "errors": {
+        "unknown": "Có lỗi xảy ra, vui lòng báo lại với nhà phát triển.",
+        "missingPermission": "Bạn không có quyền hạn để làm việc này.",
+        "directMessageOnly": "Lệnh này chỉ dành cho kênh nhắn riêng (DMs)",
+        "guildCommandOnly": "Lệnh này chỉ dành cho server.",
+        "devOnly": "Lệnh này chỉ dành cho nhà phát triển bot.",
+        "ownerOnly": "Chỉ có chủ sở hữu server mới được làm việc này",
+        "nsfw": "Lệnh này chỉ dành cho những kênh được đánh dấu nội dung nhạy cảm (NSFW)",
+        "cooldown": "Hãy chậm lại, dùng lại lệnh này sau %s"
+    },
+    "log": {
+        "auditReason": "Bởi: %s | Lý do: %s",
+        "defaultReason": "Không rõ"
+    },
+    "common": {
+        "userNotFound": "Không tìm thấy người này."
+    },
+    "commands": {
+        "ping": "Độ trễ của bot là: **%sms** (Websocket: **%sms**)",
+        "uptime": "Thời gian hoạt động của bot là: **%s**",
+        "ban": {
+            "higherRoleError": "Bạn không thể cấm 1 người có vai trò cao hơn hoặc bằng tôi.",
+            "userHigherRoleError": "Bạn không thể cấm 1 người có vai trò cao hơn hoặc bằng bạn.",
+            "unbannableError": "Không thể cấm người này.",
+            "success": "Đã cấm **%s** với lý do: %s",
+            "selfBan": "Bạn không thể cấm chính mình.",
+            "botBan": "Tôi không thể cấm chính mình."
+        },
+        "kick": {
+            "higherRoleError": "Bạn không thể đuổi 1 người có vai trò cao hơn hoặc bằng tôi.",
+            "userHigherRoleError": "Bạn không thể đuổi 1 người có vai trò cao hơn hoặc bằng bạn.",
+            "unkickableError": "Không thể đuổi người này.",
+            "success": "Đã đuổi **%s** với lý do: %s",
+            "selfKick": "Bạn không thể đuổi chính mình.",
+            "botKick": "Tôi không thể đuổi chính mình."
+        },
+        "mute": {
+            "higherRoleErrorBot": "Bạn không thể hạn chế 1 người có vai trò cao hơn hoặc bằng tôi.",
+            "higherRoleErrorUser": "Bạn không thể hạn chế 1 người có vai trò cao hơn hoặc bằng bạn.",
+            "adminError": "Bạn không thể hạn chế 1 người có quyền quản trị viên.",
+            "invalidTimeError": "Thời gian không hợp lệ.",
+            "success": "Đã hạn chế **%s** trong **%s** | Lý do: %s",
+            "selfMute": "Bạn không thể hạn chế chính mình.",
+            "botError": "Không thể hạn chế bot"
+        },
+        "unban": {
+            "notInBanList": "Không có người này trong danh sách cấm.",
+            "success": "Đã gỡ bỏ cấm của **%s** | Lý do: %s"
+        },
+        "unmute": {
+            "higherRoleErrorBot": "Bạn không thể bỏ hạn chế 1 người có vai trò cao hơn hoặc bằng tôi.",
+            "higherRoleErrorUser": "Bạn không thể bỏ hạn chế 1 người có vai trò cao hơn hoặc bằng bạn.",
+            "notMutedError": "Người này không bị hạn chế.",
+            "success": "Đã bỏ hạn chế **%s** | Lý do: %s"
+        },
+        "role": {
+            "default": {
+                "higherRoleErrorBot": "Vị trí của vai trò đó cao hơn vị trí cao nhất vai trò của tôi.",
+                "higherRoleErrorUser": "Vị trí của vai trò đó cao hơn vị trí cao nhất vai trò của bạn."
+            },
+            "roleNotFound": "Không tìm thấy vai trò này.",
+            "invalid": "Vui lòng cung cấp cả ID người dùng và ID vai trò.",
+            "add": {
+                "success": "Đã thêm vai trò **%s** cho **%s**.",
+                "alreadyHasRole": "Người này đã có vai trò này."
+            },
+            "remove": {
+                "noRole": "Người này không có vai trò cần bỏ.",
+                "success": "Đã bỏ vai trò **%s** của **%s**."
+            }
+        },
+        "help": {
+            "category": "Danh sách danh mục lệnh của %s",
+            "prefix": "**Prefix của bot tại server là:** `%s`.",
+            "notFound": "Không tìm thấy lệnh nào với tên \"%s\"",
+            "support": {
+                "title": "Hỗ trợ",
+                "description": ">>> Nếu bạn cần hỗ trợ, hãy tham gia máy chủ Discord của chúng tôi: [Nhấn vào đây](%s)"
+            },
+            "footer": "Phát triển bởi %s",
+            "field": "Các danh mục câu lệnh",
+            "selector": {
+                "category": "Chọn danh mục bạn muốn tìm hiểu",
+                "command": "Chọn lệnh bạn muốn tìm hiểu"
+            },
+            "commands": {
+                "detail": "Chi tiết câu lệnh \"%s\"",
+                "category": "Danh sách lệnh trong danh mục %s.",
+                "categories": "Các câu lệnh trong danh mục:",
+                "warning": "Đừng thêm các ngoặc (<> hoặc []) khi sử dụng lệnh.",
+                "notSupportSlash": "Danh mục lệnh này không có lệnh gạch chéo (/).",
+                "notSupportText": "Danh mục lệnh này không có lệnh văn bản.",
+                "none": "Không có",
+                "usage": "Cách dùng",
+                "aliases": "Biệt danh",
+                "parameter": "Tham số",
+                "subcommand": "Câu lệnh phụ"
+            }
+        },
+        "roulette": {
+            "title": "🎰 Roulette",
+            "help": {
+                "title": "🎰 Roulette - Hướng dẫn",
+                "description": "**Cách chơi:** `n.roulette <loại cược> <số tiền>`",
+                "examples": "**Ví dụ:**",
+                "example1": "• `n.roulette red 100` - Cược đỏ 100 AniCoin",
+                "example2": "• `n.roulette 7 50` - Cược số 7 với 50 AniCoin", 
+                "example3": "• `n.roulette even 200` - Cược chẵn 200 AniCoin",
+                "betTypes": "**Các loại cược:**",
+                "number": "• **Số:** 0-36 (tỷ lệ 35:1)",
+                "color": "• **Màu:** red/đỏ, black/đen (tỷ lệ 1:1)",
+                "evenOdd": "• **Chẵn/Lẻ:** even/chẵn, odd/lẻ (tỷ lệ 1:1)",
+                "lowHigh": "• **Thấp/Cao:** low/thấp (1-18), high/cao (19-36) (tỷ lệ 1:1)",
+                "columns": "• **Cột:** column1/cột1, column2/cột2, column3/cột3 (tỷ lệ 2:1)",
+                "dozens": "• **Hàng:** dozen1/hàng1 (1-12), dozen2/hàng2 (13-24), dozen3/hàng3 (25-36) (tỷ lệ 2:1)",
+                "limits": "**Giới hạn:** %s-%s AniCoin"
+            },
+            "game": {
+                "active": "⏳ Bạn đang có một ván roulette đang chạy! Vui lòng đợi...",
+                "invalidBet": "❌ Loại cược không hợp lệ! Dùng `n.roulette` để xem hướng dẫn.",
+                "minBet": "❌ Số tiền cược tối thiểu là %s AniCoin!",
+                "maxBet": "❌ Số tiền cược tối đa là %s AniCoin!",
+                "insufficientBalance": "❌ Bạn không đủ AniCoin! Số dư: %s",
+                "waiting": "🎲 **Đang quay...**",
+                "result": "🎲 **Kết quả:** %s **%s**",
+                "win": "🎉 **THẮNG!** +%s AniCoin",
+                "lose": "❌ **THUA!** -%s AniCoin",
+                "totalWin": "💵 **Tổng nhận:** %s AniCoin",
+                "payout": "Tỷ lệ thắng: %s:1"
+            }
+        }
+    }
+}

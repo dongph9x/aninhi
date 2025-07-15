@@ -1,0 +1,135 @@
+{
+    "prefix": "My prefix is `%s`.",
+    "errors": {
+        "unknown": "Oops, something went wrong. Let the dev know!",
+        "missingPermission": "You don't have permission to do that.",
+        "directMessageOnly": "This command only works in DMs!",
+        "guildCommandOnly": "You can only use this command in a server.",
+        "devOnly": "This one's just for the bot dev.",
+        "ownerOnly": "Only the server owner can do this.",
+        "nsfw": "This command only works in NSFW channels.",
+        "cooldown": "Whoa there, slow down! Try again in %s."
+    },
+    "log": {
+        "auditReason": "By: %s | Reason: %s",
+        "defaultReason": "No reason given"
+    },
+    "common": {
+        "userNotFound": "I couldn't find that user."
+    },
+    "commands": {
+        "ping": "Bot ping is: **%sms** (WebSocket: **%sms**)",
+        "uptime": "I've been up for: **%s**",
+        "ban": {
+            "higherRoleError": "I can’t ban someone with a higher or equal role than me.",
+            "userHigherRoleError": "You can’t ban someone with a higher or equal role than you.",
+            "unbannableError": "I can’t ban this person.",
+            "success": "Banned **%s** for: %s",
+            "selfBan": "You can’t ban yourself.",
+            "botBan": "I can’t ban myself."
+        },
+        "kick": {
+            "higherRoleError": "I can’t kick someone with a higher or equal role than me.",
+            "userHigherRoleError": "You can’t kick someone with a higher or equal role than you.",
+            "unkickableError": "I can’t kick this person.",
+            "success": "Kicked **%s** for: %s",
+            "selfKick": "You can’t kick yourself.",
+            "botKick": "I can’t kick myself."
+        },
+        "mute": {
+            "higherRoleErrorBot": "I can’t mute someone with a higher or equal role than me.",
+            "higherRoleErrorUser": "You can’t mute someone with a higher or equal role than you.",
+            "adminError": "You can’t mute an admin.",
+            "invalidTimeError": "That’s not a valid time.",
+            "success": "Muted **%s** for **%s** | Reason: %s",
+            "selfMute": "You can’t mute yourself.",
+            "botError": "Cannot mute bot"
+        },
+        "unban": {
+            "notInBanList": "That person isn’t banned.",
+            "success": "Unbanned **%s** | Reason: %s"
+        },
+        "unmute": {
+            "higherRoleErrorBot": "I can’t unmute someone with a higher or equal role than me.",
+            "higherRoleErrorUser": "You can’t unmute someone with a higher or equal role than you.",
+            "notMutedError": "This person isn’t muted.",
+            "success": "Unmuted **%s** | Reason: %s"
+        },
+        "role": {
+            "default": {
+                "higherRoleErrorBot": "That role’s higher than my top role.",
+                "higherRoleErrorUser": "That role’s higher than your top role."
+            },
+            "roleNotFound": "I couldn’t find that role.",
+            "invalid": "Please provide both user ID and role ID.",
+            "add": {
+                "success": "Gave **%s** the role **%s**.",
+                "alreadyHasRole": "They already have that role."
+            },
+            "remove": {
+                "noRole": "They don’t have that role.",
+                "success": "Took **%s**'s **%s** role."
+            }
+        },
+        "help": {
+            "category": "Here are the command categories for %s",
+            "prefix": "**Bot prefix in this server is:** `%s`.",
+            "notFound": "I couldn’t find any command named \"%s\"",
+            "support": {
+                "title": "Need Help?",
+                "description": ">>> Join our support server: [Click here](%s)"
+            },
+            "footer": "Made with ❤️ by %s",
+            "field": "Command Categories",
+            "selector": {
+                "category": "Pick a category to explore",
+                "command": "Pick a command to learn more"
+            },
+            "commands": {
+                "detail": "Details for \"%s\" command.",
+                "category": "List of commands in the %s category.",
+                "categories": "Commands in the category:",
+                "warning": "Don’t include the brackets (<> or []) when using the command.",
+                "notSupportSlash": "This category doesn't have any slash commands (/)",
+                "notSupportText": "This category doesn't have any text commands.",
+                "none": "None",
+                "usage": "How to use",
+                "aliases": "Other names",
+                "parameter": "Params",
+                "subcommand": "Subcommands"
+            }
+        },
+        "roulette": {
+            "title": "🎰 Roulette",
+            "help": {
+                "title": "🎰 Roulette - Guide",
+                "description": "**How to play:** `n.roulette <bet type> <amount>`",
+                "examples": "**Examples:**",
+                "example1": "• `n.roulette red 100` - Bet red 100 AniCoin",
+                "example2": "• `n.roulette 7 50` - Bet number 7 with 50 AniCoin",
+                "example3": "• `n.roulette even 200` - Bet even 200 AniCoin",
+                "betTypes": "**Bet types:**",
+                "number": "• **Number:** 0-36 (35:1 payout)",
+                "color": "• **Color:** red, black (1:1 payout)",
+                "evenOdd": "• **Even/Odd:** even, odd (1:1 payout)",
+                "lowHigh": "• **Low/High:** low (1-18), high (19-36) (1:1 payout)",
+                "columns": "• **Columns:** column1, column2, column3 (2:1 payout)",
+                "dozens": "• **Dozens:** dozen1 (1-12), dozen2 (13-24), dozen3 (25-36) (2:1 payout)",
+                "limits": "**Limits:** %s-%s AniCoin"
+            },
+            "game": {
+                "active": "⏳ You have an active roulette game! Please wait...",
+                "invalidBet": "❌ Invalid bet type! Use `n.roulette` to see the guide.",
+                "minBet": "❌ Minimum bet is %s AniCoin!",
+                "maxBet": "❌ Maximum bet is %s AniCoin!",
+                "insufficientBalance": "❌ Insufficient AniCoin! Balance: %s",
+                "waiting": "🎲 **Spinning...**",
+                "result": "🎲 **Result:** %s **%s**",
+                "win": "🎉 **WIN!** +%s AniCoin",
+                "lose": "❌ **LOSE!** -%s AniCoin",
+                "totalWin": "💵 **Total received:** %s AniCoin",
+                "payout": "Payout ratio: %s:1"
+            }
+        }
+    }
+}

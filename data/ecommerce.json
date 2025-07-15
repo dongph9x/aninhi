@@ -1,0 +1,14 @@
+{
+  "users": [
+  ],
+  "transactions": [],
+  "dailyClaims": {
+    "769244837030526976_791618543296577536": "2025-07-14T13:02:06.078Z"
+  },
+  "settings": {
+    "dailyBaseAmount": 1000,
+    "dailyStreakBonus": 100,
+    "maxStreakBonus": 1000,
+    "dailyCooldownHours": 24
+  }
+}
