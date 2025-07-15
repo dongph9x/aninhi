@@ -62,6 +62,17 @@ export default Bot.createCommand({
                     inline: false,
                 },
                 {
+                    name: "🛡️ **Quản Lý & Moderation**",
+                    value:
+                        `\`${prefix}ban\` - Ban người dùng\n` +
+                        `\`${prefix}unban\` - Unban người dùng\n` +
+                        `\`${prefix}kick\` - Kick người dùng\n` +
+                        `\`${prefix}mute\` - Mute người dùng\n` +
+                        `\`${prefix}unmute\` - Unmute người dùng\n` +
+                        `\`${prefix}banlist\` - Xem danh sách ban`,
+                    inline: false,
+                },
+                {
                     name: "ℹ️ **Thông Tin & Tiện Ích**",
                     value:
                         `\`${prefix}ping\` - Kiểm tra độ trễ\n` +
@@ -164,6 +175,65 @@ function getSpecificCommandHelp(commandName: string, prefix: string): string | n
             `• \`${prefix}help\` - Hiển thị tất cả lệnh\n` +
             `• \`${prefix}help daily\` - Chi tiết lệnh daily\n` +
             "• Aliases: `h`, `commands`, `cmd`",
+
+        ban:
+            "**Mô tả:** Ban người dùng khỏi server (vĩnh viễn hoặc tạm thời)\n\n" +
+            `**Cách dùng:** \`${prefix}ban <người dùng> [thời gian] [lý do]\`\n\n` +
+            "**Ví dụ:**\n" +
+            `• \`${prefix}ban @user spam\` - Ban vĩnh viễn\n` +
+            `• \`${prefix}ban @user 10m spam\` - Ban 10 phút\n` +
+            `• \`${prefix}ban @user 2h vi phạm nội quy\` - Ban 2 giờ\n` +
+            "**Đơn vị thời gian:** s (giây), m (phút), h (giờ), d (ngày), w (tuần), y (năm)\n" +
+            "**Quyền cần thiết:** Ban Members\n" +
+            "• Aliases: `banuser`, `banmember`",
+
+        unban:
+            "**Mô tả:** Unban người dùng khỏi server\n\n" +
+            `**Cách dùng:** \`${prefix}unban <người dùng>\`\n\n` +
+            "**Ví dụ:**\n" +
+            `• \`${prefix}unban 123456789\` - Unban bằng ID\n` +
+            `• \`${prefix}unban username#1234\` - Unban bằng username\n` +
+            "**Quyền cần thiết:** Ban Members\n" +
+            "• Aliases: `unbanuser`, `unbanmember`",
+
+        kick:
+            "**Mô tả:** Kick người dùng khỏi server\n\n" +
+            `**Cách dùng:** \`${prefix}kick <người dùng> [lý do]\`\n\n` +
+            "**Ví dụ:**\n" +
+            `• \`${prefix}kick @user spam\`\n` +
+            `• \`${prefix}kick @user vi phạm nội quy\`\n` +
+            "**Quyền cần thiết:** Kick Members\n" +
+            "• Aliases: `kickuser`, `kickmember`",
+
+        mute:
+            "**Mô tả:** Mute người dùng (timeout) trong server\n\n" +
+            `**Cách dùng:** \`${prefix}mute <người dùng> [thời gian] [lý do]\`\n\n` +
+            "**Ví dụ:**\n" +
+            `• \`${prefix}mute @user spam\` - Mute 5 phút (mặc định)\n` +
+            `• \`${prefix}mute @user 10m spam\` - Mute 10 phút\n` +
+            `• \`${prefix}mute @user 2h vi phạm nội quy\` - Mute 2 giờ\n` +
+            "**Đơn vị thời gian:** s (giây), m (phút), h (giờ), d (ngày), w (tuần), y (năm)\n" +
+            "**Quyền cần thiết:** Moderate Members\n" +
+            "• Aliases: `muteuser`, `mutemember`, `timeout`",
+
+        unmute:
+            "**Mô tả:** Unmute người dùng (gỡ timeout)\n\n" +
+            `**Cách dùng:** \`${prefix}unmute <người dùng>\`\n\n` +
+            "**Ví dụ:**\n" +
+            `• \`${prefix}unmute @user\`\n` +
+            `• \`${prefix}unmute 123456789\`\n` +
+            "**Quyền cần thiết:** Moderate Members\n" +
+            "• Aliases: `unmuteuser`, `unmutemember`, `untimeout`",
+
+        banlist:
+            "**Mô tả:** Xem danh sách các người dùng đang bị ban trong server\n\n" +
+            `**Cách dùng:** \`${prefix}banlist\`\n\n` +
+            "**Hiển thị:**\n" +
+            "• Danh sách ban vĩnh viễn và tạm thời\n" +
+            "• Lý do ban, người ban, thời gian ban\n" +
+            "• Thời gian còn lại (với ban tạm thời)\n" +
+            "**Quyền cần thiết:** Ban Members\n" +
+            "• Aliases: `bans`, `listbans`",
     };
 
     // Kiểm tra aliases
@@ -190,6 +260,20 @@ function getSpecificCommandHelp(commandName: string, prefix: string): string | n
         h: "help",
         commands: "help",
         cmd: "help",
+        banuser: "ban",
+        banmember: "ban",
+        unbanuser: "unban",
+        unbanmember: "unban",
+        kickuser: "kick",
+        kickmember: "kick",
+        muteuser: "mute",
+        mutemember: "mute",
+        timeout: "mute",
+        unmuteuser: "unmute",
+        unmutemember: "unmute",
+        untimeout: "unmute",
+        bans: "banlist",
+        listbans: "banlist",
     };
 
     const actualCommand = aliases[commandName] || commandName;

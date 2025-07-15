@@ -21,7 +21,7 @@ export default Bot.createEvent({
                 logger.debug("Tournament client đã được khởi tạo!");
             }
         } catch (error) {
-            logger.error("Lỗi khởi tạo tournament client:", error);
+            logger.error(`Lỗi khởi tạo tournament client: ${error}`);
         }
 
         logger.debug(`Logged in as ${bot.user.tag}!`);
