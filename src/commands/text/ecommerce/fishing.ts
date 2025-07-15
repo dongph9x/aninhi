@@ -106,6 +106,18 @@ const BAITS: Record<string, Bait> = {
 // Lưu trữ dữ liệu người chơi
 const fishers: Record<string, Fisher> = {};
 
+// Hệ thống giá cá động
+interface FishPrice {
+    name: string;
+    basePrice: number;
+    currentPrice: number;
+    lastUpdate: number;
+}
+
+const fishPrices: Record<string, FishPrice> = {};
+const PRICE_UPDATE_INTERVAL = 10 * 60 * 1000; // 10 phút
+const PRICE_VOLATILITY = 0.1; // Độ biến động giá ±10%
+
 // Cooldown cho câu cá (30 giây)
 const FISHING_COOLDOWN = 30000;
 
@@ -114,6 +126,60 @@ const FISHING_COST = 10;
 
 function getFisherKey(userId: string, guildId: string): string {
     return `${userId}_${guildId}`;
+}
+
+// Hàm khởi tạo giá cá
+function initializeFishPrices() {
+    FISH_LIST.forEach(fish => {
+        const basePrice = Math.floor((fish.minValue + fish.maxValue) / 2);
+        fishPrices[fish.name] = {
+            name: fish.name,
+            basePrice: basePrice,
+            currentPrice: basePrice,
+            lastUpdate: Date.now()
+        };
+    });
+}
+
+// Hàm cập nhật giá cá
+function updateFishPrices() {
+    const now = Date.now();
+    FISH_LIST.forEach(fish => {
+        if (!fishPrices[fish.name]) {
+            initializeFishPrices();
+            return;
+        }
+
+        const priceData = fishPrices[fish.name];
+        if (now - priceData.lastUpdate >= PRICE_UPDATE_INTERVAL) {
+            // Tạo biến động giá ngẫu nhiên
+            const volatility = (Math.random() - 0.5) * 2 * PRICE_VOLATILITY; // -30% đến +30%
+            const newPrice = Math.floor(priceData.basePrice * (1 + volatility));
+            
+            // Đảm bảo giá không quá thấp hoặc quá cao
+            const minPrice = Math.floor(priceData.basePrice * 0.5);
+            const maxPrice = Math.floor(priceData.basePrice * 2);
+            
+            fishPrices[fish.name] = {
+                name: fish.name,
+                basePrice: priceData.basePrice,
+                currentPrice: Math.max(minPrice, Math.min(maxPrice, newPrice)),
+                lastUpdate: now
+            };
+        }
+    });
+}
+
+// Hàm lấy giá hiện tại của cá
+function getCurrentFishPrice(fishName: string): number {
+    updateFishPrices();
+    return fishPrices[fishName]?.currentPrice || 0;
+}
+
+// Hàm lấy thông tin giá cá
+function getFishPriceInfo(fishName: string): FishPrice | null {
+    updateFishPrices();
+    return fishPrices[fishName] || null;
 }
 
 function getRarityColor(rarity: string): number {
@@ -281,6 +347,11 @@ export default Bot.createCommand({
         const userId = message.author.id;
         const fisherKey = getFisherKey(userId, guildId);
 
+        // Khởi tạo giá cá nếu chưa có
+        if (Object.keys(fishPrices).length === 0) {
+            initializeFishPrices();
+        }
+
         // Khởi tạo người chơi nếu chưa có
         if (!fishers[fisherKey]) {
             fishers[fisherKey] = {
@@ -319,6 +390,8 @@ export default Bot.createCommand({
                 return await showInventory(message, fisher);
             case "list":
                 return await showFishList(message);
+            case "prices":
+                return await showFishPrices(message);
             case "buy":
                 return await buyItem(message, args.slice(1), fisher);
             case "sell":
@@ -373,27 +446,31 @@ async function fish(message: Message, fisher: Fisher) {
 
     // Bắt cá
     const caughtFish = getRandomFish(fisher);
-    const fishValue = Math.floor(Math.random() * (caughtFish.maxValue - caughtFish.minValue + 1)) + caughtFish.minValue;
-
-    // Lưu cá vào inventory thay vì bán ngay
+    
+    // Lưu cá vào inventory với giá hiện tại
+    const currentPrice = getCurrentFishPrice(caughtFish.name);
+    
     if (!fisher.caughtFish[caughtFish.name]) {
         fisher.caughtFish[caughtFish.name] = {
             name: caughtFish.name,
             emoji: caughtFish.emoji,
             rarity: caughtFish.rarity,
-            value: fishValue,
+            value: currentPrice,
             quantity: 0
         };
     }
     fisher.caughtFish[caughtFish.name].quantity++;
+    
+    // Cập nhật giá cá trong inventory theo giá hiện tại
+    fisher.caughtFish[caughtFish.name].value = currentPrice;
 
     // Cập nhật thống kê
     fisher.totalFish++;
     fisher.lastFished = now;
 
     // Cập nhật cá lớn nhất
-    if (fishValue > fisher.biggestFish.value) {
-        fisher.biggestFish = { name: caughtFish.name, value: fishValue };
+    if (currentPrice > fisher.biggestFish.value) {
+        fisher.biggestFish = { name: caughtFish.name, value: currentPrice };
     }
 
     // Cập nhật cá hiếm nhất
@@ -408,12 +485,12 @@ async function fish(message: Message, fisher: Fisher) {
         fisher.guildId,
         "fishing",
         FISHING_COST,
-        fishValue,
+        currentPrice,
         "win"
     );
 
     // Tạo embed kết quả
-    const embed = createFishingEmbed(fisher, caughtFish, fishValue);
+    const embed = createFishingEmbed(fisher, caughtFish, currentPrice);
 
     // Xóa tin nhắn đang câu và gửi kết quả
     await fishingMsg.delete().catch(() => {});
@@ -561,16 +638,18 @@ async function buyItem(message: Message, args: string[], fisher: Fisher) {
 
 async function sellFish(message: Message, args: string[], fisher: Fisher) {
     if (args.length === 0) {
-        // Bán tất cả cá
+        // Bán tất cả cá với giá hiện tại
         let totalValue = 0;
         let totalFish = 0;
         const soldFish: string[] = [];
 
         for (const [fishName, fish] of Object.entries(fisher.caughtFish)) {
             if (fish.quantity > 0) {
-                totalValue += fish.value * fish.quantity;
+                const currentPrice = getCurrentFishPrice(fish.name);
+                const fishValue = currentPrice * fish.quantity;
+                totalValue += fishValue;
                 totalFish += fish.quantity;
-                soldFish.push(`${fish.emoji} ${fish.name} x${fish.quantity}`);
+                soldFish.push(`${fish.emoji} ${fish.name} x${fish.quantity} (${currentPrice.toLocaleString()}/con)`);
                 fish.quantity = 0; // Reset số lượng
             }
         }
@@ -596,7 +675,7 @@ async function sellFish(message: Message, args: string[], fisher: Fisher) {
         return;
     }
 
-    // Bán cá cụ thể
+    // Bán cá cụ thể với giá hiện tại
     const fishName = args[0];
     const quantity = parseInt(args[1]) || 1;
 
@@ -613,7 +692,8 @@ async function sellFish(message: Message, args: string[], fisher: Fisher) {
         return message.reply(`❌ Bạn chỉ có ${fish.quantity} con cá **${fishName}**!`);
     }
 
-    const totalValue = fish.value * quantity;
+    const currentPrice = getCurrentFishPrice(fishName);
+    const totalValue = currentPrice * quantity;
     await addMoney(message.author.id, fisher.guildId, totalValue, `Bán cá: ${fishName} x${quantity}`);
     fisher.totalEarnings += totalValue;
 
@@ -625,8 +705,122 @@ async function sellFish(message: Message, args: string[], fisher: Fisher) {
     const embed = new EmbedBuilder()
         .setTitle("💰 Bán cá thành công!")
         .setDescription(`Bạn đã bán **${quantity}x ${fish.emoji} ${fish.name}** với giá **${totalValue.toLocaleString()} AniCoin**!`)
+        .addFields(
+            { name: "💰 Giá hiện tại", value: `${currentPrice.toLocaleString()} AniCoin/con`, inline: true },
+            { name: "📊 Tổng thu nhập", value: `${totalValue.toLocaleString()} AniCoin`, inline: true }
+        )
         .setColor(0x00ff00)
         .setTimestamp();
+
+    await message.reply({ embeds: [embed] });
+}
+
+async function showFishPrices(message: Message) {
+    updateFishPrices();
+    
+    const embed = new EmbedBuilder()
+        .setTitle("💰 Bảng giá cá hiện tại")
+        .setDescription("Giá cá thay đổi mỗi 10 phút. Bán khi giá cao để có lợi nhuận tốt nhất!")
+        .setColor(config.embedColor)
+        .setTimestamp();
+
+    // Nhóm cá theo độ hiếm
+    const fishByRarity = {
+        common: FISH_LIST.filter(fish => fish.rarity === "common"),
+        rare: FISH_LIST.filter(fish => fish.rarity === "rare"),
+        epic: FISH_LIST.filter(fish => fish.rarity === "epic"),
+        legendary: FISH_LIST.filter(fish => fish.rarity === "legendary")
+    };
+
+    // Cá thường
+    if (fishByRarity.common.length > 0) {
+        const commonFish = fishByRarity.common.map(fish => {
+            const priceInfo = getFishPriceInfo(fish.name);
+            const currentPrice = priceInfo?.currentPrice || 0;
+            const basePrice = priceInfo?.basePrice || 0;
+            const priceChange = currentPrice - basePrice;
+            const changeEmoji = priceChange > 0 ? "📈" : priceChange < 0 ? "📉" : "➡️";
+            const changeText = priceChange > 0 ? `+${priceChange}` : priceChange < 0 ? `${priceChange}` : "0";
+            
+            return `${fish.emoji} **${fish.name}**\n   💰 ${currentPrice.toLocaleString()} AniCoin ${changeEmoji} ${changeText}`;
+        }).join("\n\n");
+        
+        embed.addFields({
+            name: "⚪ Cá thường (Common)",
+            value: commonFish,
+            inline: false
+        });
+    }
+
+    // Cá hiếm
+    if (fishByRarity.rare.length > 0) {
+        const rareFish = fishByRarity.rare.map(fish => {
+            const priceInfo = getFishPriceInfo(fish.name);
+            const currentPrice = priceInfo?.currentPrice || 0;
+            const basePrice = priceInfo?.basePrice || 0;
+            const priceChange = currentPrice - basePrice;
+            const changeEmoji = priceChange > 0 ? "📈" : priceChange < 0 ? "📉" : "➡️";
+            const changeText = priceChange > 0 ? `+${priceChange}` : priceChange < 0 ? `${priceChange}` : "0";
+            
+            return `${fish.emoji} **${fish.name}**\n   💰 ${currentPrice.toLocaleString()} AniCoin ${changeEmoji} ${changeText}`;
+        }).join("\n\n");
+        
+        embed.addFields({
+            name: "🔵 Cá hiếm (Rare)",
+            value: rareFish,
+            inline: false
+        });
+    }
+
+    // Cá quý hiếm
+    if (fishByRarity.epic.length > 0) {
+        const epicFish = fishByRarity.epic.map(fish => {
+            const priceInfo = getFishPriceInfo(fish.name);
+            const currentPrice = priceInfo?.currentPrice || 0;
+            const basePrice = priceInfo?.basePrice || 0;
+            const priceChange = currentPrice - basePrice;
+            const changeEmoji = priceChange > 0 ? "📈" : priceChange < 0 ? "📉" : "➡️";
+            const changeText = priceChange > 0 ? `+${priceChange}` : priceChange < 0 ? `${priceChange}` : "0";
+            
+            return `${fish.emoji} **${fish.name}**\n   💰 ${currentPrice.toLocaleString()} AniCoin ${changeEmoji} ${changeText}`;
+        }).join("\n\n");
+        
+        embed.addFields({
+            name: "🟣 Cá quý hiếm (Epic)",
+            value: epicFish,
+            inline: false
+        });
+    }
+
+    // Cá huyền thoại
+    if (fishByRarity.legendary.length > 0) {
+        const legendaryFish = fishByRarity.legendary.map(fish => {
+            const priceInfo = getFishPriceInfo(fish.name);
+            const currentPrice = priceInfo?.currentPrice || 0;
+            const basePrice = priceInfo?.basePrice || 0;
+            const priceChange = currentPrice - basePrice;
+            const changeEmoji = priceChange > 0 ? "📈" : priceChange < 0 ? "📉" : "➡️";
+            const changeText = priceChange > 0 ? `+${priceChange}` : priceChange < 0 ? `${priceChange}` : "0";
+            
+            return `${fish.emoji} **${fish.name}**\n   💰 ${currentPrice.toLocaleString()} AniCoin ${changeEmoji} ${changeText}`;
+        }).join("\n\n");
+        
+        embed.addFields({
+            name: "🟡 Cá huyền thoại (Legendary)",
+            value: legendaryFish,
+            inline: false
+        });
+    }
+
+    // Thông tin cập nhật
+    const nextUpdate = Math.ceil(PRICE_UPDATE_INTERVAL / 60000);
+    embed.addFields({
+        name: "⏰ Thông tin cập nhật",
+        value: `📈📉 Giá cá thay đổi mỗi **${nextUpdate} phút**\n` +
+               `📊 Độ biến động: **±${PRICE_VOLATILITY * 100}%**\n` +
+               `💡 **Mẹo:** Bán khi giá cao (📈) để có lợi nhuận tốt nhất!`,
+        inline: false
+    });
 
     await message.reply({ embeds: [embed] });
 }
@@ -722,6 +916,7 @@ async function showHelp(message: Message) {
         .setTitle("🎣 Hướng dẫn Câu Cá")
         .setDescription(
             "**Câu cá:** `n.fish`\n" +
+            "**Xem giá cá:** `n.fish prices`\n" +
             "**Xem danh sách cá:** `n.fish list`\n" +
             "**Xem cửa hàng:** `n.fish shop`\n" +
             "**Xem thống kê:** `n.fish stats`\n" +
@@ -749,6 +944,7 @@ async function showHelp(message: Message) {
             "• Chi phí: 10 AniCoin mỗi lần câu\n" +
             "• Mỗi lần câu tiêu thụ 1 mồi và 1 độ bền cần câu\n" +
             "• Cá sẽ được lưu trong inventory, dùng lệnh sell để bán\n" +
+            "• Giá cá thay đổi mỗi 10 phút, dùng `n.fish prices` để xem giá hiện tại\n" +
             "• Cần câu và mồi tốt hơn sẽ tăng tỷ lệ bắt cá hiếm"
         )
         .setColor(config.embedColor)
