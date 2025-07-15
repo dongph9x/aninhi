@@ -50,10 +50,13 @@ function initTournamentChecker() {
     // Kiểm tra mỗi 30 giây
     tournamentCheckInterval = setInterval(async () => {
         const now = new Date();
+        console.log(`[Tournament Checker] Đang kiểm tra ${Object.keys(tournaments).length} tournaments...`);
 
         for (const [tournamentId, tournament] of Object.entries(tournaments)) {
             if (tournament.status === "registration") {
                 const endTime = new Date(tournament.endTime);
+                console.log(`[Tournament Checker] Tournament ${tournamentId}: ${now.toISOString()} vs ${endTime.toISOString()}`);
+                
                 if (now >= endTime) {
                     console.log(`Tournament ${tournamentId} đã hết thời gian, đang kết thúc...`);
                     await startTournament(tournamentId);
@@ -66,7 +69,7 @@ function initTournamentChecker() {
 // Khởi tạo ngay khi module được load
 initTournamentChecker();
 
-function createTournamentEmbed(tournament: Tournament): EmbedBuilder {
+export function createTournamentEmbed(tournament: Tournament): EmbedBuilder {
     const statusEmoji = tournament.status === "registration" ? "📝" :
         tournament.status === "active" ? "⚔️" : "🏆";
     const statusText = tournament.status === "registration" ? "Đăng ký" :
@@ -102,19 +105,22 @@ function createHelpEmbed(message: Message): EmbedBuilder {
             "**Tham gia:** `n.tournament join <ID>`\n" +
             "**Xem danh sách:** `n.tournament list`\n" +
             "**Xem chi tiết:** `n.tournament info <ID>`\n" +
-            "**Kết thúc sớm:** `n.tournament end <ID>`\n\n" +
+            "**Kết thúc sớm:** `n.tournament end <ID>` (chỉ người tạo)\n" +
+            "**Force kết thúc:** `n.tournament force <ID>` (admin)\n\n" +
             "**Ví dụ:**\n" +
             "• `n.tournament create_Giải đấu mùa hè_Giải đấu thường niên_1000_50000_8_30`\n" +
             "• `n.tournament create_Tournament Test_Test tự động kết thúc_100_1000_2_1`\n" +
             "• `n.tournament join abc123`\n" +
-            "• `n.tournament end abc123`\n\n" +
+            "• `n.tournament end abc123`\n" +
+            "• `n.tournament force abc123`\n\n" +
             "**Lưu ý:**\n" +
             "• Sử dụng dấu gạch dưới (_) để phân cách các tham số\n" +
             "• Mô tả có thể chứa khoảng trắng\n" +
             "• Tournament sẽ tự động bắt đầu sau thời gian đăng ký\n" +
             "• Người chiến thắng sẽ được chọn ngẫu nhiên\n" +
             "• Giải thưởng sẽ được trao tự động\n" +
-            "• Có thể kết thúc sớm bằng lệnh `end` (chỉ người tạo)"
+            "• Có thể kết thúc sớm bằng lệnh `end` (chỉ người tạo)\n" +
+            "• Dùng `force` để force kết thúc nếu auto-end không hoạt động"
         )
         .setColor(config.embedColor)
         .setTimestamp();
@@ -154,6 +160,8 @@ export default Bot.createCommand({
                 return await showTournamentInfo(message, args.slice(1));
             case "end":
                 return await endTournament(message, args.slice(1));
+            case "force":
+                return await forceEndTournament(message, args.slice(1));
             case "help":
                 const helpEmbed = createHelpEmbed(message);
                 return message.reply({ embeds: [helpEmbed] });
@@ -526,6 +534,35 @@ async function endTournament(message: Message, args: string[]) {
     const embed = new EmbedBuilder()
         .setTitle("🏆 Tournament đã kết thúc!")
         .setDescription(`**${tournament.name}** đã được kết thúc thủ công.`)
+        .setColor("#ff0000")
+        .setTimestamp();
+
+    await message.reply({ embeds: [embed] });
+}
+
+async function forceEndTournament(message: Message, args: string[]) {
+    if (args.length === 0) {
+        return message.reply("❌ Thiếu ID tournament! Dùng: `n.tournament force <ID>`");
+    }
+
+    const tournamentId = args[0];
+    const tournament = tournaments[tournamentId];
+
+    if (!tournament) {
+        return message.reply("❌ Tournament không tồn tại!");
+    }
+
+    if (tournament.status !== "registration") {
+        return message.reply("❌ Tournament đã kết thúc rồi!");
+    }
+
+    // Force kết thúc tournament (không cần quyền)
+    console.log(`Force ending tournament: ${tournamentId}`);
+    await startTournament(tournamentId);
+
+    const embed = new EmbedBuilder()
+        .setTitle("🏆 Tournament đã được force kết thúc!")
+        .setDescription(`**${tournament.name}** đã được force kết thúc.`)
         .setColor("#ff0000")
         .setTimestamp();
 

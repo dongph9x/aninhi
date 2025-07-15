@@ -69,8 +69,14 @@ export default Bot.createMessageComponent<ComponentType.Button>({
             tournament.participants.push(interaction.user.id);
             tournament.currentParticipants++;
 
-            // Cập nhật button nếu tournament đầy
+            // Cập nhật embed và button
+            const { createTournamentEmbed } = await import("@/commands/text/ecommerce/tournament");
+            const updatedEmbed = createTournamentEmbed(tournament);
+            updatedEmbed.setFooter({ text: `ID: ${tournamentId} | Tạo bởi ${interaction.message.embeds[0]?.footer?.text?.split(" | ")[1] || "Unknown"}` });
+
+            let components = [];
             if (tournament.currentParticipants >= tournament.maxParticipants) {
+                // Tournament đầy - disable button
                 const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
                     new ButtonBuilder()
                         .setCustomId(`tournament_full:${tournamentId}`)
@@ -78,12 +84,24 @@ export default Bot.createMessageComponent<ComponentType.Button>({
                         .setStyle(ButtonStyle.Secondary)
                         .setDisabled(true)
                 );
-
-                // Cập nhật message gốc
-                await interaction.message.edit({
-                    components: [row],
-                });
+                components.push(row);
+            } else {
+                // Tournament còn chỗ - giữ button join
+                const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`tournament_join:${tournamentId}`)
+                        .setLabel("🎯 Tham Gia Tournament")
+                        .setStyle(ButtonStyle.Primary)
+                        .setEmoji("🏆")
+                );
+                components.push(row);
             }
+
+            // Cập nhật message gốc
+            await interaction.message.edit({
+                embeds: [updatedEmbed],
+                components: components,
+            });
 
             await interaction.reply({
                 content: `✅ Bạn đã tham gia **${tournament.name}**!\n💰 Phí đã trừ: ${tournament.entryFee.toLocaleString()} AniCoin\n👥 Người tham gia: ${tournament.currentParticipants}/${tournament.maxParticipants}`,
