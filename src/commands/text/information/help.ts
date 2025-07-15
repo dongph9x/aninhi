@@ -58,7 +58,8 @@ export default Bot.createCommand({
                     value:
                         `\`${prefix}slots\` - Máy đánh bạc\n` +
                         `\`${prefix}coinflip\` - Tung đồng xu\n` +
-                        `\`${prefix}blackjack\` - Trò chơi Blackjack`,
+                        `\`${prefix}blackjack\` - Trò chơi Blackjack\n` +
+                        `\`${prefix}roulette\` - Trò chơi Roulette`,
                     inline: false,
                 },
                 {
@@ -73,11 +74,23 @@ export default Bot.createCommand({
                     inline: false,
                 },
                 {
+                    name: "🏆 **Tournament & Sự Kiện**",
+                    value:
+                        `\`${prefix}tournament create\` - Tạo tournament\n` +
+                        `\`${prefix}tournament join\` - Tham gia tournament\n` +
+                        `\`${prefix}tournament list\` - Danh sách tournament\n` +
+                        `\`${prefix}tournament info\` - Thông tin tournament\n` +
+                        `\`${prefix}tournament vote\` - Bỏ phiếu\n` +
+                        `\`${prefix}tournament end\` - Kết thúc tournament`,
+                    inline: false,
+                },
+                {
                     name: "ℹ️ **Thông Tin & Tiện Ích**",
                     value:
                         `\`${prefix}ping\` - Kiểm tra độ trễ\n` +
                         `\`${prefix}uptime\` - Thời gian hoạt động\n` +
-                        `\`${prefix}help\` - Hiển thị danh sách lệnh`,
+                        `\`${prefix}help\` - Hiển thị danh sách lệnh\n` +
+                        `\`${prefix}test\` - Kiểm tra bot hoạt động`,
                     inline: false,
                 },
             )
@@ -155,6 +168,33 @@ function getSpecificCommandHelp(commandName: string, prefix: string): string | n
             "• Sử dụng reactions để chơi: Hit, Stand, Double Down\n" +
             "• Aliases: `bj`, `21`",
 
+        roulette:
+            "**Mô tả:** Chơi Roulette với nhiều loại cược\n\n" +
+            `**Cách dùng:** \`${prefix}roulette <loại cược> <số tiền>\`\n\n` +
+            "**Loại cược:**\n" +
+            "• `red/black` - Đỏ/Đen (2x)\n" +
+            "• `even/odd` - Chẵn/Lẻ (2x)\n" +
+            "• `high/low` - Cao/Thấp (2x)\n" +
+            "• `dozen` - Chục (3x)\n" +
+            "• `column` - Cột (3x)\n" +
+            "• `number` - Số cụ thể (36x)\n" +
+            "**Ví dụ:**\n" +
+            `• \`${prefix}roulette red 100\`\n` +
+            `• \`${prefix}roulette number 7 50\`\n` +
+            "• Aliases: `rl`, `roul`",
+
+        tournament:
+            "**Mô tả:** Hệ thống tournament và sự kiện\n\n" +
+            `**Cách dùng:** \`${prefix}tournament <hành động> [tham số]\`\n\n` +
+            "**Hành động:**\n" +
+            `• \`${prefix}tournament create <tên> <mô tả> <thời gian>\` - Tạo tournament\n` +
+            `• \`${prefix}tournament join <id>\` - Tham gia tournament\n` +
+            `• \`${prefix}tournament list\` - Xem danh sách\n` +
+            `• \`${prefix}tournament info <id>\` - Thông tin chi tiết\n` +
+            `• \`${prefix}tournament vote <id> <người chơi>\` - Bỏ phiếu\n` +
+            `• \`${prefix}tournament end <id>\` - Kết thúc tournament\n` +
+            "• Aliases: `tour`, `t`",
+
         ping:
             "**Mô tả:** Kiểm tra độ trễ của bot\n\n" +
             `**Cách dùng:** \`${prefix}ping\`\n\n` +
@@ -175,6 +215,14 @@ function getSpecificCommandHelp(commandName: string, prefix: string): string | n
             `• \`${prefix}help\` - Hiển thị tất cả lệnh\n` +
             `• \`${prefix}help daily\` - Chi tiết lệnh daily\n` +
             "• Aliases: `h`, `commands`, `cmd`",
+
+        test:
+            "**Mô tả:** Kiểm tra xem bot có hoạt động không\n\n" +
+            `**Cách dùng:** \`${prefix}test\`\n\n` +
+            "**Chức năng:**\n" +
+            "• Trả về thông báo xác nhận bot đang hoạt động\n" +
+            "• Dùng để debug khi lệnh không hoạt động\n" +
+            "• Aliases: `pingtest`",
 
         ban:
             "**Mô tả:** Ban người dùng khỏi server (vĩnh viễn hoặc tạm thời)\n\n" +
@@ -274,6 +322,11 @@ function getSpecificCommandHelp(commandName: string, prefix: string): string | n
         untimeout: "unmute",
         bans: "banlist",
         listbans: "banlist",
+        rl: "roulette",
+        roul: "roulette",
+        tour: "tournament",
+        t: "tournament",
+        pingtest: "test",
     };
 
     const actualCommand = aliases[commandName] || commandName;

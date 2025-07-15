@@ -52,12 +52,12 @@ export default Bot.createCommand({
             const embed = new EmbedBuilder()
                 .setTitle("❌ Cách Dùng Không Đúng")
                 .setDescription(
-                    "**Cách dùng:** `!ban <người dùng> [thời gian] [lý do]`\n\n" +
+                    "**Cách dùng:** `n.ban <người dùng> [thời gian] [lý do]`\n\n" +
                         "**Ví dụ:**\n" +
-                        "• `!ban @user spam`\n" +
-                        "• `!ban @user 10m spam`\n" +
-                        "• `!ban @user 2h vi phạm nội quy`\n" +
-                        "• `!ban @user 1d spam liên tục`\n\n" +
+                        "• `n.ban @user spam`\n" +
+                        "• `n.ban @user 10m spam`\n" +
+                        "• `n.ban @user 2h vi phạm nội quy`\n" +
+                        "• `n.ban @user 1d spam liên tục`\n\n" +
                         "**Đơn vị thời gian:**\n" +
                         "• `s` - giây (ví dụ: 30s)\n" +
                         "• `m` - phút (ví dụ: 10m)\n" +
