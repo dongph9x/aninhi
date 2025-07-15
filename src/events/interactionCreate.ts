@@ -38,6 +38,30 @@ export default Bot.createEvent({
 
             const { t, locale } = await i18n(interaction.guildId);
 
+            // Kiểm tra xem có phải tournament button không
+            if (interaction.customId.startsWith("tournament_")) {
+                console.log("Tournament button clicked:", interaction.customId);
+                
+                const component = client.components.message.get("TournamentJoin");
+                console.log("TournamentJoin component found:", !!component);
+                
+                if (component && interaction.componentType === component.type) {
+                    try {
+                        // Không dùng filter.slash cho button interaction
+                        component.run({ client, interaction, t, locale, data: null });
+                    } catch (error) {
+                        // Kiểm tra xem interaction đã được reply chưa
+                        if (!interaction.replied && !interaction.deferred) {
+                            interaction.reply(`${emojis.error} | ${t("errors.unknown")}`);
+                        }
+                        logger.error({ id: interaction.customId, error });
+                    }
+                } else {
+                    console.log("Component not found or wrong type");
+                }
+                return;
+            }
+
             try {
                 const payload: CustomIdData = JSON.parse(interaction.customId);
                 const component = client.components.message.get(payload.n);

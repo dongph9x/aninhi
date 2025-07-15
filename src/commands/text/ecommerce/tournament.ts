@@ -1,4 +1,4 @@
-import { EmbedBuilder, Message } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Message } from "discord.js";
 
 import { Bot } from "@/classes";
 import { config } from "@/config";
@@ -105,10 +105,12 @@ function createHelpEmbed(message: Message): EmbedBuilder {
             "**Kết thúc sớm:** `n.tournament end <ID>`\n\n" +
             "**Ví dụ:**\n" +
             "• `n.tournament create_Giải đấu mùa hè_Giải đấu thường niên_1000_50000_8_30`\n" +
+            "• `n.tournament create_Tournament Test_Test tự động kết thúc_100_1000_2_1`\n" +
             "• `n.tournament join abc123`\n" +
             "• `n.tournament end abc123`\n\n" +
             "**Lưu ý:**\n" +
             "• Sử dụng dấu gạch dưới (_) để phân cách các tham số\n" +
+            "• Mô tả có thể chứa khoảng trắng\n" +
             "• Tournament sẽ tự động bắt đầu sau thời gian đăng ký\n" +
             "• Người chiến thắng sẽ được chọn ngẫu nhiên\n" +
             "• Giải thưởng sẽ được trao tự động\n" +
@@ -182,12 +184,32 @@ async function createTournament(message: Message, args: string[]) {
         return message.reply("❌ Thiếu tham số! Dùng: `n.tournament create_<tên>_<mô tả>_<phí>_<giải thưởng>_<số người>_<thời gian>`");
     }
 
+    // Xử lý mô tả có thể chứa khoảng trắng
     const name = parts[1];
-    const description = parts[2];
-    const entryFee = parseInt(parts[3]);
-    const prizePool = parseInt(parts[4]);
-    const maxParticipants = parseInt(parts[5]);
-    const durationMinutes = parseInt(parts[6]) || 60;
+    let description = parts[2];
+    let entryFee = parseInt(parts[3]);
+    let prizePool = parseInt(parts[4]);
+    let maxParticipants = parseInt(parts[5]);
+    let durationMinutes = parseInt(parts[6]) || 60;
+
+    // Nếu có nhiều hơn 7 parts, có thể mô tả chứa khoảng trắng
+    if (parts.length > 7) {
+        // Tìm vị trí của các số cuối
+        const lastNumberIndex = parts.findIndex((part, index) => {
+            if (index < 2) return false; // Bỏ qua "create" và name
+            const num = parseInt(part);
+            return !isNaN(num) && index >= parts.length - 4; // 4 số cuối
+        });
+
+        if (lastNumberIndex >= 3) {
+            // Ghép lại mô tả từ parts[2] đến parts[lastNumberIndex-1]
+            description = parts.slice(2, lastNumberIndex).join(" ");
+            entryFee = parseInt(parts[lastNumberIndex]);
+            prizePool = parseInt(parts[lastNumberIndex + 1]);
+            maxParticipants = parseInt(parts[lastNumberIndex + 2]);
+            durationMinutes = parseInt(parts[lastNumberIndex + 3]) || 60;
+        }
+    }
 
     // Kiểm tra các tham số
     if (!name || !description) {
@@ -237,7 +259,16 @@ async function createTournament(message: Message, args: string[]) {
     const embed = createTournamentEmbed(tournament);
     embed.setFooter({ text: `ID: ${tournamentId} | Tạo bởi ${message.author.username}` });
 
-    await message.reply({ embeds: [embed] });
+    // Tạo button join
+    const joinButton = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`tournament_join:${tournamentId}`)
+            .setLabel("🎯 Tham Gia Tournament")
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji("🏆")
+    );
+
+    await message.reply({ embeds: [embed], components: [joinButton] });
 
     console.log(`Tournament ${tournamentId} đã được tạo, sẽ kết thúc lúc: ${endTime.toLocaleString()}`);
 }
@@ -310,7 +341,36 @@ async function listTournaments(message: Message) {
         .setColor(config.embedColor)
         .setTimestamp();
 
-    await message.reply({ embeds: [embed] });
+    // Tạo buttons cho các tournament đang đăng ký
+    const components = [];
+    const activeTournaments = guildTournaments.filter(t => 
+        t.status === "registration" && 
+        !t.participants.includes(message.author.id) &&
+        t.currentParticipants < t.maxParticipants
+    );
+
+    if (activeTournaments.length > 0) {
+        const joinButtons = activeTournaments.slice(0, 5).map(t => 
+            new ButtonBuilder()
+                .setCustomId(`tournament_join:${t.id}`)
+                .setLabel(`Join ${t.name.slice(0, 10)}...`)
+                .setStyle(ButtonStyle.Primary)
+                .setEmoji("🏆")
+        );
+
+        // Chia buttons thành các hàng (tối đa 5 buttons/hàng)
+        for (let i = 0; i < joinButtons.length; i += 5) {
+            const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                joinButtons.slice(i, i + 5)
+            );
+            components.push(row);
+        }
+    }
+
+    await message.reply({ 
+        embeds: [embed], 
+        components: components.length > 0 ? components : undefined 
+    });
 }
 
 async function showTournamentInfo(message: Message, args: string[]) {
@@ -335,7 +395,20 @@ async function showTournamentInfo(message: Message, args: string[]) {
         });
     }
 
-    await message.reply({ embeds: [embed] });
+    // Tạo button join nếu tournament còn đang đăng ký
+    let components = [];
+    if (tournament.status === "registration" && !tournament.participants.includes(message.author.id)) {
+        const joinButton = new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`tournament_join:${tournamentId}`)
+                .setLabel("🎯 Tham Gia Tournament")
+                .setStyle(ButtonStyle.Primary)
+                .setEmoji("🏆")
+        );
+        components.push(joinButton);
+    }
+
+    await message.reply({ embeds: [embed], components: components.length > 0 ? components : undefined });
 }
 
 async function startTournament(tournamentId: string) {
