@@ -5,6 +5,7 @@ import { Bot } from "@/classes";
 import type { MessageComponentProps } from "@/typings";
 import { importDefault } from "@/utils/import";
 import { logger } from "@/utils/logger";
+import { EmbedBuilder } from "@discordjs/builders";
 
 export default Bot.createHandler({
     run: async client => {
