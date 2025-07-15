@@ -59,7 +59,8 @@ export default Bot.createCommand({
                         `\`${prefix}slots\` - Máy đánh bạc\n` +
                         `\`${prefix}coinflip\` - Tung đồng xu\n` +
                         `\`${prefix}blackjack\` - Trò chơi Blackjack\n` +
-                        `\`${prefix}roulette\` - Trò chơi Roulette`,
+                        `\`${prefix}roulette\` - Trò chơi Roulette\n` +
+                        `\`${prefix}fishing\` - Câu cá kiếm tiền`,
                     inline: false,
                 },
                 {
@@ -194,6 +195,22 @@ function getSpecificCommandHelp(commandName: string, prefix: string): string | n
             "**Ví dụ:**\n" +
             `• \`${prefix}tournament create_Giải đấu test_Test tự động kết thúc_100_1000_2_1\`\n` +
             "• Aliases: `tour`, `t`",
+
+        fishing:
+            "**Mô tả:** Hệ thống câu cá kiếm AniCoin\n\n" +
+            `**Cách dùng:** \`${prefix}fishing <hành động>\`\n\n` +
+            "**Hành động:**\n" +
+            `• \`${prefix}fishing\` - Câu cá\n` +
+            `• \`${prefix}fishing shop\` - Xem cửa hàng cần câu/mồi\n` +
+            `• \`${prefix}fishing stats\` - Xem thống kê câu cá\n` +
+            `• \`${prefix}fishing buy rod <loại>\` - Mua cần câu\n` +
+            `• \`${prefix}fishing buy bait <loại>\` - Mua mồi\n` +
+            `• \`${prefix}fishing help\` - Hướng dẫn chi tiết\n` +
+            "**Loại cần câu:** `copper`, `silver`, `gold`, `diamond`\n" +
+            "**Loại mồi:** `good`, `premium`, `divine`\n" +
+            "**Cooldown:** 30 giây\n" +
+            "**Chi phí:** 10 AniCoin/lần\n" +
+            "• Aliases: `fish`, `cau`",
 
         ping:
             "**Mô tả:** Kiểm tra độ trễ của bot\n\n" +
