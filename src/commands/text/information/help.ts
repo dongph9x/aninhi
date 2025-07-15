@@ -80,7 +80,6 @@ export default Bot.createCommand({
                         `\`${prefix}tournament join\` - Tham gia tournament\n` +
                         `\`${prefix}tournament list\` - Danh sách tournament\n` +
                         `\`${prefix}tournament info\` - Thông tin tournament\n` +
-                        `\`${prefix}tournament vote\` - Bỏ phiếu\n` +
                         `\`${prefix}tournament end\` - Kết thúc tournament`,
                     inline: false,
                 },
@@ -187,12 +186,13 @@ function getSpecificCommandHelp(commandName: string, prefix: string): string | n
             "**Mô tả:** Hệ thống tournament và sự kiện\n\n" +
             `**Cách dùng:** \`${prefix}tournament <hành động> [tham số]\`\n\n` +
             "**Hành động:**\n" +
-            `• \`${prefix}tournament create <tên> <mô tả> <thời gian>\` - Tạo tournament\n` +
+            `• \`${prefix}tournament create_<tên>_<mô tả>_<phí>_<giải thưởng>_<số người>_<thời gian>\` - Tạo tournament\n` +
             `• \`${prefix}tournament join <id>\` - Tham gia tournament\n` +
             `• \`${prefix}tournament list\` - Xem danh sách\n` +
             `• \`${prefix}tournament info <id>\` - Thông tin chi tiết\n` +
-            `• \`${prefix}tournament vote <id> <người chơi>\` - Bỏ phiếu\n` +
             `• \`${prefix}tournament end <id>\` - Kết thúc tournament\n` +
+            "**Ví dụ:**\n" +
+            `• \`${prefix}tournament create_Giải đấu test_Test tự động kết thúc_100_1000_2_1\`\n` +
             "• Aliases: `tour`, `t`",
 
         ping:

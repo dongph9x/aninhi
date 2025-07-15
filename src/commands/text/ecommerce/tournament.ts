@@ -98,16 +98,17 @@ function createHelpEmbed(message: Message): EmbedBuilder {
     const embed = new EmbedBuilder()
         .setTitle("🏆 Tournament System - Hướng dẫn")
         .setDescription(
-            "**Tạo tournament:** `n.tournament create <tên> <mô tả> <phí đăng ký> <giải thưởng> <số người tham gia> <thời gian (phút)>`\n" +
+            "**Tạo tournament:** `n.tournament create_<tên>_<mô tả>_<phí đăng ký>_<giải thưởng>_<số người tham gia>_<thời gian (phút)>`\n" +
             "**Tham gia:** `n.tournament join <ID>`\n" +
             "**Xem danh sách:** `n.tournament list`\n" +
             "**Xem chi tiết:** `n.tournament info <ID>`\n" +
             "**Kết thúc sớm:** `n.tournament end <ID>`\n\n" +
             "**Ví dụ:**\n" +
-            "• `n.tournament create \"Giải đấu mùa hè\" \"Giải đấu thường niên\" 1000 50000 8 30`\n" +
+            "• `n.tournament create_Giải đấu mùa hè_Giải đấu thường niên_1000_50000_8_30`\n" +
             "• `n.tournament join abc123`\n" +
             "• `n.tournament end abc123`\n\n" +
             "**Lưu ý:**\n" +
+            "• Sử dụng dấu gạch dưới (_) để phân cách các tham số\n" +
             "• Tournament sẽ tự động bắt đầu sau thời gian đăng ký\n" +
             "• Người chiến thắng sẽ được chọn ngẫu nhiên\n" +
             "• Giải thưởng sẽ được trao tự động\n" +
@@ -155,73 +156,55 @@ export default Bot.createCommand({
                 const helpEmbed = createHelpEmbed(message);
                 return message.reply({ embeds: [helpEmbed] });
             default:
+                // Kiểm tra xem có phải format create_... không
+                if (subCommand.startsWith("create_")) {
+                    const createArgs = message.content.split(" ").slice(1); // Lấy tất cả arguments
+                    return await createTournament(message, createArgs);
+                }
                 return message.reply("❌ Lệnh không hợp lệ! Dùng `n.tournament help` để xem hướng dẫn.");
         }
     },
 });
 
 async function createTournament(message: Message, args: string[]) {
-    if (args.length < 4) {
-        return message.reply("❌ Thiếu tham số! Dùng: `n.tournament create <tên> <mô tả> <phí đăng ký> <giải thưởng> <số người tham gia> <thời gian (phút)>`");
+    // Xử lý format: create_tên_mô tả_phí_giải thưởng_số người_thời gian
+    let fullCommand = args.join(" ");
+    
+    // Kiểm tra xem có phải format create_... không
+    if (!fullCommand.startsWith("create_")) {
+        return message.reply("❌ Format không đúng! Dùng: `n.tournament create_<tên>_<mô tả>_<phí>_<giải thưởng>_<số người>_<thời gian>`");
     }
 
-    // Xử lý tên và mô tả có thể có nhiều từ
-    let name = args[0];
-    let description = args[1];
-    let currentIndex = 2;
-
-    // Nếu tên có dấu ngoặc kép, tìm phần cuối
-    if (name.startsWith('"') && !name.endsWith('"')) {
-        for (let i = 1; i < args.length; i++) {
-            name += " " + args[i];
-            if (args[i].endsWith('"')) {
-                name = name.slice(1, -1); // Bỏ dấu ngoặc kép
-                currentIndex = i + 1;
-                break;
-            }
-        }
-    } else if (name.startsWith('"') && name.endsWith('"')) {
-        name = name.slice(1, -1); // Bỏ dấu ngoặc kép
+    // Split theo dấu gạch dưới
+    const parts = fullCommand.split("_");
+    
+    if (parts.length < 7) {
+        return message.reply("❌ Thiếu tham số! Dùng: `n.tournament create_<tên>_<mô tả>_<phí>_<giải thưởng>_<số người>_<thời gian>`");
     }
 
-    // Nếu mô tả có dấu ngoặc kép, tìm phần cuối
-    if (currentIndex < args.length) {
-        description = args[currentIndex];
-        if (description.startsWith('"') && !description.endsWith('"')) {
-            for (let i = currentIndex + 1; i < args.length; i++) {
-                description += " " + args[i];
-                if (args[i].endsWith('"')) {
-                    description = description.slice(1, -1); // Bỏ dấu ngoặc kép
-                    currentIndex = i + 1;
-                    break;
-                }
-            }
-        } else if (description.startsWith('"') && description.endsWith('"')) {
-            description = description.slice(1, -1); // Bỏ dấu ngoặc kép
-            currentIndex++;
-        } else {
-            currentIndex++;
-        }
+    const name = parts[1];
+    const description = parts[2];
+    const entryFee = parseInt(parts[3]);
+    const prizePool = parseInt(parts[4]);
+    const maxParticipants = parseInt(parts[5]);
+    const durationMinutes = parseInt(parts[6]) || 60;
+
+    // Kiểm tra các tham số
+    if (!name || !description) {
+        return message.reply("❌ Tên và mô tả không được để trống!");
     }
 
-    // Lấy các tham số số
-    const entryFee = parseInt(args[currentIndex]);
-    const prizePool = parseInt(args[currentIndex + 1]);
-    const maxParticipants = parseInt(args[currentIndex + 2]);
-    const durationMinutes = parseInt(args[currentIndex + 3]) || 60;
-
-    // Debug: Kiểm tra từng tham số
     if (isNaN(entryFee)) {
-        return message.reply(`❌ Phí đăng ký không hợp lệ: "${args[currentIndex]}"`);
+        return message.reply(`❌ Phí đăng ký không hợp lệ: "${parts[3]}"`);
     }
     if (isNaN(prizePool)) {
-        return message.reply(`❌ Giải thưởng không hợp lệ: "${args[currentIndex + 1]}"`);
+        return message.reply(`❌ Giải thưởng không hợp lệ: "${parts[4]}"`);
     }
     if (isNaN(maxParticipants)) {
-        return message.reply(`❌ Số người tham gia không hợp lệ: "${args[currentIndex + 2]}"`);
+        return message.reply(`❌ Số người tham gia không hợp lệ: "${parts[5]}"`);
     }
     if (isNaN(durationMinutes)) {
-        return message.reply(`❌ Thời gian không hợp lệ: "${args[currentIndex + 3]}"`);
+        return message.reply(`❌ Thời gian không hợp lệ: "${parts[6]}"`);
     }
 
     if (entryFee < 0 || prizePool < 0 || maxParticipants < 2) {
