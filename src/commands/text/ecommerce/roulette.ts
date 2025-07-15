@@ -201,7 +201,7 @@ function createRouletteEmbed(
             `💰 **Số tiền:** ${betAmount.toLocaleString()} AniCoin\n` +
             `🎲 **Kết quả:** ${colorEmoji} **${result}**\n\n` +
             (won
-                ? `🎉 **THẮNG!** +${winnings.toLocaleString()} AniCoin\n`
+                ? `🎉 **THẮNG!** +${(winnings - betAmount).toLocaleString()} AniCoin\n`
                 : `❌ **THUA!** -${betAmount.toLocaleString()} AniCoin`
             ),
         )
@@ -332,7 +332,7 @@ export default Bot.createCommand({
             // Kiểm tra thắng thua
             const won = checkWin(betInfo.type, betInfo.value, result);
             const betTypeInfo = betTypes[betInfo.type as keyof typeof betTypes];
-            const winnings = won ? (betAmount as number) * betTypeInfo.payout : 0;
+            const winnings = won ? (betAmount as number) * (betTypeInfo.payout + 1) : 0;
 
             // Cộng tiền nếu thắng
             if (won) {
