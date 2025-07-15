@@ -201,8 +201,8 @@ function createRouletteEmbed(
             `💰 **Số tiền:** ${betAmount.toLocaleString()} AniCoin\n` +
             `🎲 **Kết quả:** ${colorEmoji} **${result}**\n\n` +
             (won
-                ? `🎉 **THẮNG!** +${winnings.toLocaleString()} AniCoin\n` +
-                  `💵 **Tổng nhận:** ${(betAmount + winnings).toLocaleString()} AniCoin`
+                ? `🎉 **THẮNG!** +${(winnings - betAmount).toLocaleString()} AniCoin\n` +
+                  `💵 **Tổng nhận:** ${winnings.toLocaleString()} AniCoin`
                 : `❌ **THUA!** -${betAmount.toLocaleString()} AniCoin`
             ),
         )
