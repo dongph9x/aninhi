@@ -4,7 +4,7 @@ import { Bot } from "@/classes";
 import { config } from "@/config";
 import { addMoney, getBalance, recordGame, subtractMoney } from "@/utils/ecommerce";
 
-const maxBet = 1000;
+const maxBet = 300000;
 const minBet = 10;
 
 // Các loại cược và tỷ lệ thắng

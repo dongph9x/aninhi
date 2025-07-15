@@ -3,7 +3,7 @@ import { EmbedBuilder } from "discord.js";
 import { Bot } from "@/classes";
 import { addMoney, getBalance, subtractMoney } from "@/utils/ecommerce";
 
-const maxBet = 100;
+const maxBet = 300000;
 const slots = ["🍆", "❤️", "🍒", "🪙", "😊", "😄"];
 const moving = "🎰";
 
