@@ -58,15 +58,22 @@ export class EcommerceService {
                 throw new Error("Số tiền phải lớn hơn 0");
             }
 
-            const user = await prisma.user.update({
+            // Đảm bảo user tồn tại trước khi update
+            const user = await prisma.user.upsert({
                 where: {
                     userId_guildId: {
                         userId,
                         guildId
                     }
                 },
-                data: {
+                update: {
                     balance: { increment: amount }
+                },
+                create: {
+                    userId,
+                    guildId,
+                    balance: amount,
+                    dailyStreak: 0
                 }
             });
 
