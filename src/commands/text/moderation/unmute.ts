@@ -1,6 +1,7 @@
 import { EmbedBuilder } from "discord.js";
 
 import { Bot } from "@/classes";
+import { ModerationService } from "@/utils/moderation";
 
 export default Bot.createCommand({
     structure: {
@@ -92,6 +93,17 @@ export default Bot.createCommand({
 
             // Perform the unmute
             await targetMember.timeout(null, `Unmute by ${message.author.username}`);
+
+            // Ghi lại moderation log
+            await ModerationService.logAction({
+                guildId: message.guildId!,
+                targetUserId: targetUser.id,
+                moderatorId: message.author.id,
+                action: "unmute",
+                reason: "Manual unmute",
+                channelId: message.channelId,
+                messageId: message.id
+            });
 
             // Create embed
             const embed = new EmbedBuilder()

@@ -1,6 +1,7 @@
 import { EmbedBuilder } from "discord.js";
 
 import { Bot } from "@/classes";
+import { ModerationService } from "@/utils/moderation";
 
 export default Bot.createCommand({
     structure: {
@@ -99,6 +100,17 @@ export default Bot.createCommand({
 
             // Perform the kick
             await targetMember.kick(`Kick by ${message.author.username}: ${reason}`);
+
+            // Ghi lại moderation log
+            await ModerationService.logAction({
+                guildId: message.guildId!,
+                targetUserId: targetUser.id,
+                moderatorId: message.author.id,
+                action: "kick",
+                reason: reason,
+                channelId: message.channelId,
+                messageId: message.id
+            });
 
             // Create embed
             const embed = new EmbedBuilder()

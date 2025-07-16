@@ -2,7 +2,7 @@ import { EmbedBuilder } from "discord.js";
 
 import { Bot } from "@/classes";
 import { config } from "@/config";
-import { getBalance, getUser } from "@/utils/ecommerce";
+import { ecommerceDB } from "@/utils/ecommerce-db";
 
 export default Bot.createCommand({
     structure: {
@@ -14,24 +14,45 @@ export default Bot.createCommand({
         const guildId = message.guildId!;
 
         try {
-            const balance = await getBalance(userId, guildId);
-            const user = await getUser(userId, guildId);
+            // Lấy thông tin user từ database
+            const user = await ecommerceDB.getUser(userId, guildId);
+            
+            // Lấy lịch sử giao dịch gần nhất
+            const recentTransactions = await ecommerceDB.getUserTransactions(userId, guildId, 5);
 
             const embed = new EmbedBuilder()
-                .setTitle("💰 Số Dư")
+                .setTitle("💰 Thông Tin Tài Khoản")
                 .setDescription(
-                    `Số dư của **${message.author.username}**:\n\n` +
-                        `💎 **AniCoin:** ${balance.toLocaleString()}\n` +
+                    `**${message.author.username}**\n\n` +
+                        `💎 **Số dư hiện tại:** ${user.balance.toLocaleString()} AniCoin\n` +
                         `🔥 **Chuỗi hàng ngày:** ${user.dailyStreak} ngày\n` +
-                        `📅 **Tài khoản tạo:** <t:${Math.floor(new Date(user.createdAt).getTime() / 1000)}:R>`,
+                        `📅 **Tham gia từ:** ${user.createdAt.toLocaleDateString('vi-VN')}\n` +
+                        `🔄 **Cập nhật lần cuối:** ${user.updatedAt.toLocaleDateString('vi-VN')}`
                 )
                 .setColor(config.embedColor)
                 .setThumbnail(message.author.displayAvatarURL())
                 .setFooter({
-                    text: `ID người dùng: ${userId}`,
+                    text: `ID: ${userId} | Database Version`,
                     iconURL: message.author.displayAvatarURL(),
                 })
                 .setTimestamp();
+
+            // Thêm lịch sử giao dịch gần nhất
+            if (recentTransactions.length > 0) {
+                const transactionList = recentTransactions
+                    .map(tx => {
+                        const emoji = tx.amount > 0 ? "➕" : "➖";
+                        const date = tx.createdAt.toLocaleDateString('vi-VN');
+                        return `${emoji} **${Math.abs(tx.amount).toLocaleString()}** AniCoin - ${tx.description || tx.type} (${date})`;
+                    })
+                    .join('\n');
+
+                embed.addFields({
+                    name: "📊 Lịch Sử Giao Dịch Gần Nhất",
+                    value: transactionList,
+                    inline: false,
+                });
+            }
 
             message.reply({ embeds: [embed] });
         } catch (error) {
@@ -39,7 +60,7 @@ export default Bot.createCommand({
 
             const errorEmbed = new EmbedBuilder()
                 .setTitle("❌ Lỗi")
-                .setDescription("Đã xảy ra lỗi khi lấy số dư. Vui lòng thử lại sau.")
+                .setDescription("Đã xảy ra lỗi khi lấy thông tin tài khoản. Vui lòng thử lại sau.")
                 .setColor("#ff0000")
                 .setTimestamp();
 

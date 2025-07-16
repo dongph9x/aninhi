@@ -1,0 +1,313 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String                  @id @default(cuid())
+  userId       String
+  guildId      String
+  balance      Int                     @default(0)
+  dailyStreak  Int                     @default(0)
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  dailyClaims  DailyClaim[]
+  fishingData  FishingData?
+  gameStats    GameStats[]
+  inventory    Inventory?
+  tournaments  TournamentParticipant[]
+  transactions Transaction[]
+
+  @@unique([userId, guildId])
+  @@index([userId])
+  @@index([guildId])
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  userId      String
+  guildId     String
+  amount      Int
+  type        String
+  description String?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId, guildId], references: [userId, guildId])
+
+  @@index([userId, guildId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model DailyClaim {
+  id        String   @id @default(cuid())
+  userId    String
+  guildId   String
+  claimedAt DateTime @default(now())
+  user      User     @relation(fields: [userId, guildId], references: [userId, guildId])
+
+  @@unique([userId, guildId, claimedAt])
+  @@index([userId, guildId])
+}
+
+model GameStats {
+  id          String   @id @default(cuid())
+  userId      String
+  guildId     String
+  gameType    String
+  gamesPlayed Int      @default(0)
+  gamesWon    Int      @default(0)
+  totalBet    Int      @default(0)
+  totalWon    Int      @default(0)
+  totalLost   Int      @default(0)
+  biggestWin  Int      @default(0)
+  biggestLoss Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId, guildId], references: [userId, guildId])
+
+  @@unique([userId, guildId, gameType])
+  @@index([userId, guildId])
+  @@index([gameType])
+}
+
+model FishingData {
+  id            String        @id @default(cuid())
+  userId        String
+  guildId       String
+  totalFish     Int           @default(0)
+  totalEarnings Int           @default(0)
+  biggestFish   String        @default("")
+  biggestValue  Int           @default(0)
+  rarestFish    String        @default("")
+  rarestRarity  String        @default("")
+  fishingTime   Int           @default(0)
+  currentRod    String        @default("basic")
+  currentBait   String        @default("basic")
+  lastFished    DateTime      @default(now())
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  fish          CaughtFish[]
+  baits         FishingBait[]
+  user          User          @relation(fields: [userId, guildId], references: [userId, guildId])
+  rods          FishingRod[]
+
+  @@unique([userId, guildId])
+  @@index([userId, guildId])
+}
+
+model FishingRod {
+  id            String      @id @default(cuid())
+  fishingDataId String
+  rodType       String
+  durability    Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  fishingData   FishingData @relation(fields: [fishingDataId], references: [id], onDelete: Cascade)
+
+  @@unique([fishingDataId, rodType])
+  @@index([fishingDataId])
+}
+
+model FishingBait {
+  id            String      @id @default(cuid())
+  fishingDataId String
+  baitType      String
+  quantity      Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  fishingData   FishingData @relation(fields: [fishingDataId], references: [id], onDelete: Cascade)
+
+  @@unique([fishingDataId, baitType])
+  @@index([fishingDataId])
+}
+
+model CaughtFish {
+  id            String      @id @default(cuid())
+  fishingDataId String
+  fishName      String
+  fishRarity    String
+  fishValue     Int         @default(0)
+  quantity      Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  fishingData   FishingData @relation(fields: [fishingDataId], references: [id], onDelete: Cascade)
+
+  @@unique([fishingDataId, fishName])
+  @@index([fishingDataId])
+  @@index([fishRarity])
+}
+
+model Tournament {
+  id                  String                  @id @default(cuid())
+  name                String
+  description         String
+  entryFee            Int
+  prizePool           Int
+  maxParticipants     Int
+  currentParticipants Int                     @default(0)
+  status              String
+  startTime           DateTime
+  endTime             DateTime
+  createdBy           String
+  guildId             String
+  channelId           String
+  winnerId            String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  participants        TournamentParticipant[]
+  messages            TournamentMessage[]     @relation("TournamentMessages")
+
+  @@index([guildId])
+  @@index([status])
+  @@index([createdBy])
+  @@index([winnerId])
+}
+
+model TournamentParticipant {
+  id           String     @id @default(cuid())
+  tournamentId String
+  userId       String
+  guildId      String
+  joinedAt     DateTime   @default(now())
+  user         User       @relation(fields: [userId, guildId], references: [userId, guildId])
+  tournament   Tournament @relation(fields: [tournamentId], references: [id])
+
+  @@unique([tournamentId, userId])
+  @@index([tournamentId])
+  @@index([userId, guildId])
+}
+
+model TournamentMessage {
+  id           String   @id @default(cuid())
+  tournamentId String
+  messageId    String
+  channelId    String
+  guildId      String
+  createdAt    DateTime @default(now())
+
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], name: "TournamentMessages")
+
+  @@index([tournamentId])
+  @@index([guildId])
+  @@index([channelId])
+  @@index([messageId])
+}
+
+model Inventory {
+  id        String          @id @default(cuid())
+  userId    String
+  guildId   String
+  capacity  Int             @default(20)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  user      User            @relation(fields: [userId, guildId], references: [userId, guildId])
+  items     InventoryItem[]
+
+  @@unique([userId, guildId])
+  @@index([userId, guildId])
+}
+
+model InventoryItem {
+  id            String    @id @default(cuid())
+  inventoryId   String
+  itemId        String
+  itemName      String
+  itemType      String
+  itemRarity    String
+  quantity      Int       @default(1)
+  durability    Int?
+  maxDurability Int?
+  enchantments  String?
+  customData    String?
+  isEquipped    Boolean   @default(false)
+  equippedSlot  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  inventory     Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  @@index([inventoryId])
+  @@index([itemId])
+  @@index([itemType])
+  @@index([itemRarity])
+  @@index([isEquipped])
+}
+
+model ItemTemplate {
+  id            String   @id @default(cuid())
+  itemId        String   @unique
+  itemName      String
+  itemType      String
+  itemRarity    String
+  description   String
+  baseValue     Int      @default(0)
+  maxStack      Int      @default(1)
+  maxDurability Int?
+  baseStats     String?
+  effects       String?
+  requirements  String?
+  isTradeable   Boolean  @default(true)
+  isDroppable   Boolean  @default(true)
+  isConsumable  Boolean  @default(false)
+  category      String
+  subcategory   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([itemId])
+  @@index([itemType])
+  @@index([itemRarity])
+  @@index([category])
+}
+
+model ModerationLog {
+  id           String   @id @default(cuid())
+  guildId      String
+  targetUserId String
+  moderatorId  String
+  action       String
+  reason       String?
+  duration     Int?
+  amount       Int?
+  channelId    String?
+  messageId    String?
+  createdAt    DateTime @default(now())
+
+  @@index([guildId])
+  @@index([targetUserId])
+  @@index([moderatorId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model SystemSettings {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+
+  @@index([key])
+}
+
+model BanRecord {
+  id          String    @id @default(cuid())
+  userId      String
+  guildId     String
+  moderatorId String
+  reason      String
+  banAt       DateTime  @default(now())
+  expiresAt   DateTime?
+  type        String
+  isActive    Boolean   @default(true)
+
+  @@unique([userId, guildId])
+  @@index([userId])
+  @@index([guildId])
+  @@index([moderatorId])
+  @@index([isActive])
+  @@index([expiresAt])
+}

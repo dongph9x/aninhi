@@ -1,6 +1,7 @@
 import { EmbedBuilder, PermissionFlagsBits } from "discord.js";
 
 import { Bot } from "@/classes";
+import { ModerationService } from "@/utils/moderation";
 
 // Helper function to parse duration
 function parseDuration(durationStr: string): { duration: number | null; unit: string } {
@@ -188,6 +189,18 @@ export default Bot.createCommand({
 
             // Perform the timeout
             await targetMember.timeout(duration, `Mute by ${message.author.username}: ${reason}`);
+
+            // Ghi lại moderation log
+            await ModerationService.logAction({
+                guildId: message.guildId!,
+                targetUserId: targetUser.id,
+                moderatorId: message.author.id,
+                action: "mute",
+                reason: reason,
+                duration: duration,
+                channelId: message.channelId,
+                messageId: message.id
+            });
 
             // Create embed
             const embed = new EmbedBuilder()

@@ -1,7 +1,7 @@
 import { EmbedBuilder } from "discord.js";
 
 import { Bot } from "@/classes";
-import { getBalance, transferMoney } from "@/utils/ecommerce";
+import { ecommerceDB } from "@/utils/ecommerce-db";
 
 // Interface cho target user
 interface TargetUser {
@@ -33,7 +33,7 @@ export default Bot.createCommand({
         }
 
         try {
-                        // Lấy target user từ mention hoặc ID
+            // Lấy target user từ mention hoặc ID
             let targetUser: TargetUser | undefined = message.mentions.users.first() || undefined;
             
             // Nếu không có mention, thử parse từ args[0] như ID
@@ -82,31 +82,15 @@ export default Bot.createCommand({
             console.log("- User ID:", userId);
 
             // Kiểm tra xem có phải chuyển cho chính mình không
-            // if (targetUser.id === userId) {
-            //     const embed = new EmbedBuilder()
-            //         .setTitle("❌ Không Thể Chuyển Cho Chính Mình")
-            //         .setDescription(
-            //             "Bạn không thể chuyển tiền cho chính mình!\n\n" +
-            //             "**Cách sử dụng đúng:**\n" +
-            //             "• `n.give @user_other 1000` - Chuyển cho user khác\n" +
-            //             "• `n.give 123456789012345678 1000` - Chuyển bằng ID\n\n" +
-            //             "**Lưu ý:** Đảm bảo bạn mention hoặc nhập ID của user khác, không phải chính mình.",
-            //         )
-            //         .setColor("#ff0000")
-            //         .setTimestamp();
-
-            //     return message.reply({ embeds: [embed] });
-            // }
-
-            const currentBalance = await getBalance(userId, guildId);
-            if (currentBalance < amount) {
+            if (targetUser.id === userId) {
                 const embed = new EmbedBuilder()
-                    .setTitle("❌ Số Dư Không Đủ")
+                    .setTitle("❌ Không Thể Chuyển Cho Chính Mình")
                     .setDescription(
-                        "Bạn không có đủ AniCoin!\n\n" +
-                            `**Số dư hiện tại:** ${currentBalance.toLocaleString()} AniCoin\n` +
-                            `**Số tiền muốn chuyển:** ${amount.toLocaleString()} AniCoin\n` +
-                            `**Thiếu:** ${(amount - currentBalance).toLocaleString()} AniCoin`,
+                        "Bạn không thể chuyển tiền cho chính mình!\n\n" +
+                        "**Cách sử dụng đúng:**\n" +
+                        "• `n.give @user_other 1000` - Chuyển cho user khác\n" +
+                        "• `n.give 123456789012345678 1000` - Chuyển bằng ID\n\n" +
+                        "**Lưu ý:** Đảm bảo bạn mention hoặc nhập ID của user khác, không phải chính mình.",
                     )
                     .setColor("#ff0000")
                     .setTimestamp();
@@ -114,26 +98,52 @@ export default Bot.createCommand({
                 return message.reply({ embeds: [embed] });
             }
 
-            const result = await transferMoney(
-                userId,
-                targetUser.id,
-                guildId,
-                amount,
-                "User transfer",
-            );
+            // Kiểm tra số dư hiện tại
+            const currentUser = await ecommerceDB.getUser(userId, guildId);
+            if (currentUser.balance < amount) {
+                const embed = new EmbedBuilder()
+                    .setTitle("❌ Số Dư Không Đủ")
+                    .setDescription(
+                        "Bạn không có đủ AniCoin!\n\n" +
+                            `**Số dư hiện tại:** ${currentUser.balance.toLocaleString()} AniCoin\n` +
+                            `**Số tiền muốn chuyển:** ${amount.toLocaleString()} AniCoin\n` +
+                            `**Thiếu:** ${(amount - currentUser.balance).toLocaleString()} AniCoin`,
+                    )
+                    .setColor("#ff0000")
+                    .setTimestamp();
+
+                return message.reply({ embeds: [embed] });
+            }
+
+            // Thực hiện transfer sử dụng database
+            const result = await ecommerceDB.transferMoney(userId, targetUser.id, guildId, amount);
+
+            if (!result.success) {
+                const embed = new EmbedBuilder()
+                    .setTitle("❌ Chuyển Tiền Thất Bại")
+                    .setDescription(result.message)
+                    .setColor("#ff0000")
+                    .setTimestamp();
+
+                return message.reply({ embeds: [embed] });
+            }
+
+            // Lấy thông tin user sau khi transfer
+            const sender = await ecommerceDB.getUser(userId, guildId);
+            const receiver = await ecommerceDB.getUser(targetUser.id, guildId);
 
             const embed = new EmbedBuilder()
                 .setTitle("✅ Chuyển Tiền Thành Công")
                 .setDescription(
                     `**${message.author.username}** đã chuyển **${amount.toLocaleString()}** AniCoin cho **<@${targetUser.id}>**\n\n` +
                         "💰 **Số Dư Mới:**\n" +
-                        `• **${message.author.username}:** ${result.fromUser.balance.toLocaleString()} AniCoin\n` +
-                        `• **<@${targetUser.id}>:** ${result.toUser.balance.toLocaleString()} AniCoin`,
+                        `• **${message.author.username}:** ${sender.balance.toLocaleString()} AniCoin\n` +
+                        `• **<@${targetUser.id}>:** ${receiver.balance.toLocaleString()} AniCoin`,
                 )
                 .setColor("#51cf66")
                 .setThumbnail(message.author.displayAvatarURL())
                 .setFooter({
-                    text: "Chuyển tiền hoàn tất",
+                    text: "Chuyển tiền hoàn tất | Database Version",
                     iconURL: message.author.displayAvatarURL(),
                 })
                 .setTimestamp();

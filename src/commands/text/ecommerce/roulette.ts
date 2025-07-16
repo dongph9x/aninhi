@@ -2,7 +2,8 @@ import { EmbedBuilder, Message } from "discord.js";
 
 import { Bot } from "@/classes";
 import { config } from "@/config";
-import { addMoney, getBalance, recordGame, subtractMoney } from "@/utils/ecommerce";
+import { EcommerceService } from "@/utils/ecommerce-db";
+import { GameStatsService } from "@/utils/gameStats";
 
 const maxBet = 300000;
 const minBet = 10;
@@ -254,117 +255,97 @@ export default Bot.createCommand({
         const userId = message.author.id;
         const guildId = message.guildId!;
         const args = message.content.split(" ").slice(1);
-        const gameKey = getGameKey(userId, guildId);
 
-        // Kiểm tra nếu đang có game active
+        // Kiểm tra cooldown
+        const gameKey = getGameKey(userId, guildId);
         if (activeGames[gameKey]) {
-            return message.reply("⏳ Bạn đang có một ván roulette đang chạy! Vui lòng đợi...");
+            return message.reply("⏳ Bạn đang chơi roulette, vui lòng đợi!");
         }
 
-        // Hiển thị help nếu không có tham số
         if (args.length === 0) {
             const helpEmbed = createHelpEmbed(message);
             return message.reply({ embeds: [helpEmbed] });
         }
 
-        // Xử lý tham số
-        const betInput = args[0];
-        let betAmount: number | "all" = 100;
-
-        if (args[1]) {
-            if (args[1] === "all") {
-                betAmount = "all";
-            } else if (!isNaN(parseInt(args[1]))) {
-                betAmount = parseInt(args[1]);
-            }
+        if (args.length < 2) {
+            return message.reply("❌ Thiếu tham số! Dùng `n.roulette help` để xem hướng dẫn.");
         }
 
-        // Kiểm tra loại cược
-        const betInfo = getBetTypeFromInput(betInput);
+        const betTypeInput = args[0];
+        const betAmountInput = args[1];
+
+        // Xử lý loại cược
+        const betInfo = getBetTypeFromInput(betTypeInput);
         if (!betInfo) {
-            return message.reply("❌ Loại cược không hợp lệ! Dùng `n.roulette` để xem hướng dẫn.");
+            return message.reply("❌ Loại cược không hợp lệ! Dùng `n.roulette help` để xem hướng dẫn.");
         }
 
-        // Kiểm tra số tiền cược
-        const balance = await getBalance(userId, guildId);
-        if (betAmount === "all") {
-            betAmount = Math.min(balance, maxBet);
-        }
-
-        if (typeof betAmount === "number") {
-            if (betAmount < minBet) {
-                return message.reply(`❌ Số tiền cược tối thiểu là ${minBet} AniCoin!`);
-            }
-            if (betAmount > maxBet) {
-                return message.reply(`❌ Số tiền cược tối đa là ${maxBet} AniCoin!`);
-            }
-            if (betAmount > balance) {
-                return message.reply(`❌ Bạn không đủ AniCoin! Số dư: ${balance.toLocaleString()}`);
+        // Xử lý số tiền cược
+        let betAmount: number;
+        if (betAmountInput.toLowerCase() === "all") {
+            betAmount = await EcommerceService.getBalance(userId, guildId);
+        } else {
+            betAmount = parseInt(betAmountInput);
+            if (isNaN(betAmount)) {
+                return message.reply("❌ Số tiền cược không hợp lệ!");
             }
         }
 
-        // Trừ tiền cược
-        await subtractMoney(userId, guildId, betAmount as number, `Roulette bet: ${betInfo.type}`);
+        // Kiểm tra giới hạn cược
+        if (betAmount < minBet) {
+            return message.reply(`❌ Số tiền cược tối thiểu là ${minBet} AniCoin!`);
+        }
+        if (betAmount > maxBet) {
+            betAmount = maxBet;
+        }
 
-        // Đánh dấu game đang chạy
+        // Kiểm tra số dư
+        const balance = await EcommerceService.getBalance(userId, guildId);
+        if (balance < betAmount) {
+            return message.reply(`❌ Không đủ tiền! Số dư: ${balance} AniCoin`);
+        }
+
+        // Đánh dấu đang chơi
         activeGames[gameKey] = true;
 
-        // Tạo embed chờ
-        const waitingEmbed = new EmbedBuilder()
-            .setTitle("🎰 Roulette")
-            .setDescription(
-                `**${message.author.username}**\n\n` +
-                `🎯 **Cược:** ${betInfo.type === "number" ? `Số ${betInfo.value}` : betTypes[betInfo.type as keyof typeof betTypes].description}\n` +
-                `💰 **Số tiền:** ${(betAmount as number).toLocaleString()} AniCoin\n\n` +
-                "🎲 **Đang quay...**",
-            )
-            .setColor(config.embedColor)
-            .setThumbnail(message.author.displayAvatarURL())
-            .setTimestamp();
+        try {
+            // Trừ tiền cược
+            await EcommerceService.subtractMoney(userId, guildId, betAmount, `Roulette bet - ${betInfo.type}`);
 
-        const waitingMsg = await message.reply({ embeds: [waitingEmbed] });
-
-        // Giả lập thời gian quay
-        setTimeout(async () => {
-            // Quay số
+            // Quay roulette
             const result = spinWheel();
-
-            // Kiểm tra thắng thua
             const won = checkWin(betInfo.type, betInfo.value, result);
-            const betTypeInfo = betTypes[betInfo.type as keyof typeof betTypes];
-            const winnings = won ? (betAmount as number) * (betTypeInfo.payout + 1) : 0;
 
-            // Cộng tiền nếu thắng
+            // Tính toán tiền thắng
+            const betTypeInfo = betTypes[betInfo.type as keyof typeof betTypes];
+            const winnings = won ? betAmount * (betTypeInfo.payout + 1) : 0;
+
+            // Cộng tiền thắng
             if (won) {
-                await addMoney(userId, guildId, winnings, `Roulette win: ${betInfo.type}`);
+                await EcommerceService.addMoney(userId, guildId, winnings, `Roulette win - ${betInfo.type}`);
             }
 
-            // Ghi lại lịch sử game
-            await recordGame(
-                userId,
-                guildId,
-                "roulette",
-                betAmount as number,
-                winnings,
-                won ? "win" : "lose",
-            );
+            // Ghi lại thống kê game
+            await GameStatsService.recordGameResult(userId, guildId, "roulette", {
+                won: won,
+                bet: betAmount,
+                winnings: winnings
+            });
 
             // Tạo embed kết quả
-            const resultEmbed = createRouletteEmbed(
-                message,
-                betInfo.type,
-                betInfo.value,
-                betAmount as number,
-                result,
-                won,
-                winnings,
-            );
+            const embed = createRouletteEmbed(message, betInfo.type, betInfo.value, betAmount, result, won, winnings);
+            embed.setFooter({
+                text: `Số dư mới: ${await EcommerceService.getBalance(userId, guildId)} AniCoin`,
+                iconURL: message.author.displayAvatarURL(),
+            });
 
-            // Cập nhật message
-            await waitingMsg.edit({ embeds: [resultEmbed] });
-
-            // Xóa game khỏi active
+            await message.reply({ embeds: [embed] });
+        } catch (error) {
+            console.error("Error in roulette command:", error);
+            await message.reply("❌ Đã xảy ra lỗi khi xử lý roulette!");
+        } finally {
+            // Xóa trạng thái chơi
             delete activeGames[gameKey];
-        }, 2000);
+        }
     },
 });

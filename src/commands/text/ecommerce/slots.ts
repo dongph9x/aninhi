@@ -1,7 +1,8 @@
 import { EmbedBuilder } from "discord.js";
 
 import { Bot } from "@/classes";
-import { addMoney, getBalance, subtractMoney } from "@/utils/ecommerce";
+import { EcommerceService } from "@/utils/ecommerce-db";
+import { GameStatsService } from "@/utils/gameStats";
 
 const maxBet = 300000;
 const slots = ["🍆", "❤️", "🍒", "🪙", "😊", "😄"];
@@ -59,7 +60,7 @@ export default Bot.createCommand({
                 return message.reply({ embeds: [errorEmbed] });
             }
 
-            const currentBalance = await getBalance(userId, guildId);
+            const currentBalance = await EcommerceService.getBalance(userId, guildId);
 
             if (all) {
                 amount = currentBalance;
@@ -128,15 +129,22 @@ export default Bot.createCommand({
             }
 
             if (win > 0) {
-                await addMoney(
+                await EcommerceService.addMoney(
                     userId,
                     guildId,
                     win - amount,
                     `Slots win - bet: ${amount}, multiplier: ${multiplier}x`,
                 );
             } else {
-                await subtractMoney(userId, guildId, amount, `Slots lose - bet: ${amount}`);
+                await EcommerceService.subtractMoney(userId, guildId, amount, `Slots lose - bet: ${amount}`);
             }
+
+            // Ghi lại thống kê game
+            await GameStatsService.recordGameResult(userId, guildId, "slots", {
+                won: win > 0,
+                bet: amount,
+                winnings: win
+            });
 
             const winmsg = win === 0 ? "không gì cả... 😢" : `**${win}** AniCoin`;
 
@@ -198,7 +206,7 @@ export default Bot.createCommand({
                             .setColor(win > 0 ? "#51cf66" : "#ff6b6b")
                             .setThumbnail(message.author.displayAvatarURL())
                             .setFooter({
-                                text: `Số dư mới: ${await getBalance(userId, guildId)} AniCoin`,
+                                text: `Số dư mới: ${await EcommerceService.getBalance(userId, guildId)} AniCoin`,
                                 iconURL: message.author.displayAvatarURL(),
                             })
                             .setTimestamp();

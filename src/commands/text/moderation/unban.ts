@@ -1,7 +1,8 @@
 import { EmbedBuilder } from "discord.js";
 
 import { Bot } from "@/classes";
-import { removeBan } from "@/utils/banStore";
+import { banDB } from "@/utils/ban-db";
+import { ModerationService } from "@/utils/moderation";
 
 export default Bot.createCommand({
     structure: {
@@ -79,8 +80,20 @@ export default Bot.createCommand({
                 
                 // Perform the unban
                 await message.guild!.members.unban(targetUser.id, `Unban by ${message.author.username}`);
-                // Xoá khỏi file ban
-                removeBan(targetUser.id, message.guildId!);
+                
+                // Xoá khỏi database
+                await banDB.unbanUser(targetUser.id, message.guildId!);
+
+                // Ghi lại moderation log
+                await ModerationService.logAction({
+                    guildId: message.guildId!,
+                    targetUserId: targetUser.id,
+                    moderatorId: message.author.id,
+                    action: "unban",
+                    reason: `Manual unban by ${message.author.username}`,
+                    channelId: message.channelId,
+                    messageId: message.id
+                });
 
                 const embed = new EmbedBuilder()
                     .setTitle("🔓 Đã Unban Người Dùng")
@@ -93,7 +106,7 @@ export default Bot.createCommand({
                     .setColor("#51cf66")
                     .setThumbnail(banInfo.user.displayAvatarURL())
                     .setFooter({
-                        text: `Unban bởi ${message.author.username}`,
+                        text: `Unban bởi ${message.author.username} | Database Version`,
                         iconURL: message.author.displayAvatarURL(),
                     })
                     .setTimestamp();

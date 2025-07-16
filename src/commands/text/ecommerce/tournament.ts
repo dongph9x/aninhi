@@ -2,7 +2,9 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Message } f
 
 import { Bot } from "@/classes";
 import { config } from "@/config";
-import { addMoney, getBalance, subtractMoney, recordGame } from "@/utils/ecommerce";
+import { EcommerceService } from "@/utils/ecommerce-db";
+import { TournamentService, saveTournamentMessage } from "@/utils/tournament";
+import { TournamentCleanupJob } from "@/utils/tournament-cleanup";
 
 // Global client reference để gửi thông báo
 let globalClient: any = null;
@@ -10,36 +12,12 @@ let globalClient: any = null;
 // Hàm để set client reference
 export function setTournamentClient(client: any) {
     globalClient = client;
+    // Lưu vào global reference để tournament-cleanup có thể sử dụng
+    (globalThis as any).tournamentClient = client;
 }
-
-// Interface cho Tournament
-interface Tournament {
-    id: string;
-    name: string;
-    description: string;
-    entryFee: number;
-    prizePool: number;
-    maxParticipants: number;
-    currentParticipants: number;
-    participants: string[];
-    status: "registration" | "active" | "completed";
-    startTime: string;
-    endTime: string;
-    createdBy: string;
-    guildId: string;
-    channelId: string; // Thêm channel ID để gửi thông báo
-    winner?: string;
-}
-
-// Lưu trữ tournaments
-export const tournaments: Record<string, Tournament> = {};
 
 // Hệ thống kiểm tra tournament định kỳ
 let tournamentCheckInterval: NodeJS.Timeout | null = null;
-
-function generateTournamentId(): string {
-    return Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
-}
 
 // Khởi tạo hệ thống kiểm tra tournament
 function initTournamentChecker() {
@@ -50,18 +28,17 @@ function initTournamentChecker() {
     // Kiểm tra mỗi 30 giây
     tournamentCheckInterval = setInterval(async () => {
         const now = new Date();
-        console.log(`[Tournament Checker] Đang kiểm tra ${Object.keys(tournaments).length} tournaments...`);
+        console.log(`[Tournament Checker] Đang kiểm tra tournaments...`);
 
-        for (const [tournamentId, tournament] of Object.entries(tournaments)) {
-            if (tournament.status === "registration") {
-                const endTime = new Date(tournament.endTime);
-                console.log(`[Tournament Checker] Tournament ${tournamentId}: ${now.toISOString()} vs ${endTime.toISOString()}`);
-                
-                if (now >= endTime) {
-                    console.log(`Tournament ${tournamentId} đã hết thời gian, đang kết thúc...`);
-                    await startTournament(tournamentId);
-                }
+        try {
+            const expiredTournaments = await TournamentService.getExpiredTournaments();
+            
+            for (const tournament of expiredTournaments) {
+                console.log(`Tournament ${tournament.id} đã hết thời gian, đang kết thúc...`);
+                await startTournament(tournament.id);
             }
+        } catch (error) {
+            console.error("Error checking tournaments:", error);
         }
     }, 30000); // 30 giây
 }
@@ -69,11 +46,14 @@ function initTournamentChecker() {
 // Khởi tạo ngay khi module được load
 initTournamentChecker();
 
-export function createTournamentEmbed(tournament: Tournament): EmbedBuilder {
+export function createTournamentEmbed(tournament: any): EmbedBuilder {
     const statusEmoji = tournament.status === "registration" ? "📝" :
         tournament.status === "active" ? "⚔️" : "🏆";
     const statusText = tournament.status === "registration" ? "Đăng ký" :
         tournament.status === "active" ? "Đang diễn ra" : "Hoàn thành";
+
+    // Chọn format thời gian dựa trên trạng thái
+    const timeFormat = tournament.status === "completed" ? "F" : "R"; // F = absolute, R = relative
 
     const embed = new EmbedBuilder()
         .setTitle(`${statusEmoji} ${tournament.name}`)
@@ -82,16 +62,16 @@ export function createTournamentEmbed(tournament: Tournament): EmbedBuilder {
             { name: "💰 Phí đăng ký", value: `${tournament.entryFee.toLocaleString()} AniCoin`, inline: true },
             { name: "🏆 Giải thưởng", value: `${tournament.prizePool.toLocaleString()} AniCoin`, inline: true },
             { name: "👥 Người tham gia", value: `${tournament.currentParticipants}/${tournament.maxParticipants}`, inline: true },
-            { name: "📅 Bắt đầu", value: `<t:${Math.floor(new Date(tournament.startTime).getTime() / 1000)}:R>`, inline: true },
-            { name: "⏰ Kết thúc", value: `<t:${Math.floor(new Date(tournament.endTime).getTime() / 1000)}:R>`, inline: true },
+            { name: "📅 Bắt đầu", value: `<t:${Math.floor(new Date(tournament.startTime).getTime() / 1000)}:${timeFormat}>`, inline: true },
+            { name: "⏰ Kết thúc", value: `<t:${Math.floor(new Date(tournament.endTime).getTime() / 1000)}:${timeFormat}>`, inline: true },
             { name: "📊 Trạng thái", value: statusText, inline: true },
         )
         .setColor(tournament.status === "registration" ? "#00ff00" :
             tournament.status === "active" ? "#ffaa00" : "#ff0000")
         .setTimestamp();
 
-    if (tournament.winner) {
-        embed.addFields({ name: "👑 Người chiến thắng", value: `<@${tournament.winner}>`, inline: false });
+    if (tournament.winnerId) {
+        embed.addFields({ name: "👑 Người chiến thắng", value: `<@${tournament.winnerId}>`, inline: false });
     }
 
     return embed;
@@ -106,7 +86,9 @@ function createHelpEmbed(message: Message): EmbedBuilder {
             "**Xem danh sách:** `n.tournament list`\n" +
             "**Xem chi tiết:** `n.tournament info <ID>`\n" +
             "**Kết thúc sớm:** `n.tournament end <ID>` (chỉ người tạo)\n" +
-            "**Force kết thúc:** `n.tournament force <ID>` (admin)\n\n" +
+            "**Force kết thúc:** `n.tournament force <ID>` (admin)\n" +
+            "**Cleanup:** `n.tournament cleanup` (admin)\n" +
+            "**Restart job:** `n.tournament restart` (admin)\n\n" +
             "**Ví dụ:**\n" +
             "• `n.tournament create_Giải đấu mùa hè_Giải đấu thường niên_1000_50000_8_30`\n" +
             "• `n.tournament create_Tournament Test_Test tự động kết thúc_100_1000_2_1`\n" +
@@ -162,6 +144,12 @@ export default Bot.createCommand({
                 return await endTournament(message, args.slice(1));
             case "force":
                 return await forceEndTournament(message, args.slice(1));
+            case "cleanup":
+            case "dọn dẹp":
+                return await cleanupTournaments(message);
+            case "restart":
+            case "khởi động lại":
+                return await restartCleanupJob(message);
             case "help":
                 const helpEmbed = createHelpEmbed(message);
                 return message.reply({ embeds: [helpEmbed] });
@@ -241,330 +229,353 @@ async function createTournament(message: Message, args: string[]) {
         return message.reply("❌ Phí đăng ký, giải thưởng phải >= 0 và số người tham gia >= 2!");
     }
 
-    const tournamentId = generateTournamentId();
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + durationMinutes * 60 * 1000);
+    try {
+        const startTime = new Date();
+        const endTime = new Date(startTime.getTime() + durationMinutes * 60 * 1000);
 
-    const tournament: Tournament = {
-        id: tournamentId,
-        name,
-        description,
-        entryFee,
-        prizePool,
-        maxParticipants,
-        currentParticipants: 0,
-        participants: [],
-        status: "registration",
-        startTime: startTime.toISOString(),
-        endTime: endTime.toISOString(),
-        createdBy: message.author.id,
-        guildId: message.guildId!,
-        channelId: message.channelId,
-    };
+        const tournament = await TournamentService.createTournament({
+            name,
+            description,
+            entryFee,
+            prizePool,
+            maxParticipants,
+            startTime,
+            endTime,
+            createdBy: message.author.id,
+            guildId: message.guildId!,
+            channelId: message.channelId
+        });
 
-    tournaments[tournamentId] = tournament;
+        const embed = createTournamentEmbed(tournament);
+        embed.setDescription(`✅ **Tournament đã được tạo thành công!**\n\n${tournament.description}`);
 
-    const embed = createTournamentEmbed(tournament);
-    embed.setFooter({ text: `ID: ${tournamentId} | Tạo bởi ${message.author.username}` });
+        // Tạo nút join hoặc nút đã kết thúc
+        let row;
+        if (tournament.status === "registration") {
+            const joinButton = new ButtonBuilder()
+                .setCustomId(JSON.stringify({
+                    n: "TournamentJoin",
+                    d: { tournamentId: tournament.id }
+                }))
+                .setLabel("Tham gia ngay")
+                .setStyle(ButtonStyle.Primary)
+                .setEmoji("🏆");
+            row = new ActionRowBuilder<ButtonBuilder>().addComponents(joinButton);
+        } else {
+            const endedButton = new ButtonBuilder()
+                .setCustomId("tournament_ended")
+                .setLabel("Đã kết thúc")
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(true);
+            row = new ActionRowBuilder<ButtonBuilder>().addComponents(endedButton);
+        }
 
-    // Tạo button join
-    const joinButton = new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`tournament_join:${tournamentId}`)
-            .setLabel("🎯 Tham Gia Tournament")
-            .setStyle(ButtonStyle.Primary)
-            .setEmoji("🏆")
-    );
+        const reply = await message.reply({ 
+            embeds: [embed],
+            components: [row]
+        });
 
-    await message.reply({ embeds: [embed], components: [joinButton] });
-
-    console.log(`Tournament ${tournamentId} đã được tạo, sẽ kết thúc lúc: ${endTime.toLocaleString()}`);
+        // Lưu message ID vào DB để cập nhật sau này
+        await saveTournamentMessage(tournament.id, reply.id, message.channelId, message.guildId!);
+    } catch (error) {
+        console.error("Error creating tournament:", error);
+        await message.reply("❌ Đã xảy ra lỗi khi tạo tournament!");
+    }
 }
 
 async function joinTournament(message: Message, args: string[]) {
-    if (args.length === 0) {
+    if (args.length < 1) {
         return message.reply("❌ Thiếu ID tournament! Dùng: `n.tournament join <ID>`");
     }
 
     const tournamentId = args[0];
-    const tournament = tournaments[tournamentId];
 
-    if (!tournament) {
-        return message.reply("❌ Tournament không tồn tại!");
+    try {
+        // Kiểm tra tournament
+        const tournament = await TournamentService.getTournamentById(tournamentId);
+        if (!tournament) {
+            return message.reply("❌ Tournament không tồn tại!");
+        }
+
+        if (tournament.guildId !== message.guildId) {
+            return message.reply("❌ Tournament này không thuộc server này!");
+        }
+
+        // Kiểm tra trạng thái tournament
+        if (tournament.status !== "registration") {
+            if (tournament.status === "completed") {
+                return message.reply("❌ Tournament này đã kết thúc!");
+            } else {
+                return message.reply("❌ Tournament này không còn nhận đăng ký!");
+            }
+        }
+
+        // Kiểm tra số người tham gia
+        if (tournament.currentParticipants >= tournament.maxParticipants) {
+            return message.reply(`❌ Tournament này đã đầy! (${tournament.currentParticipants}/${tournament.maxParticipants})`);
+        }
+
+        // Kiểm tra số dư
+        const balance = await EcommerceService.getBalance(message.author.id, message.guildId!);
+        if (balance < tournament.entryFee) {
+            return message.reply(`❌ Không đủ tiền! Cần ${tournament.entryFee} AniCoin, số dư: ${balance} AniCoin`);
+        }
+
+        // Tham gia tournament
+        await TournamentService.joinTournament(tournamentId, message.author.id, message.guildId!);
+        
+        // Trừ phí đăng ký
+        await EcommerceService.subtractMoney(message.author.id, message.guildId!, tournament.entryFee, `Tournament entry fee - ${tournament.name}`);
+
+        const embed = new EmbedBuilder()
+            .setTitle("✅ Tham gia thành công!")
+            .setDescription(`**${message.author.username}** đã tham gia tournament **${tournament.name}**\nPhí đăng ký: ${tournament.entryFee} AniCoin`)
+            .setColor("#00ff00")
+            .setTimestamp();
+
+        await message.reply({ embeds: [embed] });
+    } catch (error: any) {
+        console.error("Error joining tournament:", error);
+        
+        // Xử lý các lỗi cụ thể
+        if (error.message.includes("đã tham gia")) {
+            await message.reply("❌ Bạn đã tham gia tournament này rồi!");
+        } else if (error.message.includes("đã đóng đăng ký")) {
+            await message.reply("❌ Tournament này đã đóng đăng ký!");
+        } else if (error.message.includes("đã đầy")) {
+            await message.reply("❌ Tournament này đã đầy người tham gia!");
+        } else {
+            await message.reply(`❌ ${error.message || "Đã xảy ra lỗi khi tham gia tournament!"}`);
+        }
     }
-
-    if (tournament.status !== "registration") {
-        return message.reply("❌ Tournament đã đóng đăng ký!");
-    }
-
-    if (tournament.participants.includes(message.author.id)) {
-        return message.reply("❌ Bạn đã đăng ký tham gia rồi!");
-    }
-
-    if (tournament.currentParticipants >= tournament.maxParticipants) {
-        return message.reply("❌ Tournament đã đầy!");
-    }
-
-    const balance = await getBalance(message.author.id, tournament.guildId);
-    if (balance < tournament.entryFee) {
-        return message.reply(`❌ Bạn không đủ AniCoin! Cần: ${tournament.entryFee.toLocaleString()}, Có: ${balance.toLocaleString()}`);
-    }
-
-    // Trừ phí đăng ký
-    await subtractMoney(message.author.id, tournament.guildId, tournament.entryFee, `Tournament entry: ${tournament.name}`);
-
-    // Thêm vào danh sách tham gia
-    tournament.participants.push(message.author.id);
-    tournament.currentParticipants++;
-
-    const embed = new EmbedBuilder()
-        .setTitle("✅ Đăng ký thành công!")
-        .setDescription(`Bạn đã tham gia **${tournament.name}**`)
-        .addFields(
-            { name: "💰 Phí đã trừ", value: `${tournament.entryFee.toLocaleString()} AniCoin`, inline: true },
-            { name: "👥 Người tham gia", value: `${tournament.currentParticipants}/${tournament.maxParticipants}`, inline: true },
-        )
-        .setColor("#00ff00")
-        .setTimestamp();
-
-    await message.reply({ embeds: [embed] });
 }
 
 async function listTournaments(message: Message) {
-    const guildTournaments = Object.values(tournaments).filter(t => t.guildId === message.guildId);
+    try {
+        const tournaments = await TournamentService.getActiveTournamentsByGuild(message.guildId!);
 
-    if (guildTournaments.length === 0) {
-        return message.reply("📝 Không có tournament nào đang diễn ra!");
-    }
-
-    const embed = new EmbedBuilder()
-        .setTitle("🏆 Danh sách Tournament")
-        .setDescription(guildTournaments.map(t =>
-            `**${t.name}** (ID: ${t.id})\n` +
-            `📊 ${t.currentParticipants}/${t.maxParticipants} người tham gia | ` +
-            `💰 ${t.entryFee.toLocaleString()} AniCoin | ` +
-            `🏆 ${t.prizePool.toLocaleString()} AniCoin\n` +
-            `📅 <t:${Math.floor(new Date(t.endTime).getTime() / 1000)}:R>\n`
-        ).join("\n"))
-        .setColor(config.embedColor)
-        .setTimestamp();
-
-    // Tạo buttons cho các tournament đang đăng ký
-    const components = [];
-    const activeTournaments = guildTournaments.filter(t => 
-        t.status === "registration" && 
-        !t.participants.includes(message.author.id) &&
-        t.currentParticipants < t.maxParticipants
-    );
-
-    if (activeTournaments.length > 0) {
-        const joinButtons = activeTournaments.slice(0, 5).map(t => 
-            new ButtonBuilder()
-                .setCustomId(`tournament_join:${t.id}`)
-                .setLabel(`Join ${t.name.slice(0, 10)}...`)
-                .setStyle(ButtonStyle.Primary)
-                .setEmoji("🏆")
-        );
-
-        // Chia buttons thành các hàng (tối đa 5 buttons/hàng)
-        for (let i = 0; i < joinButtons.length; i += 5) {
-            const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                joinButtons.slice(i, i + 5)
-            );
-            components.push(row);
+        if (tournaments.length === 0) {
+            return message.reply("📝 Không có tournament nào đang hoạt động trong server này!");
         }
-    }
 
-    await message.reply({ 
-        embeds: [embed], 
-        components: components.length > 0 ? components : undefined 
-    });
+        const embed = new EmbedBuilder()
+            .setTitle("🏆 Danh sách Tournament")
+            .setDescription(tournaments.map((t: any) => 
+                `**${t.name}** (${t.currentParticipants}/${t.maxParticipants})\n` +
+                `💰 ${t.entryFee} AniCoin | 🏆 ${t.prizePool} AniCoin\n` +
+                `📅 <t:${Math.floor(new Date(t.endTime).getTime() / 1000)}:R>\n` +
+                `ID: \`${t.id}\``
+            ).join("\n\n"))
+            .setColor(config.embedColor)
+            .setTimestamp();
+
+        await message.reply({ embeds: [embed] });
+    } catch (error) {
+        console.error("Error listing tournaments:", error);
+        await message.reply("❌ Đã xảy ra lỗi khi lấy danh sách tournament!");
+    }
 }
 
 async function showTournamentInfo(message: Message, args: string[]) {
-    if (args.length === 0) {
+    if (args.length < 1) {
         return message.reply("❌ Thiếu ID tournament! Dùng: `n.tournament info <ID>`");
     }
 
     const tournamentId = args[0];
-    const tournament = tournaments[tournamentId];
 
-    if (!tournament) {
-        return message.reply("❌ Tournament không tồn tại!");
-    }
+    try {
+        const tournament = await TournamentService.getTournamentById(tournamentId);
+        if (!tournament) {
+            return message.reply("❌ Tournament không tồn tại!");
+        }
 
-    const embed = createTournamentEmbed(tournament);
+        if (tournament.guildId !== message.guildId) {
+            return message.reply("❌ Tournament này không thuộc server này!");
+        }
 
-    if (tournament.participants.length > 0) {
-        embed.addFields({
-            name: "👥 Danh sách tham gia",
-            value: tournament.participants.map(p => `<@${p}>`).join(", "),
-            inline: false
-        });
-    }
+        const embed = createTournamentEmbed(tournament);
+        
+        if (tournament.participants.length > 0) {
+            embed.addFields({
+                name: "👥 Danh sách tham gia",
+                value: tournament.participants.map((p: any) => `<@${p.userId}>`).join(", "),
+                inline: false
+            });
+        }
 
-    // Tạo button join nếu tournament còn đang đăng ký
-    let components = [];
-    if (tournament.status === "registration" && !tournament.participants.includes(message.author.id)) {
-        const joinButton = new ActionRowBuilder<ButtonBuilder>().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`tournament_join:${tournamentId}`)
-                .setLabel("🎯 Tham Gia Tournament")
+        // Tạo nút join hoặc nút đã kết thúc
+        let components = [];
+        if (tournament.status === "registration") {
+            const joinButton = new ButtonBuilder()
+                .setCustomId(JSON.stringify({
+                    n: "TournamentJoin",
+                    d: { tournamentId: tournament.id }
+                }))
+                .setLabel("Tham gia ngay")
                 .setStyle(ButtonStyle.Primary)
-                .setEmoji("🏆")
-        );
-        components.push(joinButton);
-    }
+                .setEmoji("🏆");
+            const row = new ActionRowBuilder<ButtonBuilder>().addComponents(joinButton);
+            components.push(row);
+        } else {
+            const endedButton = new ButtonBuilder()
+                .setCustomId("tournament_ended")
+                .setLabel("Đã kết thúc")
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(true);
+            const row = new ActionRowBuilder<ButtonBuilder>().addComponents(endedButton);
+            components.push(row);
+        }
 
-    await message.reply({ embeds: [embed], components: components.length > 0 ? components : undefined });
+        const reply = await message.reply({ 
+            embeds: [embed],
+            components: components.length > 0 ? components : undefined
+        });
+
+        // Lưu message ID vào DB để cập nhật sau này (chỉ khi tournament đang đăng ký)
+        if (tournament.status === "registration") {
+            await saveTournamentMessage(tournament.id, reply.id, message.channelId, message.guildId!);
+        }
+    } catch (error) {
+        console.error("Error showing tournament info:", error);
+        await message.reply("❌ Đã xảy ra lỗi khi lấy thông tin tournament!");
+    }
 }
 
 async function startTournament(tournamentId: string) {
-    const tournament = tournaments[tournamentId];
-    if (!tournament || tournament.status !== "registration") return;
+    try {
+        const winner = await TournamentService.startTournament(tournamentId);
+        const tournament = await TournamentService.getTournamentById(tournamentId);
+        
+        if (!tournament) return;
 
-    console.log(`Bắt đầu kết thúc tournament: ${tournamentId}`);
-
-    if (tournament.currentParticipants < 2) {
-        tournament.status = "completed";
-        console.log(`Tournament ${tournamentId} bị hủy do không đủ người tham gia`);
-
-        // Hoàn tiền cho người tham gia
-        for (const participantId of tournament.participants) {
-            await addMoney(participantId, tournament.guildId, tournament.entryFee, `Tournament cancelled: ${tournament.name}`);
+        // Cộng tiền cho người chiến thắng
+        if (winner) {
+            await EcommerceService.addMoney(winner.userId, tournament.guildId, tournament.prizePool, `Tournament winner - ${tournament.name}`);
         }
 
-        // Thông báo hủy tournament
-        try {
-            if (globalClient) {
-                const channel = globalClient.channels.cache.get(tournament.channelId);
-                if (channel && channel.isTextBased()) {
+        // Gửi thông báo
+        if (globalClient && tournament.channelId) {
+            try {
+                const channel = await globalClient.channels.fetch(tournament.channelId);
+                if (channel) {
                     const embed = new EmbedBuilder()
-                        .setTitle("❌ Tournament bị hủy")
-                        .setDescription(`**${tournament.name}** đã bị hủy do không đủ người tham gia.\n` +
-                            `👥 Số người tham gia: ${tournament.currentParticipants}/${tournament.maxParticipants}\n` +
-                            `💰 Phí đăng ký đã được hoàn lại cho tất cả người tham gia.`)
-                        .setColor("#ff0000")
+                        .setTitle("🏆 Tournament Kết Thúc!")
+                        .setDescription(`Tournament **${tournament.name}** đã kết thúc!\n\n${winner ? `👑 **Người chiến thắng:** <@${winner.userId}>\n💰 **Giải thưởng:** ${tournament.prizePool} AniCoin` : "Không có người tham gia"}`)
+                        .setColor("#ffaa00")
                         .setTimestamp();
 
                     await channel.send({ embeds: [embed] });
-                    console.log(`Đã gửi thông báo hủy tournament đến channel ${tournament.channelId}`);
                 }
-            }
-        } catch (error) {
-            console.error("Error sending tournament cancellation message:", error);
-        }
-        
-        return;
-    }
-
-    tournament.status = "active";
-
-    // Chọn người chiến thắng ngẫu nhiên
-    const winnerIndex = Math.floor(Math.random() * tournament.participants.length);
-    const winner = tournament.participants[winnerIndex];
-
-    // Trao giải thưởng
-    await addMoney(winner, tournament.guildId, tournament.prizePool, `Tournament winner: ${tournament.name}`);
-
-    // Cập nhật tournament
-    tournament.winner = winner;
-    tournament.status = "completed";
-
-    console.log(`Tournament ${tournamentId} kết thúc! Người chiến thắng: ${winner}, Giải thưởng: ${tournament.prizePool}`);
-
-    // Ghi lại lịch sử
-    await recordGame(
-        winner,
-        tournament.guildId,
-        "tournament_win",
-        0,
-        tournament.prizePool,
-        "win",
-    );
-
-    // Thông báo người chiến thắng
-    try {
-        if (globalClient) {
-            const channel = globalClient.channels.cache.get(tournament.channelId);
-            if (channel && channel.isTextBased()) {
-                const embed = new EmbedBuilder()
-                    .setTitle("🏆 Tournament kết thúc!")
-                    .setDescription(`**${tournament.name}** đã kết thúc!\n\n` +
-                        `👑 **Người chiến thắng:** <@${winner}>\n` +
-                        `🏆 **Giải thưởng:** ${tournament.prizePool.toLocaleString()} AniCoin\n` +
-                        `👥 **Số người tham gia:** ${tournament.currentParticipants}/${tournament.maxParticipants}\n\n` +
-                        `🎉 Chúc mừng người chiến thắng!`)
-                    .setColor("#00ff00")
-                    .setTimestamp();
-
-                await channel.send({ embeds: [embed] });
-                console.log(`Đã gửi thông báo người chiến thắng đến channel ${tournament.channelId}`);
+            } catch (error) {
+                console.error("Error sending tournament notification:", error);
             }
         }
     } catch (error) {
-        console.error("Error sending tournament winner message:", error);
+        console.error("Error starting tournament:", error);
     }
 }
 
 async function endTournament(message: Message, args: string[]) {
-    if (args.length === 0) {
+    if (args.length < 1) {
         return message.reply("❌ Thiếu ID tournament! Dùng: `n.tournament end <ID>`");
     }
 
     const tournamentId = args[0];
-    const tournament = tournaments[tournamentId];
 
-    if (!tournament) {
-        return message.reply("❌ Tournament không tồn tại!");
+    try {
+        const winner = await TournamentService.endTournament(tournamentId, message.author.id);
+        const tournament = await TournamentService.getTournamentById(tournamentId);
+        
+        if (!tournament) {
+            return message.reply("❌ Tournament không tồn tại!");
+        }
+
+        // Cộng tiền cho người chiến thắng
+        if (winner) {
+            await EcommerceService.addMoney(winner.userId, tournament.guildId, tournament.prizePool, `Tournament winner - ${tournament.name}`);
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle("🏆 Tournament Đã Kết Thúc!")
+            .setDescription(`Tournament **${tournament.name}** đã được kết thúc sớm!\n\n${winner ? `👑 **Người chiến thắng:** <@${winner.userId}>\n💰 **Giải thưởng:** ${tournament.prizePool} AniCoin` : "Không có người tham gia"}`)
+            .setColor("#ffaa00")
+            .setTimestamp();
+
+        await message.reply({ embeds: [embed] });
+    } catch (error: any) {
+        console.error("Error ending tournament:", error);
+        await message.reply(`❌ ${error.message || "Đã xảy ra lỗi khi kết thúc tournament!"}`);
     }
-
-    if (tournament.status !== "registration") {
-        return message.reply("❌ Tournament đã kết thúc rồi!");
-    }
-
-    // Kiểm tra quyền (chỉ người tạo hoặc admin mới có thể kết thúc)
-    if (tournament.createdBy !== message.author.id) {
-        return message.reply("❌ Bạn không có quyền kết thúc tournament này!");
-    }
-
-    // Kết thúc tournament
-    await startTournament(tournamentId);
-
-    const embed = new EmbedBuilder()
-        .setTitle("🏆 Tournament đã kết thúc!")
-        .setDescription(`**${tournament.name}** đã được kết thúc thủ công.`)
-        .setColor("#ff0000")
-        .setTimestamp();
-
-    await message.reply({ embeds: [embed] });
 }
 
 async function forceEndTournament(message: Message, args: string[]) {
-    if (args.length === 0) {
+    if (args.length < 1) {
         return message.reply("❌ Thiếu ID tournament! Dùng: `n.tournament force <ID>`");
     }
 
     const tournamentId = args[0];
-    const tournament = tournaments[tournamentId];
 
-    if (!tournament) {
-        return message.reply("❌ Tournament không tồn tại!");
+    try {
+        const winner = await TournamentService.forceEndTournament(tournamentId);
+        const tournament = await TournamentService.getTournamentById(tournamentId);
+        
+        if (!tournament) {
+            return message.reply("❌ Tournament không tồn tại!");
+        }
+
+        // Cộng tiền cho người chiến thắng
+        if (winner) {
+            await EcommerceService.addMoney(winner.userId, tournament.guildId, tournament.prizePool, `Tournament winner - ${tournament.name}`);
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle("🏆 Tournament Đã Bị Force Kết Thúc!")
+            .setDescription(`Tournament **${tournament.name}** đã được force kết thúc bởi admin!\n\n${winner ? `👑 **Người chiến thắng:** <@${winner.userId}>\n💰 **Giải thưởng:** ${tournament.prizePool} AniCoin` : "Không có người tham gia"}`)
+            .setColor("#ff0000")
+            .setTimestamp();
+
+        await message.reply({ embeds: [embed] });
+    } catch (error: any) {
+        console.error("Error force ending tournament:", error);
+        await message.reply(`❌ ${error.message || "Đã xảy ra lỗi khi force kết thúc tournament!"}`);
     }
+}
 
-    if (tournament.status !== "registration") {
-        return message.reply("❌ Tournament đã kết thúc rồi!");
+async function cleanupTournaments(message: Message) {
+    try {
+        // Chạy cleanup thủ công
+        await TournamentCleanupJob.runManualCleanup();
+        
+        const embed = new EmbedBuilder()
+            .setTitle("🧹 Tournament Cleanup")
+            .setDescription("Đã chạy cleanup tournaments hết hạn thành công!")
+            .setColor("#00ff00")
+            .setTimestamp();
+
+        await message.reply({ embeds: [embed] });
+    } catch (error: any) {
+        console.error("Error running tournament cleanup:", error);
+        await message.reply(`❌ ${error.message || "Đã xảy ra lỗi khi chạy cleanup!"}`);
     }
+}
 
-    // Force kết thúc tournament (không cần quyền)
-    console.log(`Force ending tournament: ${tournamentId}`);
-    await startTournament(tournamentId);
+async function restartCleanupJob(message: Message) {
+    try {
+        // Dừng job cũ
+        TournamentCleanupJob.stop();
+        
+        // Khởi động lại job
+        TournamentCleanupJob.start();
+        
+        const embed = new EmbedBuilder()
+            .setTitle("🔄 Tournament Cleanup Job Restarted")
+            .setDescription("Đã khởi động lại job cleanup tournaments thành công!")
+            .setColor("#00ff00")
+            .setTimestamp();
 
-    const embed = new EmbedBuilder()
-        .setTitle("🏆 Tournament đã được force kết thúc!")
-        .setDescription(`**${tournament.name}** đã được force kết thúc.`)
-        .setColor("#ff0000")
-        .setTimestamp();
-
-    await message.reply({ embeds: [embed] });
+        await message.reply({ embeds: [embed] });
+    } catch (error: any) {
+        console.error("Error restarting tournament cleanup job:", error);
+        await message.reply(`❌ ${error.message || "Đã xảy ra lỗi khi khởi động lại job!"}`);
+    }
 } 

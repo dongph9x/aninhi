@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 
 import { ExtendedClient } from "@/classes";
+import { databaseService } from "@/utils/database";
 
 const cwd = process.cwd();
 const envFolder = path.join(cwd, "env");
@@ -15,10 +16,40 @@ config({ path: path.resolve(envFolder, `.env.${process.env.NODE_ENV}`) });
 const localFile = path.resolve(envFolder, `.env.${process.env.NODE_ENV}.local`);
 if (fs.existsSync(localFile)) config({ path: localFile });
 
-const client = new ExtendedClient({
-    partials: [Partials.Channel, Partials.GuildMember, Partials.Message, Partials.User],
-    intents: ["Guilds", "GuildMembers", "GuildMessages", "MessageContent", "GuildMessageReactions"],
-    presence: { status: PresenceUpdateStatus.Online, afk: false },
-});
+async function startBot() {
+    try {
+        // Initialize database
+        console.log('🔌 Initializing database...');
+        await databaseService.initialize();
+        console.log('✅ Database initialized successfully');
 
-client.run();
+        // Create Discord client
+        const client = new ExtendedClient({
+            partials: [Partials.Channel, Partials.GuildMember, Partials.Message, Partials.User],
+            intents: ["Guilds", "GuildMembers", "GuildMessages", "MessageContent", "GuildMessageReactions"],
+            presence: { status: PresenceUpdateStatus.Online, afk: false },
+        });
+
+        // Start bot
+        client.run();
+
+        // Graceful shutdown
+        process.on('SIGINT', async () => {
+            console.log('\n🛑 Shutting down...');
+            await databaseService.disconnect();
+            process.exit(0);
+        });
+
+        process.on('SIGTERM', async () => {
+            console.log('\n🛑 Shutting down...');
+            await databaseService.disconnect();
+            process.exit(0);
+        });
+
+    } catch (error) {
+        console.error('❌ Failed to start bot:', error);
+        process.exit(1);
+    }
+}
+
+startBot();
