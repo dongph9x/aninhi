@@ -16,37 +16,12 @@ export default Bot.createMessageComponent<ComponentType.StringSelect, {}>({
     type: ComponentType.StringSelect,
     run: async ({ interaction }) => {
         try {
-            const selectedValue = interaction.values[0];
+            const baitType = interaction.values[0];
             const userId = interaction.user.id;
             const guildId = interaction.guildId!;
 
-            // Parse bait type and quantity from selected value
-            const [baitType, quantityStr] = selectedValue.split(':');
-            const quantity = parseInt(quantityStr) || 1;
-
-            // Mua mồi với số lượng đã chọn
-            const result = await FishingService.buyBait(userId, guildId, baitType, quantity);
-
-            const baitInfo = BAITS[baitType as keyof typeof BAITS];
-            
-            const successEmbed = new EmbedBuilder()
-                .setTitle("🪱 Mua Mồi Thành Công!")
-                .setDescription(
-                    `**${interaction.user.username}** đã mua:\n\n` +
-                    `${baitInfo.emoji} **${baitInfo.name}** x${quantity}\n` +
-                    `💰 **Giá mỗi cái:** ${baitInfo.price} AniCoin\n` +
-                    `💵 **Tổng giá:** ${result.totalCost} AniCoin\n` +
-                    `✨ **Bonus hiếm:** +${baitInfo.rarityBonus}%\n` +
-                    `📝 **Mô tả:** ${baitInfo.description}\n\n` +
-                    `✅ **Đã tự động đặt làm mồi hiện tại!**`
-                )
-                .setColor("#00ff00")
-                .setTimestamp();
-
-            await interaction.reply({ 
-                embeds: [successEmbed], 
-                ephemeral: true 
-            });
+            // Hiển thị menu chọn số lượng
+            await showQuantitySelector(interaction, baitType, userId, guildId);
 
         } catch (error: any) {
             const errorEmbed = new EmbedBuilder()
@@ -61,4 +36,45 @@ export default Bot.createMessageComponent<ComponentType.StringSelect, {}>({
             });
         }
     },
-}); 
+});
+
+async function showQuantitySelector(interaction: any, baitType: string, userId: string, guildId: string) {
+    const baitInfo = BAITS[baitType as keyof typeof BAITS];
+    const quantities = [1, 5, 10, 20, 50];
+    
+    const embed = new EmbedBuilder()
+        .setTitle("🪱 Chọn Số Lượng")
+        .setDescription(`Bạn đã chọn: ${baitInfo.emoji} **${baitInfo.name}**\nChọn số lượng bạn muốn mua:`)
+        .setColor("#ff9900")
+        .setTimestamp();
+
+    const row = new ActionRowBuilder<StringSelectMenuBuilder>()
+        .addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId(JSON.stringify({ n: "BuyBaitQuantity", d: { baitType, userId, guildId } }))
+                .setPlaceholder("Chọn số lượng...")
+                .addOptions(
+                    quantities.map(qty => 
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel(`${baitInfo.name} x${qty} - ${baitInfo.price * qty} AniCoin`)
+                            .setDescription(`${qty} cái - ${baitInfo.price * qty} AniCoin`)
+                            .setValue(qty.toString())
+                            .setEmoji(baitInfo.emoji)
+                    )
+                )
+        );
+
+    const backRow = new ActionRowBuilder<ButtonBuilder>()
+        .addComponents(
+            new ButtonBuilder()
+                .setCustomId(JSON.stringify({ n: "FishingShop", d: { action: "buy_bait" } }))
+                .setLabel("⬅️ Quay Lại")
+                .setStyle(ButtonStyle.Secondary)
+        );
+
+    await interaction.reply({ 
+        embeds: [embed], 
+        components: [row, backRow],
+        ephemeral: true 
+    });
+} 
