@@ -137,89 +137,7 @@ export class EcommerceService {
         }
     }
 
-    /**
-     * Chuyển tiền giữa hai người dùng
-     */
-    static async transferMoney(
-        fromUserId: string,
-        toUserId: string,
-        guildId: string,
-        amount: number,
-        description: string = "Transfer"
-    ) {
-        try {
-            if (amount <= 0) {
-                throw new Error("Số tiền phải lớn hơn 0");
-            }
 
-            if (fromUserId === toUserId) {
-                throw new Error("Không thể chuyển tiền cho chính mình");
-            }
-
-            // Kiểm tra số dư người gửi
-            const fromUser = await this.getUser(fromUserId, guildId);
-            if (fromUser.balance < amount) {
-                throw new Error("Không đủ tiền để chuyển");
-            }
-
-            // Thực hiện chuyển tiền trong transaction
-            const result = await prisma.$transaction(async (tx: any) => {
-                // Trừ tiền người gửi
-                const updatedFromUser = await tx.user.update({
-                    where: {
-                        userId_guildId: {
-                            userId: fromUserId,
-                            guildId
-                        }
-                    },
-                    data: {
-                        balance: { decrement: amount }
-                    }
-                });
-
-                // Cộng tiền người nhận
-                const updatedToUser = await tx.user.update({
-                    where: {
-                        userId_guildId: {
-                            userId: toUserId,
-                            guildId
-                        }
-                    },
-                    data: {
-                        balance: { increment: amount }
-                    }
-                });
-
-                // Ghi lại giao dịch
-                await tx.transaction.create({
-                    data: {
-                        userId: fromUserId,
-                        guildId,
-                        amount: -amount,
-                        type: "transfer",
-                        description: `${description} -> ${toUserId}`
-                    }
-                });
-
-                await tx.transaction.create({
-                    data: {
-                        userId: toUserId,
-                        guildId,
-                        amount,
-                        type: "transfer",
-                        description: `${description} <- ${fromUserId}`
-                    }
-                });
-
-                return { fromUser: updatedFromUser, toUser: updatedToUser };
-            });
-
-            return result;
-        } catch (error) {
-            console.error("Error transferring money:", error);
-            throw error;
-        }
-    }
 
     /**
      * Kiểm tra có thể nhận daily không
@@ -416,4 +334,186 @@ export class EcommerceService {
             throw error;
         }
     }
-} 
+
+    /**
+     * Process daily claim with return structure for compatibility
+     */
+    static async processDailyClaim(userId: string, guildId: string) {
+        try {
+            const canClaim = await this.canClaimDaily(userId, guildId);
+            if (!canClaim) {
+                return { success: false };
+            }
+
+            const user = await this.getUser(userId, guildId);
+            const baseAmount = 1000;
+            const streakBonus = Math.min(user.dailyStreak * 100, 1000);
+            const totalAmount = baseAmount + streakBonus;
+
+            // Cập nhật user và ghi lại daily claim
+            const result = await prisma.$transaction(async (tx: any) => {
+                const updatedUser = await tx.user.update({
+                    where: {
+                        userId_guildId: {
+                            userId,
+                            guildId
+                        }
+                    },
+                    data: {
+                        balance: { increment: totalAmount },
+                        dailyStreak: { increment: 1 }
+                    }
+                });
+
+                await tx.dailyClaim.create({
+                    data: {
+                        userId,
+                        guildId
+                    }
+                });
+
+                await tx.transaction.create({
+                    data: {
+                        userId,
+                        guildId,
+                        amount: totalAmount,
+                        type: "daily",
+                        description: `Daily reward (streak: ${user.dailyStreak + 1})`
+                    }
+                });
+
+                return updatedUser;
+            });
+
+            return {
+                success: true,
+                amount: totalAmount,
+                newStreak: user.dailyStreak + 1
+            };
+        } catch (error) {
+            console.error("Error processing daily claim:", error);
+            return { success: false };
+        }
+    }
+
+    /**
+     * Get last daily claim time
+     */
+    static async getLastDailyClaim(userId: string, guildId: string) {
+        try {
+            const lastClaim = await prisma.dailyClaim.findFirst({
+                where: {
+                    userId,
+                    guildId
+                },
+                orderBy: {
+                    claimedAt: 'desc'
+                }
+            });
+
+            return lastClaim ? new Date(lastClaim.claimedAt) : null;
+        } catch (error) {
+            console.error("Error getting last daily claim:", error);
+            return null;
+        }
+    }
+
+    /**
+     * Get settings
+     */
+    static async getSettings() {
+        return {
+            dailyBaseAmount: 1000,
+            dailyStreakBonus: 100,
+            maxStreakBonus: 1000,
+            dailyCooldownHours: 24
+        };
+    }
+
+    /**
+     * Transfer money with return structure for compatibility
+     */
+    static async transferMoney(
+        fromUserId: string,
+        toUserId: string,
+        guildId: string,
+        amount: number,
+        description: string = "Transfer"
+    ) {
+        try {
+            if (amount <= 0) {
+                return { success: false, message: "Số tiền phải lớn hơn 0" };
+            }
+
+            if (fromUserId === toUserId) {
+                return { success: false, message: "Không thể chuyển tiền cho chính mình" };
+            }
+
+            // Đảm bảo cả hai user đều tồn tại trước khi transfer
+            const fromUser = await this.getUser(fromUserId, guildId);
+            const toUser = await this.getUser(toUserId, guildId);
+
+            if (fromUser.balance < amount) {
+                return { success: false, message: "Không đủ tiền để chuyển" };
+            }
+
+            // Thực hiện chuyển tiền trong transaction
+            await prisma.$transaction(async (tx: any) => {
+                // Trừ tiền người gửi
+                await tx.user.update({
+                    where: {
+                        userId_guildId: {
+                            userId: fromUserId,
+                            guildId
+                        }
+                    },
+                    data: {
+                        balance: { decrement: amount }
+                    }
+                });
+
+                // Cộng tiền người nhận
+                await tx.user.update({
+                    where: {
+                        userId_guildId: {
+                            userId: toUserId,
+                            guildId
+                        }
+                    },
+                    data: {
+                        balance: { increment: amount }
+                    }
+                });
+
+                // Ghi lại giao dịch
+                await tx.transaction.create({
+                    data: {
+                        userId: fromUserId,
+                        guildId,
+                        amount: -amount,
+                        type: "transfer",
+                        description: `${description} -> ${toUserId}`
+                    }
+                });
+
+                await tx.transaction.create({
+                    data: {
+                        userId: toUserId,
+                        guildId,
+                        amount: amount,
+                        type: "transfer",
+                        description: `${description} <- ${fromUserId}`
+                    }
+                });
+            });
+
+            return { success: true, message: "Chuyển tiền thành công" };
+        } catch (error) {
+            console.error("Error transferring money:", error);
+            return { success: false, message: "Lỗi khi chuyển tiền" };
+        }
+    }
+}
+
+// Export instance for backward compatibility
+export const ecommerceDB = EcommerceService;
