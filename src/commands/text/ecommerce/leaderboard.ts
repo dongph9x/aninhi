@@ -2,7 +2,7 @@ import { EmbedBuilder } from "discord.js";
 
 import { Bot } from "@/classes";
 import { config } from "@/config";
-import { getTopUsers } from "@/utils/ecommerce";
+import { ecommerceDB } from "@/utils/ecommerce-db";
 
 export default Bot.createCommand({
     structure: {
@@ -13,7 +13,7 @@ export default Bot.createCommand({
         const guildId = message.guildId!;
 
         try {
-            const topUsers = await getTopUsers(guildId, 10);
+            const topUsers = await ecommerceDB.getTopUsers(guildId, 10);
 
             if (topUsers.length === 0) {
                 const embed = new EmbedBuilder()
@@ -44,7 +44,7 @@ export default Bot.createCommand({
                 )
                 .setColor(config.embedColor)
                 .setFooter({
-                    text: `${message.guild?.name} • Top 10 Người Dùng Giàu Nhất`,
+                    text: `${message.guild?.name} • Top 10 Người Dùng Giàu Nhất | Database Version`,
                     iconURL: message.guild?.iconURL() || undefined,
                 })
                 .setTimestamp();

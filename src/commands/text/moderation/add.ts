@@ -1,7 +1,8 @@
 import { EmbedBuilder } from "discord.js";
 
 import { Bot } from "@/classes";
-import { addMoney } from "@/utils/ecommerce";
+import { EcommerceService } from "@/utils/ecommerce-db";
+import { ModerationService } from "@/utils/moderation";
 
 export default Bot.createCommand({
     structure: {
@@ -63,12 +64,24 @@ export default Bot.createCommand({
             }
 
             // Thực hiện thêm tiền
-            const user = await addMoney(
+            const user = await EcommerceService.addMoney(
                 targetUser.id,
                 guildId,
                 amount,
                 `Admin add by ${message.author.username}`,
             );
+
+            // Ghi lại moderation log
+            await ModerationService.logAction({
+                guildId,
+                targetUserId: targetUser.id,
+                moderatorId: message.author.id,
+                action: "add_money",
+                reason: `Admin add by ${message.author.username}`,
+                amount: amount,
+                channelId: message.channelId,
+                messageId: message.id
+            });
 
             const embed = new EmbedBuilder()
                 .setTitle("✅ Đã Thêm Tiền")

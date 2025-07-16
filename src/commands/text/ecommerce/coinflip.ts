@@ -1,7 +1,8 @@
 import { EmbedBuilder } from "discord.js";
 
 import { Bot } from "@/classes";
-import { addMoney, getBalance, subtractMoney } from "@/utils/ecommerce";
+import { EcommerceService } from "@/utils/ecommerce-db";
+import { GameStatsService } from "@/utils/gameStats";
 
 const maxBet = 300000;
 const spin = "🪙";
@@ -79,7 +80,7 @@ export default Bot.createCommand({
             }
 
             // Lấy số dư hiện tại
-            const currentBalance = await getBalance(userId, guildId);
+            const currentBalance = await EcommerceService.getBalance(userId, guildId);
 
             // Xử lý bet "all"
             if (bet === "all") {
@@ -126,10 +127,17 @@ export default Bot.createCommand({
 
             // Cập nhật số dư
             if (win) {
-                await addMoney(userId, guildId, bet, `Coinflip win - bet: ${bet}`);
+                await EcommerceService.addMoney(userId, guildId, bet, `Coinflip win - bet: ${bet}`);
             } else {
-                await subtractMoney(userId, guildId, bet, `Coinflip lose - bet: ${bet}`);
+                await EcommerceService.subtractMoney(userId, guildId, bet, `Coinflip lose - bet: ${bet}`);
             }
+
+            // Ghi lại thống kê game
+            await GameStatsService.recordGameResult(userId, guildId, "coinflip", {
+                won: win,
+                bet: betAmount,
+                winnings: win ? betAmount * 2 : 0
+            });
 
             // Tạo embed thông báo
             const choiceText = choice === "h" ? "**heads**" : "**tails**";
@@ -162,7 +170,7 @@ export default Bot.createCommand({
                     .setColor(win ? "#51cf66" : "#ff6b6b")
                     .setThumbnail(message.author.displayAvatarURL())
                     .setFooter({
-                        text: `Số dư mới: ${await getBalance(userId, guildId)} AniCoin`,
+                        text: `Số dư mới: ${await EcommerceService.getBalance(userId, guildId)} AniCoin`,
                         iconURL: message.author.displayAvatarURL(),
                     })
                     .setTimestamp();

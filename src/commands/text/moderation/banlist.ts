@@ -1,7 +1,7 @@
 import { EmbedBuilder } from "discord.js";
 
 import { Bot } from "@/classes";
-import { getBans } from "@/utils/banStore";
+import { banDB } from "@/utils/ban-db";
 
 export default Bot.createCommand({
     structure: {
@@ -15,8 +15,7 @@ export default Bot.createCommand({
     run: async ({ message, t, args }) => {
         try {
             const guildId = message.guildId!;
-            const allBans = getBans();
-            const guildBans = allBans.filter(ban => ban.guildId === guildId);
+            const guildBans = await banDB.getBanList(guildId);
 
             if (guildBans.length === 0) {
                 const embed = new EmbedBuilder()
@@ -43,7 +42,7 @@ export default Bot.createCommand({
                 const permanentList = permanentBans
                     .map(ban => {
                         const banDate = new Date(ban.banAt);
-                        return `• <@${ban.userId}> - **${ban.reason}** (Ban bởi <@${ban.moderatorId}> - <t:${Math.floor(ban.banAt / 1000)}:R>)`;
+                        return `• <@${ban.userId}> - **${ban.reason}** (Ban bởi <@${ban.moderatorId}> - <t:${Math.floor(ban.banAt.getTime() / 1000)}:R>)`;
                     })
                     .join("\n");
 
@@ -59,7 +58,7 @@ export default Bot.createCommand({
                 const temporaryList = temporaryBans
                     .map(ban => {
                         const banDate = new Date(ban.banAt);
-                        const expiresDate = ban.expiresAt ? new Date(ban.expiresAt) : null;
+                        const expiresDate = ban.expiresAt;
                         const timeLeft = expiresDate ? Math.max(0, expiresDate.getTime() - Date.now()) : 0;
                         
                         let status = "";
@@ -83,7 +82,7 @@ export default Bot.createCommand({
             }
 
             embed.setFooter({
-                text: `Server: ${message.guild?.name}`,
+                text: `Server: ${message.guild?.name} | Database Version`,
                 iconURL: message.guild?.iconURL() || undefined,
             });
 

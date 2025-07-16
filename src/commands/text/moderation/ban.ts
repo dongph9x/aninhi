@@ -1,8 +1,8 @@
 import { EmbedBuilder, PermissionFlagsBits } from "discord.js";
 
 import { Bot } from "@/classes";
-import { addBan, removeBan } from "@/utils/banStore";
-import type { BanRecord } from "@/utils/banStore";
+import { banDB } from "@/utils/ban-db";
+import { ModerationService } from "@/utils/moderation";
 
 // Helper function to parse duration
 function parseDuration(durationStr: string): { duration: number | null; unit: string } {
@@ -172,15 +172,27 @@ export default Bot.createCommand({
 
             await message.guild!.members.ban(targetUser.id, banOptions);
 
-            // Lưu lịch sử ban vào file JSON
-            addBan({
-                userId: targetUser.id,
-                guildId: message.guildId!,
-                moderatorId: message.author.id,
+            // Lưu lịch sử ban vào database
+            const banType = duration !== null ? "temporary" : "permanent";
+            await banDB.createBan(
+                targetUser.id,
+                message.guildId!,
+                message.author.id,
                 reason,
-                banAt: Date.now(),
-                expiresAt: duration !== null ? Date.now() + duration : null,
-                type: duration !== null ? "temporary" : "permanent",
+                banType,
+                duration || undefined
+            );
+
+            // Ghi lại moderation log
+            await ModerationService.logAction({
+                guildId: message.guildId!,
+                targetUserId: targetUser.id,
+                moderatorId: message.author.id,
+                action: "ban",
+                reason: reason,
+                duration: duration || undefined,
+                channelId: message.channelId,
+                messageId: message.id
             });
 
             // Create embed
@@ -200,7 +212,7 @@ export default Bot.createCommand({
                     "displayAvatarURL" in targetUser ? targetUser.displayAvatarURL() : null,
                 )
                 .setFooter({
-                    text: `Ban bởi ${message.author.username}`,
+                    text: `Ban bởi ${message.author.username} | Database Version`,
                     iconURL: message.author.displayAvatarURL(),
                 })
                 .setTimestamp();
@@ -212,8 +224,8 @@ export default Bot.createCommand({
                 setTimeout(async () => {
                     try {
                         await message.guild!.members.unban(targetUser.id, "Tự động unban sau khi hết hạn");
-                        // Xoá khỏi file ban khi auto-unban
-                        removeBan(targetUser.id, message.guildId!);
+                        // Xoá khỏi database khi auto-unban
+                        await banDB.unbanUser(targetUser.id, message.guildId!);
                         
                         const unbanEmbed = new EmbedBuilder()
                             .setTitle("🔓 Tự Động Unban")

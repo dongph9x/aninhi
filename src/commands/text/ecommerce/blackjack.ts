@@ -1,7 +1,8 @@
 import { EmbedBuilder, Message, User } from "discord.js";
 
 import { Bot } from "@/classes";
-import { addMoney, getBalance, subtractMoney } from "@/utils/ecommerce";
+import { EcommerceService } from "@/utils/ecommerce-db";
+import { GameStatsService } from "@/utils/gameStats";
 
 const maxBet = 300000;
 const hitEmoji = "👊";
@@ -88,7 +89,7 @@ export default Bot.createCommand({
         if (bet !== "all" && (bet <= 0 || isNaN(bet))) {
             return message.reply("Số tiền cược không hợp lệ!");
         }
-        const balance = await getBalance(userId, guildId);
+        const balance = await EcommerceService.getBalance(userId, guildId);
         if (bet === "all") bet = Math.min(balance, maxBet);
         if (typeof bet === "number" && bet > maxBet) bet = maxBet;
         if (balance < (bet as number)) {
@@ -97,7 +98,7 @@ export default Bot.createCommand({
         if ((bet as number) <= 0) {
             return message.reply("Bạn không thể cược 0 AniCoin!");
         }
-        await subtractMoney(userId, guildId, bet as number, "Blackjack bet");
+        await EcommerceService.subtractMoney(userId, guildId, bet as number, "Blackjack bet");
 
         // Khởi tạo ván bài
         const deck = createDeck();
@@ -300,17 +301,26 @@ async function endGame(
     games[gameKey].finished = true;
     let reward = 0;
     let resultText = "";
+    
     if (draw) {
         reward = bet;
         resultText = `🤝 **Hòa!** Bạn nhận lại ${bet} AniCoin.`;
-        await addMoney(userId, guildId, bet, "Blackjack draw");
+        await EcommerceService.addMoney(userId, guildId, bet, "Blackjack draw");
     } else if (win) {
         reward = bet * 2;
         resultText = `🎉 **Bạn thắng!** Nhận ${bet * 2} AniCoin!`;
-        await addMoney(userId, guildId, bet * 2, "Blackjack win");
+        await EcommerceService.addMoney(userId, guildId, bet * 2, "Blackjack win");
     } else {
         resultText = `😢 **Bạn thua!** Mất ${bet} AniCoin.`;
     }
+
+    // Ghi lại thống kê game
+    await GameStatsService.recordGameResult(userId, guildId, "blackjack", {
+        won: win,
+        bet: bet,
+        winnings: reward
+    });
+
     const embed = new EmbedBuilder()
         .setTitle("🃏 Kết Quả Blackjack")
         .setDescription(
@@ -322,7 +332,7 @@ async function endGame(
         .setColor(win ? "#51cf66" : draw ? "#ffd93d" : "#ff6b6b")
         .setThumbnail(message.author.displayAvatarURL())
         .setFooter({
-            text: `Số dư mới: ${await getBalance(userId, guildId)} AniCoin`,
+            text: `Số dư mới: ${await EcommerceService.getBalance(userId, guildId)} AniCoin`,
             iconURL: message.author.displayAvatarURL(),
         })
         .setTimestamp();
