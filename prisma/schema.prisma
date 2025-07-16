@@ -311,3 +311,18 @@ model BanRecord {
   @@index([isActive])
   @@index([expiresAt])
 }
+
+model FishPrice {
+  id          String   @id @default(cuid())
+  fishName    String
+  basePrice   Int
+  currentPrice Int
+  priceChange Int      @default(0) // Số tiền thay đổi so với giá gốc
+  changePercent Float  @default(0) // Phần trăm thay đổi
+  lastUpdated DateTime @default(now())
+  priceHistory String? // JSON array lưu lịch sử giá
+
+  @@unique([fishName])
+  @@index([fishName])
+  @@index([lastUpdated])
+}

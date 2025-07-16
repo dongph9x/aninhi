@@ -23,6 +23,13 @@ async function startBot() {
         await databaseService.initialize();
         console.log('✅ Database initialized successfully');
 
+        // Initialize fish price system
+        console.log('🐟 Initializing fish price system...');
+        const { FishPriceService } = await import("@/utils/fishing");
+        await FishPriceService.initializeFishPrices();
+        FishPriceService.startPriceUpdateScheduler();
+        console.log('✅ Fish price system initialized successfully');
+
         // Create Discord client
         const client = new ExtendedClient({
             partials: [Partials.Channel, Partials.GuildMember, Partials.Message, Partials.User],

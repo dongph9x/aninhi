@@ -30,15 +30,16 @@ export default Bot.createMessageComponent<ComponentType.Button, { fishId: string
                 });
             }
 
-            // Bán cá
-            const result = await FishingService.sellFish(userId, guildId, fishName, 1);
+            // Bán toàn bộ số lượng cá
+            const result = await FishingService.sellFish(userId, guildId, fishName, caughtFish.quantity);
 
             const successEmbed = new EmbedBuilder()
                 .setTitle("💰 Bán Thành Công!")
                 .setDescription(
                     `**${interaction.user.username}** đã bán:\n\n` +
                     `🐟 **${result.fishName}** x${result.quantity}\n` +
-                    `💰 **Tổng giá:** ${result.totalValue} AniCoin`
+                    `💰 **Giá hiện tại:** ${result.currentPrice} AniCoin\n` +
+                    `💵 **Tổng giá:** ${result.totalValue} AniCoin`
                 )
                 .setColor("#00ff00")
                 .setTimestamp();

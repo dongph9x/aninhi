@@ -66,18 +66,18 @@ export const FISH_LIST: Fish[] = [
 // Danh sách cần câu
 export const FISHING_RODS: Record<string, FishingRod> = {
     "basic": { name: "Cần câu cơ bản", emoji: "🎣", price: 100, rarityBonus: 0, durability: 10, description: "Cần câu cơ bản, độ bền thấp" },
-    "copper": { name: "Cần câu đồng", emoji: "🎣", price: 1000, rarityBonus: 10, durability: 25, description: "Tăng 10% tỷ lệ hiếm, độ bền trung bình" },
-    "silver": { name: "Cần câu bạc", emoji: "🎣", price: 5000, rarityBonus: 20, durability: 50, description: "Tăng 20% tỷ lệ hiếm, độ bền cao" },
-    "gold": { name: "Cần câu vàng", emoji: "🎣", price: 15000, rarityBonus: 35, durability: 100, description: "Tăng 35% tỷ lệ hiếm, độ bền rất cao" },
-    "diamond": { name: "Cần câu kim cương", emoji: "💎", price: 50000, rarityBonus: 50, durability: 200, description: "Tăng 50% tỷ lệ hiếm, độ bền tối đa" },
+    "copper": { name: "Cần câu đồng", emoji: "🎣", price: 1000, rarityBonus: 2, durability: 25, description: "Tăng 2% tỷ lệ hiếm, độ bền trung bình" },
+    "silver": { name: "Cần câu bạc", emoji: "🎣", price: 5000, rarityBonus: 4, durability: 50, description: "Tăng 4% tỷ lệ hiếm, độ bền cao" },
+    "gold": { name: "Cần câu vàng", emoji: "🎣", price: 15000, rarityBonus: 7, durability: 100, description: "Tăng 7% tỷ lệ hiếm, độ bền rất cao" },
+    "diamond": { name: "Cần câu kim cương", emoji: "💎", price: 50000, rarityBonus: 10, durability: 200, description: "Tăng 10% tỷ lệ hiếm, độ bền tối đa" },
 };
 
 // Danh sách mồi
 export const BAITS: Record<string, Bait> = {
     "basic": { name: "Mồi cơ bản", emoji: "🪱", price: 10, rarityBonus: 0, description: "Mồi cơ bản, tỷ lệ thường" },
-    "good": { name: "Mồi ngon", emoji: "🦐", price: 50, rarityBonus: 15, description: "Tăng 15% tỷ lệ hiếm" },
-    "premium": { name: "Mồi thượng hạng", emoji: "🦀", price: 200, rarityBonus: 30, description: "Tăng 30% tỷ lệ hiếm" },
-    "divine": { name: "Mồi thần", emoji: "🌟", price: 1000, rarityBonus: 50, description: "Tăng 50% tỷ lệ hiếm" },
+    "good": { name: "Mồi ngon", emoji: "🦐", price: 50, rarityBonus: 3, description: "Tăng 3% tỷ lệ hiếm" },
+    "premium": { name: "Mồi thượng hạng", emoji: "🦀", price: 200, rarityBonus: 6, description: "Tăng 6% tỷ lệ hiếm" },
+    "divine": { name: "Mồi thần", emoji: "🌟", price: 1000, rarityBonus: 10, description: "Tăng 10% tỷ lệ hiếm" },
 };
 
 // Cooldown cho câu cá (30 giây)
@@ -86,39 +86,231 @@ const FISHING_COOLDOWN = 30000;
 // Chi phí mỗi lần câu
 const FISHING_COST = 10;
 
+// Thời gian cập nhật giá cá (10 phút)
+const PRICE_UPDATE_INTERVAL = 10 * 60 * 1000;
+
+export class FishPriceService {
+    /**
+     * Khởi tạo giá cá ban đầu
+     */
+    static async initializeFishPrices() {
+        try {
+            for (const fish of FISH_LIST) {
+                const basePrice = Math.floor((fish.minValue + fish.maxValue) / 2);
+                
+                await prisma.fishPrice.upsert({
+                    where: { fishName: fish.name },
+                    update: {},
+                    create: {
+                        fishName: fish.name,
+                        basePrice,
+                        currentPrice: basePrice,
+                        priceChange: 0,
+                        changePercent: 0,
+                        priceHistory: JSON.stringify([{
+                            price: basePrice,
+                            timestamp: new Date().toISOString()
+                        }])
+                    }
+                });
+            }
+            console.log("✅ Đã khởi tạo giá cá ban đầu");
+        } catch (error) {
+            console.error("❌ Lỗi khởi tạo giá cá:", error);
+        }
+    }
+
+    /**
+     * Cập nhật giá cá với biến động ±10%
+     */
+    static async updateFishPrices() {
+        try {
+            const fishPrices = await prisma.fishPrice.findMany();
+            
+            for (const fishPrice of fishPrices) {
+                // Tạo biến động ngẫu nhiên ±10%
+                const fluctuation = (Math.random() - 0.5) * 0.2; // -10% đến +10%
+                const newPrice = Math.max(1, Math.floor(fishPrice.basePrice * (1 + fluctuation)));
+                const priceChange = newPrice - fishPrice.basePrice;
+                const changePercent = (fluctuation * 100);
+
+                // Cập nhật lịch sử giá
+                const priceHistory = JSON.parse(fishPrice.priceHistory || '[]');
+                priceHistory.push({
+                    price: newPrice,
+                    timestamp: new Date().toISOString()
+                });
+
+                // Giữ chỉ 24 điểm dữ liệu gần nhất (4 giờ với 10 phút/lần)
+                if (priceHistory.length > 24) {
+                    priceHistory.splice(0, priceHistory.length - 24);
+                }
+
+                await prisma.fishPrice.update({
+                    where: { id: fishPrice.id },
+                    data: {
+                        currentPrice: newPrice,
+                        priceChange,
+                        changePercent,
+                        lastUpdated: new Date(),
+                        priceHistory: JSON.stringify(priceHistory)
+                    }
+                });
+            }
+            console.log(`✅ Đã cập nhật giá cá lúc ${new Date().toLocaleString()}`);
+        } catch (error) {
+            console.error("❌ Lỗi cập nhật giá cá:", error);
+        }
+    }
+
+    /**
+     * Lấy giá hiện tại của cá
+     */
+    static async getCurrentPrice(fishName: string): Promise<number> {
+        try {
+            const fishPrice = await prisma.fishPrice.findUnique({
+                where: { fishName }
+            });
+
+            if (!fishPrice) {
+                // Nếu chưa có giá, tạo giá mặc định
+                const fish = FISH_LIST.find(f => f.name === fishName);
+                if (fish) {
+                    const basePrice = Math.floor((fish.minValue + fish.maxValue) / 2);
+                    await this.initializeFishPrices();
+                    return basePrice;
+                }
+                return 0;
+            }
+
+            return fishPrice.currentPrice;
+        } catch (error) {
+            console.error("❌ Lỗi lấy giá cá:", error);
+            return 0;
+        }
+    }
+
+    /**
+     * Lấy thông tin giá chi tiết của cá
+     */
+    static async getFishPriceInfo(fishName: string) {
+        try {
+            const fishPrice = await prisma.fishPrice.findUnique({
+                where: { fishName }
+            });
+
+            if (!fishPrice) {
+                return null;
+            }
+
+            return {
+                fishName: fishPrice.fishName,
+                basePrice: fishPrice.basePrice,
+                currentPrice: fishPrice.currentPrice,
+                priceChange: fishPrice.priceChange,
+                changePercent: fishPrice.changePercent,
+                lastUpdated: fishPrice.lastUpdated,
+                priceHistory: JSON.parse(fishPrice.priceHistory || '[]')
+            };
+        } catch (error) {
+            console.error("❌ Lỗi lấy thông tin giá cá:", error);
+            return null;
+        }
+    }
+
+    /**
+     * Lấy tất cả giá cá hiện tại
+     */
+    static async getAllFishPrices() {
+        try {
+            const fishPrices = await prisma.fishPrice.findMany({
+                orderBy: { fishName: 'asc' }
+            });
+
+            return fishPrices.map(fp => ({
+                fishName: fp.fishName,
+                basePrice: fp.basePrice,
+                currentPrice: fp.currentPrice,
+                priceChange: fp.priceChange,
+                changePercent: fp.changePercent,
+                lastUpdated: fp.lastUpdated
+            }));
+        } catch (error) {
+            console.error("❌ Lỗi lấy tất cả giá cá:", error);
+            return [];
+        }
+    }
+
+    /**
+     * Bắt đầu hệ thống cập nhật giá tự động
+     */
+    static startPriceUpdateScheduler() {
+        // Cập nhật giá ngay lập tức
+        this.updateFishPrices();
+        
+        // Cập nhật giá mỗi 10 phút
+        setInterval(() => {
+            this.updateFishPrices();
+        }, PRICE_UPDATE_INTERVAL);
+
+        console.log("🔄 Đã khởi động hệ thống cập nhật giá cá tự động (10 phút/lần)");
+    }
+}
+
 export class FishingService {
     /**
      * Lấy hoặc tạo fishing data cho người dùng
      */
     static async getFishingData(userId: string, guildId: string) {
         try {
-            const fishingData = await prisma.fishingData.upsert({
-                where: {
-                    userId_guildId: {
+            // Đảm bảo User tồn tại trước khi tạo FishingData
+            const fishingData = await prisma.$transaction(async (tx: any) => {
+                // Tạo hoặc lấy User trước
+                await tx.user.upsert({
+                    where: {
+                        userId_guildId: {
+                            userId,
+                            guildId
+                        }
+                    },
+                    update: {},
+                    create: {
                         userId,
-                        guildId
+                        guildId,
+                        balance: 0,
+                        dailyStreak: 0
                     }
-                },
-                update: {},
-                create: {
-                    userId,
-                    guildId,
-                    totalFish: 0,
-                    totalEarnings: 0,
-                    biggestFish: "",
-                    biggestValue: 0,
-                    rarestFish: "",
-                    rarestRarity: "",
-                    fishingTime: 0,
-                    currentRod: "basic",
-                    currentBait: "basic",
-                    lastFished: new Date(0) // Cho phép câu ngay lập tức
-                },
-                include: {
-                    rods: true,
-                    baits: true,
-                    fish: true
-                }
+                });
+
+                // Sau đó tạo hoặc lấy FishingData
+                return await tx.fishingData.upsert({
+                    where: {
+                        userId_guildId: {
+                            userId,
+                            guildId
+                        }
+                    },
+                    update: {},
+                    create: {
+                        userId,
+                        guildId,
+                        totalFish: 0,
+                        totalEarnings: 0,
+                        biggestFish: "",
+                        biggestValue: 0,
+                        rarestFish: "",
+                        rarestRarity: "",
+                        fishingTime: 0,
+                        currentRod: "", // Không có cần câu mặc định
+                        currentBait: "", // Không có mồi mặc định
+                        lastFished: new Date(0) // Cho phép câu ngay lập tức
+                    },
+                    include: {
+                        rods: true,
+                        baits: true,
+                        fish: true
+                    }
+                });
             });
 
             return fishingData;
@@ -131,23 +323,67 @@ export class FishingService {
     /**
      * Kiểm tra có thể câu cá không
      */
-    static async canFish(userId: string, guildId: string): Promise<{ canFish: boolean; remainingTime: number }> {
+    static async canFish(userId: string, guildId: string): Promise<{ canFish: boolean; remainingTime: number; message?: string }> {
         try {
             const fishingData = await this.getFishingData(userId, guildId);
             const now = new Date();
             const timeSinceLastFish = now.getTime() - fishingData.lastFished.getTime();
 
+            // Kiểm tra cooldown
             if (timeSinceLastFish < FISHING_COOLDOWN) {
                 return {
                     canFish: false,
-                    remainingTime: FISHING_COOLDOWN - timeSinceLastFish
+                    remainingTime: FISHING_COOLDOWN - timeSinceLastFish,
+                    message: `Bạn cần đợi ${Math.ceil((FISHING_COOLDOWN - timeSinceLastFish) / 1000)} giây nữa để câu cá!`
+                };
+            }
+
+            // Kiểm tra có cần câu không
+            if (!fishingData.currentRod || fishingData.currentRod === "") {
+                return {
+                    canFish: false,
+                    remainingTime: 0,
+                    message: "Bạn cần mua cần câu trước khi câu cá! Dùng `n.fishing shop` để xem cửa hàng."
+                };
+            }
+
+            // Kiểm tra có mồi không
+            if (!fishingData.currentBait || fishingData.currentBait === "") {
+                return {
+                    canFish: false,
+                    remainingTime: 0,
+                    message: "Bạn cần mua mồi trước khi câu cá! Dùng `n.fishing shop` để xem cửa hàng."
+                };
+            }
+
+            // Kiểm tra cần câu có độ bền không
+            const currentRod = fishingData.rods.find(r => r.rodType === fishingData.currentRod);
+            if (!currentRod || currentRod.durability <= 0) {
+                return {
+                    canFish: false,
+                    remainingTime: 0,
+                    message: "Cần câu của bạn đã hết độ bền! Hãy mua cần câu mới."
+                };
+            }
+
+            // Kiểm tra có mồi không
+            const currentBait = fishingData.baits.find(b => b.baitType === fishingData.currentBait);
+            if (!currentBait || currentBait.quantity <= 0) {
+                return {
+                    canFish: false,
+                    remainingTime: 0,
+                    message: "Bạn đã hết mồi! Hãy mua thêm mồi."
                 };
             }
 
             return { canFish: true, remainingTime: 0 };
         } catch (error) {
             console.error("Error checking fishing cooldown:", error);
-            return { canFish: false, remainingTime: FISHING_COOLDOWN };
+            return { 
+                canFish: false, 
+                remainingTime: FISHING_COOLDOWN,
+                message: "Đã xảy ra lỗi khi kiểm tra điều kiện câu cá!"
+            };
         }
     }
 
@@ -158,10 +394,10 @@ export class FishingService {
         try {
             const fishingData = await this.getFishingData(userId, guildId);
             
-            // Kiểm tra cooldown
+            // Kiểm tra điều kiện câu cá
             const cooldownCheck = await this.canFish(userId, guildId);
             if (!cooldownCheck.canFish) {
-                throw new Error(`Bạn cần đợi ${Math.ceil(cooldownCheck.remainingTime / 1000)} giây nữa để câu cá!`);
+                throw new Error(cooldownCheck.message || `Bạn cần đợi ${Math.ceil(cooldownCheck.remainingTime / 1000)} giây nữa để câu cá!`);
             }
 
             // Kiểm tra số dư
@@ -250,11 +486,11 @@ export class FishingService {
                     data: { durability: { decrement: 1 } }
                 });
 
-                // Nếu cần câu hết độ bền, chuyển về cần cơ bản
+                // Nếu cần câu hết độ bền, xóa cần câu hiện tại
                 if (currentRod.durability <= 1) {
                     await prisma.fishingData.update({
                         where: { id: fishingData.id },
-                        data: { currentRod: "basic" }
+                        data: { currentRod: "" }
                     });
                 }
             }
@@ -267,11 +503,11 @@ export class FishingService {
                     data: { quantity: { decrement: 1 } }
                 });
 
-                // Nếu hết mồi, chuyển về mồi cơ bản
+                // Nếu hết mồi, xóa mồi hiện tại
                 if (currentBait.quantity <= 0) {
                     await prisma.fishingData.update({
                         where: { id: fishingData.id },
-                        data: { currentBait: "basic" }
+                        data: { currentBait: "" }
                     });
                 }
             }
@@ -327,6 +563,14 @@ export class FishingService {
                         durability: rod.durability
                     }
                 });
+
+                // Tự động set làm cần câu hiện tại nếu chưa có cần câu nào
+                if (!fishingData.currentRod || fishingData.currentRod === "") {
+                    await tx.fishingData.update({
+                        where: { id: fishingData.id },
+                        data: { currentRod: rodType }
+                    });
+                }
             });
 
             return rod;
@@ -380,11 +624,75 @@ export class FishingService {
                         quantity
                     }
                 });
+
+                // Tự động set làm mồi hiện tại nếu chưa có mồi nào
+                if (!fishingData.currentBait || fishingData.currentBait === "") {
+                    await tx.fishingData.update({
+                        where: { id: fishingData.id },
+                        data: { currentBait: baitType }
+                    });
+                }
             });
 
             return { bait, quantity, totalCost };
         } catch (error) {
             console.error("Error buying bait:", error);
+            throw error;
+        }
+    }
+
+    /**
+     * Set cần câu hiện tại
+     */
+    static async setCurrentRod(userId: string, guildId: string, rodType: string) {
+        try {
+            const fishingData = await this.getFishingData(userId, guildId);
+            const rod = fishingData.rods.find(r => r.rodType === rodType);
+
+            if (!rod) {
+                throw new Error("Bạn không có cần câu này! Hãy mua trước.");
+            }
+
+            if (rod.durability <= 0) {
+                throw new Error("Cần câu này đã hết độ bền!");
+            }
+
+            await prisma.fishingData.update({
+                where: { id: fishingData.id },
+                data: { currentRod: rodType }
+            });
+
+            return rod;
+        } catch (error) {
+            console.error("Error setting current rod:", error);
+            throw error;
+        }
+    }
+
+    /**
+     * Set mồi hiện tại
+     */
+    static async setCurrentBait(userId: string, guildId: string, baitType: string) {
+        try {
+            const fishingData = await this.getFishingData(userId, guildId);
+            const bait = fishingData.baits.find(b => b.baitType === baitType);
+
+            if (!bait) {
+                throw new Error("Bạn không có mồi này! Hãy mua trước.");
+            }
+
+            if (bait.quantity <= 0) {
+                throw new Error("Bạn đã hết mồi này!");
+            }
+
+            await prisma.fishingData.update({
+                where: { id: fishingData.id },
+                data: { currentBait: baitType }
+            });
+
+            return bait;
+        } catch (error) {
+            console.error("Error setting current bait:", error);
             throw error;
         }
     }
@@ -405,7 +713,9 @@ export class FishingService {
                 throw new Error(`Bạn chỉ có ${caughtFish.quantity} con ${fishName}!`);
             }
 
-            const totalValue = caughtFish.fishValue * quantity;
+            // Lấy giá hiện tại của cá
+            const currentPrice = await FishPriceService.getCurrentPrice(fishName);
+            const totalValue = currentPrice * quantity;
 
             // Cộng tiền và trừ cá
             await prisma.$transaction(async (tx: any) => {
@@ -426,7 +736,7 @@ export class FishingService {
                 }
             });
 
-            return { fishName, quantity, totalValue };
+            return { fishName, quantity, totalValue, currentPrice };
         } catch (error) {
             console.error("Error selling fish:", error);
             throw error;
