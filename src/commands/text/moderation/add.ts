@@ -10,7 +10,7 @@ export default Bot.createCommand({
         aliases: ["addmoney", "giveadmin"],
     },
     options: {
-        permissions: ["ModerateMembers"],
+        permissions: ["Administrator"],
         inGuild: true,
     },
     run: async ({ message, t, args }) => {
@@ -21,11 +21,11 @@ export default Bot.createCommand({
             const embed = new EmbedBuilder()
                 .setTitle("❌ Cách Dùng Không Đúng")
                 .setDescription(
-                    "**Cách dùng:** `p!add <người dùng> <số tiền>`\n\n" +
+                    "**Cách dùng:** `n.add <người dùng> <số tiền>`\n\n" +
                         "**Ví dụ:**\n" +
-                        "• `p!add @user 1000`\n" +
-                        "• `p!add 123456789 500`\n\n" +
-                        "**Lưu ý:** Lệnh này yêu cầu quyền Moderate Members.",
+                        "• `n.add @user 1000`\n" +
+                        "• `n.add 123456789 500`\n\n" +
+                        "**Lưu ý:** Lệnh này yêu cầu quyền Administrator.",
                 )
                 .setColor("#ff0000")
                 .setTimestamp();
