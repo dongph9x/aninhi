@@ -146,4 +146,10 @@ docker stats aninhi-discord-bot
 
 # Xem container info
 docker inspect aninhi-discord-bot
+
+# Pull image
+docker pull node:18-alpine
+
+# Khởi tạo/migrate database
+docker compose up -d database-init
 ``` 
