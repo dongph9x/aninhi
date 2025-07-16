@@ -5,9 +5,9 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "start": "cross-env NODE_ENV=production DEBUG=bot:* tsx src/index.ts",
-    "dev": "cross-env NODE_ENV=development DEBUG=bot:* tsx watch src/index.ts",
-    "dev:inspect": "cross-env NODE_ENV=development DEBUG=bot:* tsx --inspect-brk src/index.ts",
+    "start": "cross-env NODE_ENV=production DEBUG=bot:* tsx --tsconfig tsconfig.json src/index.ts",
+    "dev": "cross-env NODE_ENV=development DEBUG=bot:* tsx watch --tsconfig tsconfig.json src/index.ts",
+    "dev:inspect": "cross-env NODE_ENV=development DEBUG=bot:* tsx --inspect-brk --tsconfig tsconfig.json src/index.ts",
     "format:fix": "prettier --write --list-different .",
     "type-checking": "tsc --noEmit",
     "format": "prettier --check .",
