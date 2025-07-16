@@ -1,13 +1,11 @@
-version: '3.8'
-
 services:
-  discord-bot-dev:
+  aninhi-bot-dev:
     build: .
     container_name: aninhi-discord-bot-dev
     restart: unless-stopped
     environment:
       - NODE_ENV=development
-      - BOT_TOKEN=${BOT_TOKEN}
+      - DATABASE_URL=file:./data/database.db
       - DEBUG=bot:*
     volumes:
       # Mount source code để hot reload
@@ -18,7 +16,7 @@ services:
       # Mount logs
       - ./logs:/app/logs
     networks:
-      - bot-network-dev
+      - aninhi-network-dev
     command: ["yarn", "dev"]
     healthcheck:
       test: ["CMD", "node", "-e", "console.log('Dev bot is running')"]
@@ -27,8 +25,27 @@ services:
       retries: 3
       start_period: 40s
 
+  # Service để khởi tạo database trong development
+  database-init-dev:
+    build: .
+    container_name: aninhi-db-init-dev
+    environment:
+      - DATABASE_URL=file:./data/database.db
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./data:/app/data
+    command: >
+      sh -c "
+        npx prisma generate &&
+        npx prisma migrate dev --name init &&
+        echo 'Development database initialized successfully'
+      "
+    profiles:
+      - init
+
 networks:
-  bot-network-dev:
+  aninhi-network-dev:
     driver: bridge
 
 volumes:

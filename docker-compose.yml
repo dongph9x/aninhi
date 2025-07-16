@@ -1,26 +1,51 @@
-version: '3.8'
-
 services:
-  eco-bot-v2:
+  aninhi-bot:
     build: .
-    container_name: eco-bot-v2
+    container_name: aninhi-discord-bot
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-      # Thêm các biến môi trường khác nếu cần
-      # - DISCORD_TOKEN=your_token_here
-      # - CLIENT_ID=your_client_id_here
+      - DATABASE_URL=file:./data/database.db
     volumes:
-      # Mount thư mục data để lưu trữ dữ liệu
+      # Mount thư mục data để lưu trữ database
       - ./data:/app/data
-      # Mount file .env.local từ thư mục env
-      - ./env/.env.local:/app/.env:ro
+      # Mount thư mục logs
+      - ./logs:/app/logs
+      # Mount file .env (optional - có thể dùng environment variables)
+      - ./.env:/app/.env:ro
     ports:
       # Expose port nếu bot có web interface
       - "3000:3000"
     networks:
-      - eco-bot-network
+      - aninhi-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "console.log('Bot is running')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Service để khởi tạo database
+  database-init:
+    build: .
+    container_name: aninhi-db-init
+    environment:
+      - DATABASE_URL=file:./data/database.db
+    volumes:
+      - ./data:/app/data
+    command: >
+      sh -c "
+        npx prisma generate &&
+        npx prisma migrate deploy &&
+        echo 'Database initialized successfully'
+      "
+    profiles:
+      - init
 
 networks:
-  eco-bot-network:
-    driver: bridge 
+  aninhi-network:
+    driver: bridge
+
+volumes:
+  data:
+  logs: 

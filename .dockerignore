@@ -100,7 +100,6 @@ lib-cov
 
 # Coverage directory used by tools like istanbul
 coverage
-*.lcov
 
 # Grunt intermediate storage
 .grunt
@@ -121,9 +120,6 @@ jspm_packages/
 # Optional npm cache directory
 .npm
 
-# Optional eslint cache
-.eslintcache
-
 # Optional REPL history
 .node_repl_history
 
@@ -135,32 +131,6 @@ jspm_packages/
 
 # dotenv environment variables file
 .env
-.env.test
-.env.local
-.env.production
-
-# parcel-bundler cache
-.cache
-.parcel-cache
-
-# Next.js build output
-.next
-
-# Nuxt.js build / generate output
-.nuxt
-dist
-
-# Gatsby files
-.cache/
-public
-
-# Storybook build outputs
-.out
-.storybook-out
-
-# Temporary folders
-tmp/
-temp/
 
 # IDE files
 .vscode/
@@ -183,18 +153,23 @@ Thumbs.db
 .gitignore
 
 # Docker
-Dockerfile
-docker-compose.yml
+Dockerfile*
+docker-compose*
 .dockerignore
 
 # Documentation
 README.md
 *.md
 
+# Database files (will be mounted as volume)
+data/
+*.db
+*.sqlite
+*.sqlite3
+
 # Backup files
-backups/
+backup/
 *.backup
-*.bak
 
 # Test files
 test/
@@ -203,4 +178,37 @@ __tests__/
 *.test.js
 *.test.ts
 *.spec.js
-*.spec.ts 
+*.spec.ts
+
+# Scripts
+scripts/
+*.sh
+
+# Husky
+.husky/
+
+# Lint staged
+.lint-staged*
+
+# Commitlint
+.commitlintrc*
+
+# ESLint
+.eslintrc*
+.eslintignore
+
+# Prettier
+.prettierrc*
+.prettierignore
+
+# TypeScript
+tsconfig.json
+*.tsbuildinfo
+
+# Prisma
+prisma/migrations/
+prisma/seed.ts
+
+# Misc
+*.tgz
+*.tar.gz 
