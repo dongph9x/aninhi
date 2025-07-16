@@ -62,6 +62,36 @@ export default Bot.createEvent({
                 return;
             }
 
+            // Kiểm tra xem có phải vote kick button không
+            try {
+                const voteKickData = JSON.parse(interaction.customId);
+                if (voteKickData.type === "votekick") {
+                    console.log("Vote kick button clicked:", interaction.customId);
+                    
+                    // Import và gọi handler từ vote kick command
+                    const { handleVoteKickButton } = await import("../commands/text/moderation/votekick");
+                    
+                    try {
+                        const handled = await handleVoteKickButton(interaction);
+                        if (!handled) {
+                            // Nếu không handle được, trả về lỗi
+                            if (!interaction.replied && !interaction.deferred) {
+                                interaction.reply(`${emojis.error} | Vote kick không hợp lệ hoặc đã kết thúc.`);
+                            }
+                        }
+                    } catch (error) {
+                        // Kiểm tra xem interaction đã được reply chưa
+                        if (!interaction.replied && !interaction.deferred) {
+                            interaction.reply(`${emojis.error} | ${t("errors.unknown")}`);
+                        }
+                        logger.error({ id: interaction.customId, error });
+                    }
+                    return;
+                }
+            } catch (error) {
+                // Không phải JSON, tiếp tục xử lý bình thường
+            }
+
             try {
                 const payload: CustomIdData = JSON.parse(interaction.customId);
                 const component = client.components.message.get(payload.n);
