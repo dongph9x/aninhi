@@ -158,16 +158,13 @@ async function showBaitShop(interaction: any) {
                 .setCustomId(JSON.stringify({ n: "BuyBait", d: {} }))
                 .setPlaceholder("Chọn loại mồi...")
                 .addOptions(
-                    Object.entries(BAITS).flatMap(([key, bait]) => {
-                        const quantities = [1, 5, 10, 20, 50];
-                        return quantities.map(qty => 
-                            new StringSelectMenuOptionBuilder()
-                                .setLabel(`${bait.name} x${qty} - ${bait.price * qty} AniCoin`)
-                                .setDescription(`${bait.description} (Bonus: +${bait.rarityBonus}%) - ${qty} cái`)
-                                .setValue(`${key}:${qty}`)
-                                .setEmoji(bait.emoji)
-                        );
-                    })
+                    Object.entries(BAITS).map(([key, bait]) => 
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel(`${bait.name} - ${bait.price} AniCoin`)
+                            .setDescription(`${bait.description} (Bonus: +${bait.rarityBonus}%)`)
+                            .setValue(key)
+                            .setEmoji(bait.emoji)
+                    )
                 )
         );
 

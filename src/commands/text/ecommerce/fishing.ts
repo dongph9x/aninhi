@@ -417,17 +417,19 @@ async function showInventory(message: Message) {
             .setColor(config.embedColor)
             .setTimestamp();
 
-        // Tạo components với nút bán nhanh cho từng loại cá
+        // Tạo components với nút bán nhanh cho từng loại cá (giới hạn 5 components)
         const components = [];
         if (fishingData.fish.length > 0) {
-            const rows = [];
-            for (let i = 0; i < fishingData.fish.length; i += 3) {
+            // Chỉ hiển thị tối đa 4 loại cá để tránh vượt quá giới hạn 5 components
+            const fishToShow = fishingData.fish.slice(0, 4);
+            
+            for (let i = 0; i < fishToShow.length; i += 2) {
                 const row = {
                     type: 1 as const,
-                    components: fishingData.fish.slice(i, i + 3).map((f: any, index: number) => ({
+                    components: fishToShow.slice(i, i + 2).map((f: any) => ({
                         type: 2 as const,
                         style: 3 as const, // Green button
-                        label: `Bán tất cả ${f.fishName}`,
+                        label: `Bán ${f.fishName}`,
                         custom_id: JSON.stringify({
                             n: "SellFish",
                             d: {
@@ -438,28 +440,29 @@ async function showInventory(message: Message) {
                         emoji: { name: "💰" }
                     }))
                 };
-                rows.push(row);
+                components.push(row);
             }
-            components.push(...rows);
         }
 
-        // Thêm nút quản lý trang bị
-        const manageRow = {
-            type: 1 as const,
-            components: [
-                {
-                    type: 2 as const,
-                    style: 2 as const, // Secondary button
-                    label: "⚙️ Quản Lý Trang Bị",
-                    custom_id: JSON.stringify({
-                        n: "FishingShop",
-                        d: { action: "manage" }
-                    }),
-                    emoji: { name: "⚙️" }
-                }
-            ]
-        };
-        components.push(manageRow);
+        // Thêm nút quản lý trang bị (nếu chưa đủ 5 components)
+        if (components.length < 5) {
+            const manageRow = {
+                type: 1 as const,
+                components: [
+                    {
+                        type: 2 as const,
+                        style: 2 as const, // Secondary button
+                        label: "⚙️ Quản Lý Trang Bị",
+                        custom_id: JSON.stringify({
+                            n: "FishingShop",
+                            d: { action: "manage" }
+                        }),
+                        emoji: { name: "⚙️" }
+                    }
+                ]
+            };
+            components.push(manageRow);
+        }
 
         await message.reply({ 
             embeds: [embed],
