@@ -10,12 +10,14 @@ import { Bot } from "@/classes";
 import type { MessageComponentProps } from "@/typings";
 import { FishingService, BAITS } from "@/utils/fishing";
 
-export default Bot.createMessageComponent<ComponentType.StringSelect, { baitType: string, userId: string, guildId: string }>({
+export default Bot.createMessageComponent<ComponentType.StringSelect, { baitType: string }>({
     type: ComponentType.StringSelect,
     run: async ({ interaction, data }) => {
         try {
             const quantity = parseInt(interaction.values[0]);
-            const { baitType, userId, guildId } = data;
+            const { baitType } = data;
+            const userId = interaction.user.id;
+            const guildId = interaction.guildId!;
 
             // Mua mồi với số lượng đã chọn
             const result = await FishingService.buyBait(userId, guildId, baitType, quantity);

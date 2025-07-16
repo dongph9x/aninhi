@@ -17,12 +17,8 @@ export default Bot.createMessageComponent<ComponentType.StringSelect, {}>({
     run: async ({ interaction }) => {
         try {
             const baitType = interaction.values[0];
-            const userId = interaction.user.id;
-            const guildId = interaction.guildId!;
-
-            // Hiển thị menu chọn số lượng
-            await showQuantitySelector(interaction, baitType, userId, guildId);
-
+            // Không cần userId/guildId ở custom_id
+            await showQuantitySelector(interaction, baitType);
         } catch (error: any) {
             const errorEmbed = new EmbedBuilder()
                 .setTitle("❌ Lỗi")
@@ -38,7 +34,7 @@ export default Bot.createMessageComponent<ComponentType.StringSelect, {}>({
     },
 });
 
-async function showQuantitySelector(interaction: any, baitType: string, userId: string, guildId: string) {
+async function showQuantitySelector(interaction: any, baitType: string) {
     const baitInfo = BAITS[baitType as keyof typeof BAITS];
     const quantities = [1, 5, 10, 20, 50];
     
@@ -51,7 +47,7 @@ async function showQuantitySelector(interaction: any, baitType: string, userId: 
     const row = new ActionRowBuilder<StringSelectMenuBuilder>()
         .addComponents(
             new StringSelectMenuBuilder()
-                .setCustomId(JSON.stringify({ n: "BuyBaitQuantity", d: { baitType, userId, guildId } }))
+                .setCustomId(JSON.stringify({ n: "BuyBaitQuantity", d: { baitType } }))
                 .setPlaceholder("Chọn số lượng...")
                 .addOptions(
                     quantities.map(qty => 
