@@ -2,3 +2,40 @@ node_modules
 env/.env.local
 
 /generated/prisma
+
+# Database files - không commit database vì mỗi môi trường có dữ liệu khác nhau
+prisma/data/database.db
+data/database.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files - không commit backup vì có thể chứa dữ liệu nhạy cảm
+data/backup/
+backup/
+*.backup
+
+# Logs
+logs/
+*.log
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.development
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
