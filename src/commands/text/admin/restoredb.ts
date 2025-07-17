@@ -45,21 +45,30 @@ export default Bot.createCommand({
             const tempFile = path.join(tempDir, `backup-${Date.now()}.db`);
             fs.writeFileSync(tempFile, Buffer.from(buffer));
 
-            // Backup database hiện tại
-            const currentDb = path.resolve('data/database.db');
-            if (fs.existsSync(currentDb)) {
-                const backupCurrent = path.resolve('data/database.db.backup-' + Date.now());
-                fs.copyFileSync(currentDb, backupCurrent);
-                await message.reply(`💾 Đã backup database hiện tại: ${path.basename(backupCurrent)}`);
+            // Backup database hiện tại (cả data và prisma)
+            const dataDb = path.resolve('data/database.db');
+            const prismaDb = path.resolve('prisma/data/database.db');
+            
+            if (fs.existsSync(dataDb)) {
+                const backupData = path.resolve('data/database.db.backup-' + Date.now());
+                fs.copyFileSync(dataDb, backupData);
+                await message.reply(`💾 Đã backup data database: ${path.basename(backupData)}`);
+            }
+            
+            if (fs.existsSync(prismaDb)) {
+                const backupPrisma = path.resolve('data/prisma-database.db.backup-' + Date.now());
+                fs.copyFileSync(prismaDb, backupPrisma);
+                await message.reply(`💾 Đã backup prisma database: ${path.basename(backupPrisma)}`);
             }
 
-            // Thay thế database
-            fs.copyFileSync(tempFile, currentDb);
+            // Thay thế cả hai database
+            fs.copyFileSync(tempFile, dataDb);
+            fs.copyFileSync(tempFile, prismaDb);
             
             // Xóa file temp
             fs.unlinkSync(tempFile);
 
-            const stats = fs.statSync(currentDb);
+            const stats = fs.statSync(dataDb);
             const sizeKB = Math.round(stats.size / 1024);
 
             await message.reply(`✅ **Đã restore database thành công!**
@@ -67,13 +76,14 @@ export default Bot.createCommand({
 📁 File: ${attachment.name}
 📊 Kích thước: ${sizeKB} KB
 🕐 Thời gian: ${new Date().toLocaleString('vi-VN')}
+🔄 Đã cập nhật: Data Database + Prisma Database
 
 🚀 **Bước tiếp theo:**
 1. \`docker-compose down\`
 2. \`docker-compose up -d --build\`
 3. \`n.balance\` để kiểm tra dữ liệu
 
-💡 **Lý do restart:** Volume mount sẽ tự động đồng bộ file mới vào container`);
+💡 **Lý do restart:** Đảm bảo bot đọc database mới và đồng bộ cache`);
 
         } catch (err) {
             console.error('Restore DB error:', err);
