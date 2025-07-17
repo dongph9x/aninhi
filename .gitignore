@@ -14,6 +14,7 @@ data/database.db
 data/backup/
 backup/
 data/
+exports/
 *.backup
 
 # Logs
