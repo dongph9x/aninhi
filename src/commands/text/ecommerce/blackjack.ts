@@ -131,7 +131,7 @@ async function sendGameEmbed(
                 `Cược: **${bet}** AniCoin\n\n` +
                 (playerPoints === 21 ? "🎉 **Blackjack!** 🎉\n" : "") +
                 (first && playerPoints < 21
-                    ? `Bấm ${hitEmoji} để rút bài, ${standEmoji} để dừng`
+                    ? `Bấm ${hitEmoji} để rút bài, ${standEmoji} để dừng\n⏰ **Thời gian: 15 phút**`
                     : ""),
         )
         .setColor("#ffd93d")
@@ -154,7 +154,7 @@ async function sendGameEmbed(
             );
         };
 
-        const collector = msg.createReactionCollector({ filter, time: 60000 });
+        const collector = msg.createReactionCollector({ filter, time: 900000 }); // 15 phút thay vì 60 giây
 
         collector.on("collect", async (reaction, user) => {
             console.log(`Collected reaction: ${reaction.emoji.name} from user: ${user.id}`);
@@ -179,7 +179,7 @@ async function sendGameEmbed(
                             `Cược: **${bet}** AniCoin\n\n` +
                             (points === 21 ? "🎉 **Blackjack!** 🎉\n" : "") +
                             (points < 21
-                                ? `Bấm ${hitEmoji} để rút bài, ${standEmoji} để dừng`
+                                ? `Bấm ${hitEmoji} để rút bài, ${standEmoji} để dừng\n⏰ **Thời gian: 15 phút**`
                                 : points > 21
                                     ? "💥 **Bust! Quá 21 điểm!** 💥"
                                     : ""),
@@ -251,6 +251,44 @@ async function sendGameEmbed(
 
         collector.on("end", async () => {
             console.log("Collector ended");
+            
+            // Kiểm tra xem game có còn active không
+            if (games[gameKey] && !games[gameKey].finished) {
+                console.log("Game timeout - auto stand");
+                
+                // Tự động dừng game khi timeout
+                const playerPoints = getPoints(games[gameKey].player);
+                if (playerPoints <= 21) {
+                    // Cập nhật embed để hiển thị timeout
+                    const timeoutEmbed = new EmbedBuilder()
+                        .setTitle("🃏 Blackjack - Timeout")
+                        .setDescription(
+                            `**${message.author.username}**\n\n` +
+                                `Bài của bạn: ${handToString(games[gameKey].player)} (**${playerPoints}**)\n` +
+                                `Bài của dealer: ${handToString(games[gameKey].dealer, true)}\n` +
+                                `Cược: **${bet}** AniCoin\n\n` +
+                                "⏰ **Hết thời gian! Tự động dừng...**",
+                        )
+                        .setColor("#ffa500")
+                        .setThumbnail(message.author.displayAvatarURL())
+                        .setTimestamp();
+
+                    await msg.edit({ embeds: [timeoutEmbed] });
+                    
+                    // Chờ 2 giây rồi tiếp tục với dealer
+                    setTimeout(async () => {
+                        await dealerTurn(
+                            message,
+                            bet,
+                            games[gameKey].deck,
+                            games[gameKey].player,
+                            games[gameKey].dealer,
+                            msg,
+                        );
+                    }, 2000);
+                }
+            }
+            
             try {
                 await msg.reactions.removeAll();
             } catch (error) {

@@ -13,6 +13,7 @@ data/database.db
 # Backup files - không commit backup vì có thể chứa dữ liệu nhạy cảm
 data/backup/
 backup/
+data/
 *.backup
 
 # Logs
