@@ -23,6 +23,8 @@
     "db:sync": "./scripts/sync-database.sh",
     "db:sync:container": "./scripts/sync-database-from-container.sh",
     "db:sync:prisma": "./scripts/sync-prisma-database.sh",
+    "db:export": "./scripts/export-database-from-cache.sh",
+    "db:export:detailed": "./scripts/export-database-detailed.sh",
     "db:reset": "prisma migrate reset",
     "db:backup": "./scripts/backup-database.sh",
     "db:backup-docker": "./scripts/backup-docker-db.sh",
