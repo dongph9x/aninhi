@@ -96,11 +96,11 @@ async function showRodShop(interaction: any) {
         .setColor("#00ff00")
         .setTimestamp();
 
-    // Thêm thông tin từng loại cần câu
+    // Rút gọn thông tin từng loại cần câu
     Object.entries(FISHING_RODS).forEach(([key, rod]) => {
         embed.addFields({
-            name: `${rod.emoji} ${rod.name} - ${rod.price} AniCoin`,
-            value: `**Độ bền:** ${rod.durability} lần\n**Bonus hiếm:** +${rod.rarityBonus}%\n**Mô tả:** ${rod.description}`,
+            name: `${rod.emoji} ${rod.name}`,
+            value: `Giá: ${rod.price}₳ | Độ bền: ${rod.durability} | Bonus: +${rod.rarityBonus}%`,
             inline: true
         });
     });
@@ -113,8 +113,8 @@ async function showRodShop(interaction: any) {
                 .addOptions(
                     Object.entries(FISHING_RODS).map(([key, rod]) => 
                         new StringSelectMenuOptionBuilder()
-                            .setLabel(`${rod.name} - ${rod.price} AniCoin`)
-                            .setDescription(`${rod.description} (Độ bền: ${rod.durability})`)
+                            .setLabel(`${rod.name} - ${rod.price}₳`)
+                            .setDescription(`Độ bền: ${rod.durability} | Bonus: +${rod.rarityBonus}%`)
                             .setValue(key)
                             .setEmoji(rod.emoji)
                     )
@@ -143,11 +143,11 @@ async function showBaitShop(interaction: any) {
         .setColor("#ff9900")
         .setTimestamp();
 
-    // Thêm thông tin từng loại mồi
+    // Rút gọn thông tin từng loại mồi
     Object.entries(BAITS).forEach(([key, bait]) => {
         embed.addFields({
-            name: `${bait.emoji} ${bait.name} - ${bait.price} AniCoin`,
-            value: `**Bonus hiếm:** +${bait.rarityBonus}%\n**Mô tả:** ${bait.description}`,
+            name: `${bait.emoji} ${bait.name}`,
+            value: `Giá: ${bait.price}₳ | Bonus: +${bait.rarityBonus}%`,
             inline: true
         });
     });
@@ -160,8 +160,8 @@ async function showBaitShop(interaction: any) {
                 .addOptions(
                     Object.entries(BAITS).map(([key, bait]) => 
                         new StringSelectMenuOptionBuilder()
-                            .setLabel(`${bait.name} - ${bait.price} AniCoin`)
-                            .setDescription(`${bait.description} (Bonus: +${bait.rarityBonus}%)`)
+                            .setLabel(`${bait.name} - ${bait.price}₳`)
+                            .setDescription(`Bonus: +${bait.rarityBonus}%`)
                             .setValue(key)
                             .setEmoji(bait.emoji)
                     )

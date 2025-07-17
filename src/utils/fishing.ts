@@ -357,7 +357,7 @@ export class FishingService {
             }
 
             // Kiểm tra cần câu có độ bền không
-            const currentRod = fishingData.rods.find(r => r.rodType === fishingData.currentRod);
+            const currentRod = fishingData.rods.find((r: { rodType: string; durability: number; id: string }) => r.rodType === fishingData.currentRod);
             if (!currentRod || currentRod.durability <= 0) {
                 return {
                     canFish: false,
@@ -367,7 +367,7 @@ export class FishingService {
             }
 
             // Kiểm tra có mồi không
-            const currentBait = fishingData.baits.find(b => b.baitType === fishingData.currentBait);
+            const currentBait = fishingData.baits.find((b: { baitType: string; quantity: number; id: string }) => b.baitType === fishingData.currentBait);
             if (!currentBait || currentBait.quantity <= 0) {
                 return {
                     canFish: false,
@@ -479,7 +479,7 @@ export class FishingService {
             });
 
             // Giảm độ bền cần câu
-            const currentRod = fishingData.rods.find(r => r.rodType === fishingData.currentRod);
+            const currentRod = fishingData.rods.find((r: { rodType: string; durability: number; id: string }) => r.rodType === fishingData.currentRod);
             if (currentRod && currentRod.durability > 0) {
                 await prisma.fishingRod.update({
                     where: { id: currentRod.id },
@@ -496,7 +496,7 @@ export class FishingService {
             }
 
             // Giảm số lượng mồi
-            const currentBait = fishingData.baits.find(b => b.baitType === fishingData.currentBait);
+            const currentBait = fishingData.baits.find((b: { baitType: string; quantity: number; id: string }) => b.baitType === fishingData.currentBait);
             if (currentBait && currentBait.quantity > 0) {
                 await prisma.fishingBait.update({
                     where: { id: currentBait.id },
@@ -544,32 +544,38 @@ export class FishingService {
             const fishingData = await this.getFishingData(userId, guildId);
 
             // Kiểm tra đã có cần câu này chưa
-            const existingRod = fishingData.rods.find(r => r.rodType === rodType);
-            if (existingRod) {
-                throw new Error("Bạn đã có cần câu này rồi!");
-            }
-
-            // Trừ tiền và thêm cần câu
+            const existingRod = fishingData.rods.find((r: { rodType: string; durability: number; id: string }) => r.rodType === rodType);
+            
+            // Trừ tiền và thêm/cộng dồn cần câu
             await prisma.$transaction(async (tx: any) => {
                 await tx.user.update({
                     where: { userId_guildId: { userId, guildId } },
                     data: { balance: { decrement: rod.price } }
                 });
 
-                await tx.fishingRod.create({
-                    data: {
-                        fishingDataId: fishingData.id,
-                        rodType,
-                        durability: rod.durability
-                    }
-                });
-
-                // Tự động set làm cần câu hiện tại nếu chưa có cần câu nào
-                if (!fishingData.currentRod || fishingData.currentRod === "") {
-                    await tx.fishingData.update({
-                        where: { id: fishingData.id },
-                        data: { currentRod: rodType }
+                if (existingRod) {
+                    // Nếu đã có cần câu này, cộng dồn độ bền
+                    await tx.fishingRod.update({
+                        where: { id: existingRod.id },
+                        data: { durability: { increment: rod.durability } }
                     });
+                } else {
+                    // Nếu chưa có, tạo cần câu mới
+                    await tx.fishingRod.create({
+                        data: {
+                            fishingDataId: fishingData.id,
+                            rodType,
+                            durability: rod.durability
+                        }
+                    });
+
+                    // Tự động set làm cần câu hiện tại nếu chưa có cần câu nào
+                    if (!fishingData.currentRod || fishingData.currentRod === "") {
+                        await tx.fishingData.update({
+                            where: { id: fishingData.id },
+                            data: { currentRod: rodType }
+                        });
+                    }
                 }
             });
 
@@ -647,7 +653,7 @@ export class FishingService {
     static async setCurrentRod(userId: string, guildId: string, rodType: string) {
         try {
             const fishingData = await this.getFishingData(userId, guildId);
-            const rod = fishingData.rods.find(r => r.rodType === rodType);
+            const rod = fishingData.rods.find((r: { rodType: string; durability: number; id: string }) => r.rodType === rodType);
 
             if (!rod) {
                 throw new Error("Bạn không có cần câu này! Hãy mua trước.");
@@ -675,7 +681,7 @@ export class FishingService {
     static async setCurrentBait(userId: string, guildId: string, baitType: string) {
         try {
             const fishingData = await this.getFishingData(userId, guildId);
-            const bait = fishingData.baits.find(b => b.baitType === baitType);
+            const bait = fishingData.baits.find((b: { baitType: string; quantity: number; id: string }) => b.baitType === baitType);
 
             if (!bait) {
                 throw new Error("Bạn không có mồi này! Hãy mua trước.");
@@ -703,7 +709,7 @@ export class FishingService {
     static async sellFish(userId: string, guildId: string, fishName: string, quantity: number = 1) {
         try {
             const fishingData = await this.getFishingData(userId, guildId);
-            const caughtFish = fishingData.fish.find(f => f.fishName === fishName);
+            const caughtFish = fishingData.fish.find((f: { fishName: string; quantity: number; id: string }) => f.fishName === fishName);
 
             if (!caughtFish) {
                 throw new Error("Bạn không có cá này!");
