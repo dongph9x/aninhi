@@ -19,6 +19,7 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset",
+    "db:backup": "./scripts/backup-database.sh",
     "migrate:json": "tsx scripts/migrate.ts",
     "test:db": "tsx scripts/test-db.ts",
     "test:commands": "tsx scripts/test-commands.ts"
