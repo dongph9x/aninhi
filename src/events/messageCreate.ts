@@ -26,6 +26,11 @@ export default Bot.createEvent({
         const command = commands.get(commandName) ?? commands.get(aliases.get(commandName)!);
         if (!command) return;
 
+        // Kiểm tra chế độ bảo trì
+        if (client.maintenanceMode && command.structure.name !== "maintenance") {
+            return message.reply("🔧 **Bot đang trong chế độ bảo trì**\nVui lòng chờ cho đến khi bảo trì hoàn tất.");
+        }
+
         try {
             const pull = SubCommand.handleParamPull(command, args, message);
             const { t, locale } = await i18n(message.guildId);

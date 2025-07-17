@@ -16,6 +16,11 @@ export default Bot.createEvent({
                 return interaction.reply(`${emojis.error} | ${t("errors.unknown")}`);
             }
 
+            // Kiểm tra chế độ bảo trì cho slash commands
+            if (client.maintenanceMode) {
+                return interaction.reply(`${emojis.info} **Bot đang trong chế độ bảo trì**\nVui lòng chờ cho đến khi bảo trì hoàn tất.`);
+            }
+
             const pull = SubCommand.handleGetPullSlashCommand(command, interaction);
             if (typeof pull.run !== "function") {
                 logger.error(`Command "${interaction.commandName}" doesn't have run function.`);
@@ -37,6 +42,11 @@ export default Bot.createEvent({
             if (interaction.customId.startsWith("Collector:")) return;
 
             const { t, locale } = await i18n(interaction.guildId);
+
+            // Kiểm tra chế độ bảo trì cho message components
+            if (client.maintenanceMode) {
+                return interaction.reply(`${emojis.info} **Bot đang trong chế độ bảo trì**\nVui lòng chờ cho đến khi bảo trì hoàn tất.`);
+            }
 
             // Kiểm tra xem có phải tournament button không
             if (interaction.customId.startsWith("tournament_")) {
@@ -125,6 +135,11 @@ export default Bot.createEvent({
 
             const { t, locale } = await i18n(interaction.guildId);
 
+            // Kiểm tra chế độ bảo trì cho modal submits
+            if (client.maintenanceMode) {
+                return interaction.reply(`${emojis.info} **Bot đang trong chế độ bảo trì**\nVui lòng chờ cho đến khi bảo trì hoàn tất.`);
+            }
+
             if (!component) {
                 logger.error(`Component "${payload.n}" doesn't exist.`);
                 return interaction.reply(`${emojis.error} | ${t("errors.unknown")}`);
@@ -179,6 +194,11 @@ export default Bot.createEvent({
             if (!component) {
                 logger.error(`Component "${interaction.commandName}" doesn't exist.`);
                 return interaction.reply(`${emojis.error} | ${t("errors.unknown")}`);
+            }
+
+            // Kiểm tra chế độ bảo trì cho context menu commands
+            if (client.maintenanceMode) {
+                return interaction.reply(`${emojis.info} **Bot đang trong chế độ bảo trì**\nVui lòng chờ cho đến khi bảo trì hoàn tất.`);
             }
 
             try {

@@ -20,6 +20,7 @@ import { logger } from "@/utils/logger";
 export class ExtendedClient<Ready extends boolean = boolean> extends Client<Ready> {
     cwd = process.cwd();
     production = process.env.NODE_ENV === "production";
+    maintenanceMode = false;
 
     filter = new Filter(this);
     root = path.join(this.cwd, "src");

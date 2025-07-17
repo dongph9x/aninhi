@@ -42,6 +42,25 @@ services:
     profiles:
       - init
 
+  # Prisma Studio - Web interface để xem database
+  prisma-studio:
+    build: .
+    container_name: aninhi-prisma-studio
+    environment:
+      - DATABASE_URL=file:./data/database.db
+    volumes:
+      - ./data:/app/data
+      - ./prisma:/app/prisma
+    ports:
+      - "5555:5555"
+    command: >
+      sh -c "
+        npx prisma generate &&
+        npx prisma studio --hostname 0.0.0.0 --port 5555
+      "
+    profiles:
+      - studio
+
 networks:
   aninhi-network:
     driver: bridge
