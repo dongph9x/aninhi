@@ -218,19 +218,18 @@ async function fish(message: Message) {
 async function showShop(message: Message) {
     const embed = new EmbedBuilder()
         .setTitle("🏪 Cửa Hàng Câu Cá")
-        .setDescription("**Cần câu:**\n" +
-            Object.entries(FISHING_RODS).map(([key, rod]) =>
-                `${rod.emoji} **${rod.name}** - ${rod.price} AniCoin\n` +
-                `└ ${rod.description}`
-            ).join("\n\n") +
+        .setDescription(
+            "**Cần câu:**\n" +
+            Object.entries(FISHING_RODS).map(([key, rod]: [string, typeof FISHING_RODS[string]]) =>
+                `${rod.emoji} **${rod.name}** - ${rod.price}₳ | Độ bền: ${rod.durability} | Bonus: +${rod.rarityBonus}%`
+            ).join("\n") +
             "\n\n**Mồi:**\n" +
-            Object.entries(BAITS).map(([key, bait]) =>
-                `${bait.emoji} **${bait.name}** - ${bait.price} AniCoin\n` +
-                `└ ${bait.description}`
-            ).join("\n\n") +
-            "\n\n**Cách mua:** `n.fishing buy <loại> <số lượng>`\n" +
-            "**Ví dụ:** `n.fishing buy copper 1` hoặc `n.fishing buy good 5`\n\n" +
-            "**Hoặc sử dụng Shop UI bên dưới để mua dễ dàng hơn!**"
+            Object.entries(BAITS).map(([key, bait]: [string, typeof BAITS[string]]) =>
+                `${bait.emoji} **${bait.name}** - ${bait.price}₳ | Bonus: +${bait.rarityBonus}%`
+            ).join("\n") +
+            "\n\n**Mua:** `n.fishing buy <loại> <số lượng>`\n" +
+            "Ví dụ: `n.fishing buy copper 1` hoặc `n.fishing buy good 5`\n" +
+            "\n**Hoặc sử dụng Shop UI bên dưới để mua dễ dàng hơn!**"
         )
         .setColor(config.embedColor)
         .setTimestamp();
