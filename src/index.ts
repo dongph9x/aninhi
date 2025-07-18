@@ -7,14 +7,25 @@ import { ExtendedClient } from "@/classes";
 import { databaseService } from "@/utils/database";
 
 const cwd = process.cwd();
-const envFolder = path.join(cwd, "env");
 
-config({ path: path.resolve(envFolder, ".env") });
-config({ path: path.resolve(envFolder, ".env.local") });
-config({ path: path.resolve(envFolder, `.env.${process.env.NODE_ENV}`) });
+// Load .env files from root directory
+config({ path: path.resolve(cwd, ".env") });
+config({ path: path.resolve(cwd, ".env.local") });
+config({ path: path.resolve(cwd, `.env.${process.env.NODE_ENV}`) });
 
-const localFile = path.resolve(envFolder, `.env.${process.env.NODE_ENV}.local`);
+const localFile = path.resolve(cwd, `.env.${process.env.NODE_ENV}.local`);
 if (fs.existsSync(localFile)) config({ path: localFile });
+
+// Also try loading from env folder if it exists
+const envFolder = path.join(cwd, "env");
+if (fs.existsSync(envFolder)) {
+    config({ path: path.resolve(envFolder, ".env") });
+    config({ path: path.resolve(envFolder, ".env.local") });
+    config({ path: path.resolve(envFolder, `.env.${process.env.NODE_ENV}`) });
+    
+    const envLocalFile = path.resolve(envFolder, `.env.${process.env.NODE_ENV}.local`);
+    if (fs.existsSync(envLocalFile)) config({ path: envLocalFile });
+}
 
 async function startBot() {
     try {

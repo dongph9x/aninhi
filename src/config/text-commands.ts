@@ -277,6 +277,72 @@ const data: Record<string, CommandData> = {
             },
         ],
     },
+    add: {
+        description: {
+            vi: "Thêm AniCoin cho người dùng (Admin only).",
+            en: "Add AniCoin to a user (Admin only).",
+        },
+        parameters: [
+            {
+                name: "user",
+                required: true,
+            },
+            {
+                name: "amount",
+                required: true,
+            },
+        ],
+        parameters_info: [
+            {
+                name: "user",
+                description: {
+                    vi: "Người dùng nhận tiền",
+                    en: "User to receive money",
+                },
+            },
+            {
+                name: "amount",
+                description: {
+                    vi: "Số tiền thêm",
+                    en: "Amount to add",
+                },
+            },
+        ],
+        subcommands: [],
+    },
+    subtract: {
+        description: {
+            vi: "Trừ AniCoin từ người dùng (Admin only).",
+            en: "Subtract AniCoin from a user (Admin only).",
+        },
+        parameters: [
+            {
+                name: "user",
+                required: true,
+            },
+            {
+                name: "amount",
+                required: true,
+            },
+        ],
+        parameters_info: [
+            {
+                name: "user",
+                description: {
+                    vi: "Người dùng bị trừ tiền",
+                    en: "User to subtract money from",
+                },
+            },
+            {
+                name: "amount",
+                description: {
+                    vi: "Số tiền trừ",
+                    en: "Amount to subtract",
+                },
+            },
+        ],
+        subcommands: [],
+    },
     balance: {
         description: {
             vi: "Xem số dư AniCoin và thông tin tài khoản.",

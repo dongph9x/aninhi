@@ -6,6 +6,7 @@ services:
     environment:
       - NODE_ENV=development
       - DATABASE_URL=file:./data/database.db
+      - BOT_TOKEN=${BOT_TOKEN}
       - DEBUG=bot:*
     volumes:
       # Mount source code để hot reload

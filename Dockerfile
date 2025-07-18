@@ -13,8 +13,13 @@ COPY package.json yarn.lock ./
 # Cài đặt dependencies
 RUN yarn install --frozen-lockfile
 
-# Copy source code
-COPY . .
+# Copy source code (exclude data directory)
+COPY package.json yarn.lock ./
+COPY prisma ./prisma
+COPY src ./src
+COPY tsconfig.json ./
+COPY eslint.config.mjs ./
+COPY tsx.config.json ./
 
 # Generate Prisma client
 RUN npx prisma generate

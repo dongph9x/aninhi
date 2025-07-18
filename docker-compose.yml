@@ -6,12 +6,13 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=file:./data/database.db
+      - BOT_TOKEN=${BOT_TOKEN}
     volumes:
-      # Mount thư mục data để lưu trữ database
-      - ./data:/app/data
+      # Mount thư mục data để lưu trữ database (read-write)
+      - ./data:/app/data:rw
       # Mount thư mục logs
-      - ./logs:/app/logs
-      # Mount file .env (optional - có thể dùng environment variables)
+      - ./logs:/app/logs:rw
+      # Mount file .env (read-only)
       - ./.env:/app/.env:ro
     ports:
       # Expose port nếu bot có web interface

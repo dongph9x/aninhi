@@ -7,10 +7,10 @@ import { ModerationService } from "@/utils/moderation";
 export default Bot.createCommand({
     structure: {
         name: "subtract",
-        aliases: ["sub", "takemoney", "remove"],
+        aliases: ["subtractmoney", "takeadmin"],
     },
     options: {
-        permissions: ["ModerateMembers"],
+        permissions: ["Administrator"],
         inGuild: true,
     },
     run: async ({ message, t, args }) => {
@@ -21,11 +21,11 @@ export default Bot.createCommand({
             const embed = new EmbedBuilder()
                 .setTitle("❌ Cách Dùng Không Đúng")
                 .setDescription(
-                    "**Cách dùng:** `p!subtract <người dùng> <số tiền>`\n\n" +
+                    "**Cách dùng:** `n.subtract <người dùng> <số tiền>`\n\n" +
                         "**Ví dụ:**\n" +
-                        "• `p!subtract @user 1000`\n" +
-                        "• `p!subtract 123456789 500`\n\n" +
-                        "**Lưu ý:** Lệnh này yêu cầu quyền Moderate Members.",
+                        "• `n.subtract @user 1000`\n" +
+                        "• `n.subtract 123456789 500`\n\n" +
+                        "**Lưu ý:** Lệnh này yêu cầu quyền Administrator.",
                 )
                 .setColor("#ff0000")
                 .setTimestamp();
@@ -63,6 +63,30 @@ export default Bot.createCommand({
                 return message.reply({ embeds: [embed] });
             }
 
+            // Kiểm tra số dư hiện tại trước khi trừ
+            const currentBalance = await EcommerceService.getBalance(targetUser.id, guildId);
+            
+            if (currentBalance < amount) {
+                const embed = new EmbedBuilder()
+                    .setTitle("❌ Không Đủ Tiền")
+                    .setDescription(
+                        `**<@${targetUser.id}>** chỉ có **${currentBalance.toLocaleString()}** AniCoin\n\n` +
+                        `Không thể trừ **${amount.toLocaleString()}** AniCoin\n\n` +
+                        `**Thiếu:** ${(amount - currentBalance).toLocaleString()} AniCoin`
+                    )
+                    .setColor("#ff6b6b")
+                    .setThumbnail(
+                        "displayAvatarURL" in targetUser ? targetUser.displayAvatarURL() : null,
+                    )
+                    .setFooter({
+                        text: `Thử trừ bởi ${message.author.username}`,
+                        iconURL: message.author.displayAvatarURL(),
+                    })
+                    .setTimestamp();
+
+                return message.reply({ embeds: [embed] });
+            }
+
             // Thực hiện trừ tiền
             const user = await EcommerceService.subtractMoney(
                 targetUser.id,
@@ -86,7 +110,7 @@ export default Bot.createCommand({
             const embed = new EmbedBuilder()
                 .setTitle("✅ Đã Trừ Tiền")
                 .setDescription(
-                    `**${message.author.username}** đã trừ **${amount.toLocaleString()}** AniCoin của **<@${targetUser.id}>**\n\n` +
+                    `**${message.author.username}** đã trừ **${amount.toLocaleString()}** AniCoin từ **<@${targetUser.id}>**\n\n` +
                         `💰 **Số dư mới:** ${user.balance.toLocaleString()} AniCoin`,
                 )
                 .setColor("#ff6b6b")
@@ -103,13 +127,19 @@ export default Bot.createCommand({
         } catch (error) {
             console.error("Error in subtract command:", error);
 
+            let errorMessage = "Đã xảy ra lỗi khi trừ tiền. Vui lòng thử lại sau.";
+            
+            if (error instanceof Error) {
+                if (error.message === "Không đủ tiền") {
+                    errorMessage = "Người dùng không có đủ tiền để thực hiện giao dịch này.";
+                } else {
+                    errorMessage = error.message;
+                }
+            }
+
             const errorEmbed = new EmbedBuilder()
                 .setTitle("❌ Trừ Tiền Thất Bại")
-                .setDescription(
-                    error instanceof Error
-                        ? error.message
-                        : "Đã xảy ra lỗi khi trừ tiền. Vui lòng thử lại sau.",
-                )
+                .setDescription(errorMessage)
                 .setColor("#ff0000")
                 .setTimestamp();
 
