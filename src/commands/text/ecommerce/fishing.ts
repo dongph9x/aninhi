@@ -427,7 +427,7 @@ async function showInventory(message: Message) {
         let baitInfo = "Không có";
         
         if (fishingData.currentRod && fishingData.currentRod !== "") {
-            const currentRod = fishingData.rods.find(r => r.rodType === fishingData.currentRod);
+            const currentRod = fishingData.rods.find((r: any) => r.rodType === fishingData.currentRod);
             if (currentRod) {
                 const rodData = FISHING_RODS[fishingData.currentRod];
                 rodInfo = `${rodData.emoji} **${rodData.name}** (Độ bền: ${currentRod.durability})`;
@@ -435,12 +435,18 @@ async function showInventory(message: Message) {
         }
         
         if (fishingData.currentBait && fishingData.currentBait !== "") {
-            const currentBait = fishingData.baits.find(b => b.baitType === fishingData.currentBait);
+            const currentBait = fishingData.baits.find((b: any) => b.baitType === fishingData.currentBait);
             if (currentBait) {
                 const baitData = BAITS[fishingData.currentBait];
                 baitInfo = `${baitData.emoji} **${baitData.name}** (Số lượng: ${currentBait.quantity})`;
             }
         }
+
+        // Lọc ra chỉ cá thường (không phải legendary)
+        const normalFish = fishingData.fish.filter((f: any) => {
+            const fishInfo = FISH_LIST.find(fish => fish.name === f.fishName);
+            return fishInfo && fishInfo.rarity !== 'legendary';
+        });
 
         const embed = new EmbedBuilder()
             .setTitle("🎒 Túi Đồ Câu Cá")
@@ -448,8 +454,8 @@ async function showInventory(message: Message) {
                 `🎣 **Cần câu hiện tại:** ${rodInfo}\n` +
                 `🪱 **Mồi hiện tại:** ${baitInfo}\n\n` +
                 `**Cá đã bắt:**\n` +
-                                 (fishingData.fish.length > 0 
-                     ? fishingData.fish.map((f: any) => 
+                                 (normalFish.length > 0 
+                     ? normalFish.map((f: any) => 
                          `${FISH_LIST.find(fish => fish.name === f.fishName)?.emoji || "🐟"} **${f.fishName}** x${f.quantity} (${f.fishValue} AniCoin)`
                      ).join("\n")
                      : "Chưa có cá nào"
@@ -460,9 +466,9 @@ async function showInventory(message: Message) {
 
         // Tạo components với nút bán nhanh cho từng loại cá (giới hạn 5 components)
         const components = [];
-        if (fishingData.fish.length > 0) {
+        if (normalFish.length > 0) {
             // Chỉ hiển thị tối đa 4 loại cá để tránh vượt quá giới hạn 5 components
-            const fishToShow = fishingData.fish.slice(0, 4);
+            const fishToShow = normalFish.slice(0, 4);
             
             for (let i = 0; i < fishToShow.length; i += 2) {
                 const row = {
@@ -582,7 +588,11 @@ async function showHelp(message: Message) {
             "• Cần câu có độ bền, mồi có số lượng giới hạn\n" +
             "• Khi hết độ bền hoặc mồi, bạn cần mua mới\n" +
             "• **Giá cá thay đổi mỗi 10 phút với biến động ±10%**\n" +
-            "• Trong túi đồ có nút \"Bán tất cả\" để bán toàn bộ số lượng cá nhanh"
+            "• Trong túi đồ có nút \"Bán tất cả\" để bán toàn bộ số lượng cá nhanh\n\n" +
+            "**📋 Phân biệt các loại cá:**\n" +
+            "• **Cá thường (Common/Rare/Epic):** Hiển thị trong `n.fishing inventory`\n" +
+            "• **Cá huyền thoại (Legendary):** Chỉ hiển thị trong `n.fishbarn` (rương nuôi cá)\n" +
+            "• **Cá huyền thoại không xuất hiện trong `n.fishing inventory`**"
         )
         .setColor(config.embedColor)
         .setTimestamp();
