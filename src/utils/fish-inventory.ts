@@ -5,8 +5,32 @@ export class FishInventoryService {
    * Lấy hoặc tạo fish inventory cho user
    */
   static async getOrCreateFishInventory(userId: string, guildId: string) {
-    let inventory = await prisma.fishInventory.findUnique({
+    // Đảm bảo User tồn tại trước khi tạo FishInventory
+    await prisma.user.upsert({
+      where: {
+        userId_guildId: {
+          userId,
+          guildId
+        }
+      },
+      update: {},
+      create: {
+        userId,
+        guildId,
+        balance: 0,
+        dailyStreak: 0
+      }
+    });
+
+    // Sau đó tạo hoặc lấy FishInventory
+    const inventory = await prisma.fishInventory.upsert({
       where: { userId_guildId: { userId, guildId } },
+      update: {},
+      create: {
+        userId,
+        guildId,
+        capacity: 10,
+      },
       include: {
         items: {
           include: {
@@ -18,26 +42,6 @@ export class FishInventoryService {
         },
       },
     });
-
-    if (!inventory) {
-      inventory = await prisma.fishInventory.create({
-        data: {
-          userId,
-          guildId,
-          capacity: 10,
-        },
-        include: {
-          items: {
-            include: {
-              fish: true,
-            },
-            orderBy: {
-              createdAt: 'asc',
-            },
-          },
-        },
-      });
-    }
 
     return inventory;
   }
@@ -186,12 +190,18 @@ export class FishInventoryService {
    * Lấy cá từ fish inventory theo ID
    */
   static async getFishFromInventory(userId: string, guildId: string, fishId: string) {
+    // Lấy fish inventory trước
+    const inventory = await prisma.fishInventory.findUnique({
+      where: { userId_guildId: { userId, guildId } },
+    });
+
+    if (!inventory) {
+      return null;
+    }
+
     const inventoryItem = await prisma.fishInventoryItem.findFirst({
       where: {
-        fishInventoryId: {
-          userId,
-          guildId,
-        },
+        fishInventoryId: inventory.id,
         fishId,
       },
       include: {
@@ -219,12 +229,18 @@ export class FishInventoryService {
    * Kiểm tra xem cá có trong fish inventory không
    */
   static async isFishInInventory(userId: string, guildId: string, fishId: string) {
+    // Lấy fish inventory trước
+    const inventory = await prisma.fishInventory.findUnique({
+      where: { userId_guildId: { userId, guildId } },
+    });
+
+    if (!inventory) {
+      return false;
+    }
+
     const inventoryItem = await prisma.fishInventoryItem.findFirst({
       where: {
-        fishInventoryId: {
-          userId,
-          guildId,
-        },
+        fishInventoryId: inventory.id,
         fishId,
       },
     });
