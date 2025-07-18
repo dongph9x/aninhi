@@ -143,6 +143,15 @@ export class FishInventoryService {
 
     const fish = inventoryItem.fish;
 
+    // Kiểm tra xem cá có trong battle inventory không
+    const isInBattleInventory = await prisma.battleFishInventoryItem.findFirst({
+      where: { fishId },
+    });
+
+    if (isInBattleInventory) {
+      return { success: false, error: 'Không thể bán cá đang trong túi đấu! Hãy xóa cá khỏi túi đấu trước.' };
+    }
+
     // Tính giá theo level (tăng 2% mỗi level)
     const levelBonus = fish.level > 1 ? (fish.level - 1) * 0.02 : 0;
     const finalValue = Math.floor(fish.value * (1 + levelBonus));

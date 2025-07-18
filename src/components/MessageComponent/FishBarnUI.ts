@@ -1,4 +1,5 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } from 'discord.js';
+import prisma from '../../utils/prisma';
 
 export class FishBarnUI {
   private inventory: any;
@@ -19,7 +20,7 @@ export class FishBarnUI {
     this.selectedParent2Id = selectedParent2Id;
   }
 
-  createEmbed(): EmbedBuilder {
+  async createEmbed(): Promise<EmbedBuilder> {
     const embed = new EmbedBuilder()
       .setTitle('🐟 Rương Nuôi Cá Huyền Thoại')
       .setColor('#FFD700')
@@ -44,9 +45,10 @@ export class FishBarnUI {
         if (parent1) {
           const stats = parent1.fish.stats || {};
           const totalPower = this.calculateTotalPower(parent1.fish);
+          const isInBattleInventory = await this.isFishInBattleInventory(parent1.fish.id);
           embed.addFields({
             name: '🐟 Cá Bố (Đã chọn)',
-            value: this.createFishDisplayText(parent1.fish, stats, totalPower),
+            value: this.createFishDisplayText(parent1.fish, stats, totalPower, undefined, undefined, undefined, isInBattleInventory),
             inline: true,
           });
         }
@@ -57,9 +59,10 @@ export class FishBarnUI {
         if (parent2) {
           const stats = parent2.fish.stats || {};
           const totalPower = this.calculateTotalPower(parent2.fish);
+          const isInBattleInventory = await this.isFishInBattleInventory(parent2.fish.id);
           embed.addFields({
             name: '🐟 Cá Mẹ (Đã chọn)',
-            value: this.createFishDisplayText(parent2.fish, stats, totalPower),
+            value: this.createFishDisplayText(parent2.fish, stats, totalPower, undefined, undefined, undefined, isInBattleInventory),
             inline: true,
           });
         }
@@ -115,16 +118,17 @@ export class FishBarnUI {
         const levelBonus = fish.level > 1 ? (fish.level - 1) * 0.02 : 0;
         const finalValue = Math.floor(fish.value * (1 + levelBonus));
         
+        const isInBattleInventory = await this.isFishInBattleInventory(fish.id);
         embed.addFields({
           name: `${statusEmoji} ${fish.name} (Lv.${fish.level}) - Đã chọn`,
-          value: this.createFishDisplayText(fish, stats, totalPower, levelBar, finalValue, levelBonus),
+          value: this.createFishDisplayText(fish, stats, totalPower, levelBar, finalValue, levelBonus, isInBattleInventory),
           inline: false,
         });
       } else {
         console.log(`❌ Selected fish not found, falling back to show all fish`);
         // Fallback: show all fish if selected fish not found
         const displayItems = this.inventory.items.slice(0, 5);
-        displayItems.forEach((item: any, index: number) => {
+        for (const item of displayItems) {
           const fish = item.fish;
           const stats = fish.stats || {};
           const totalPower = this.calculateTotalPower(fish);
@@ -133,12 +137,13 @@ export class FishBarnUI {
           const levelBonus = fish.level > 1 ? (fish.level - 1) * 0.02 : 0;
           const finalValue = Math.floor(fish.value * (1 + levelBonus));
           
+          const isInBattleInventory = await this.isFishInBattleInventory(fish.id);
           embed.addFields({
             name: `${statusEmoji} ${fish.name} (Lv.${fish.level})`,
-            value: this.createFishDisplayText(fish, stats, totalPower, levelBar, finalValue, levelBonus),
+            value: this.createFishDisplayText(fish, stats, totalPower, levelBar, finalValue, levelBonus, isInBattleInventory),
             inline: true,
           });
-        });
+        }
       }
       if (this.inventory.items.length > 5) {
         embed.addFields({
@@ -318,8 +323,19 @@ export class FishBarnUI {
     return totalPower;
   }
 
-  private createFishDisplayText(fish: any, stats: any, totalPower: number, levelBar?: string, finalValue?: number, levelBonus?: number): string {
+  private async isFishInBattleInventory(fishId: string): Promise<boolean> {
+    const isInBattleInventory = await prisma.battleFishInventoryItem.findFirst({
+      where: { fishId },
+    });
+    return !!isInBattleInventory;
+  }
+
+  private createFishDisplayText(fish: any, stats: any, totalPower: number, levelBar?: string, finalValue?: number, levelBonus?: number, isInBattleInventory: boolean = false): string {
     let text = `**Trạng thái:** ${fish.status === 'adult' ? 'Trưởng thành' : 'Đang lớn'}\n`;
+    
+    if (isInBattleInventory) {
+      text += `**⚔️ Vị trí:** Trong túi đấu (không thể bán)\n`;
+    }
     
     if (finalValue !== undefined) {
       text += `**Giá trị:** ${finalValue.toLocaleString()} coins${levelBonus && levelBonus > 0 ? ` (+${Math.round(levelBonus * 100)}%)` : ''}\n`;

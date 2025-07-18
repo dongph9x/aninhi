@@ -28,7 +28,7 @@ export default {
       
       // Tạo UI
       const ui = new FishBarnUI(inventory, userId, guildId, selectedFishId);
-      const embed = ui.createEmbed();
+      const embed = await ui.createEmbed();
       const components = ui.createComponents();
       
       const sentMessage = await message.reply({

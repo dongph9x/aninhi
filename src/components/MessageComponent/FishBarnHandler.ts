@@ -136,7 +136,7 @@ export class FishBarnHandler {
       breedingData?.selectedParent1Id,
       breedingData?.selectedParent2Id
     );
-    const newEmbed = ui.createEmbed();
+    const newEmbed = await ui.createEmbed();
     const newComponents = ui.createComponents();
 
     await interaction.update({
@@ -191,7 +191,7 @@ export class FishBarnHandler {
       breedingData?.selectedParent1Id,
       breedingData?.selectedParent2Id
     );
-    const newEmbed = ui.createEmbed();
+    const newEmbed = await ui.createEmbed();
     const newComponents = ui.createComponents();
 
     await interaction.update({
@@ -225,7 +225,7 @@ export class FishBarnHandler {
 
     // Cập nhật UI
     const ui = new FishBarnUI(inventory, userId, guildId, undefined, true);
-    const newEmbed = ui.createEmbed();
+    const newEmbed = await ui.createEmbed();
     const newComponents = ui.createComponents();
 
     await interaction.update({
@@ -251,7 +251,7 @@ export class FishBarnHandler {
       breedingData?.selectedParent1Id,
       breedingData?.selectedParent2Id
     );
-    const newEmbed = ui.createEmbed();
+    const newEmbed = await ui.createEmbed();
     const newComponents = ui.createComponents();
 
     await interaction.update({
@@ -317,7 +317,7 @@ export class FishBarnHandler {
       breedingData.selectedParent1Id,
       breedingData.selectedParent2Id
     );
-    const newEmbed = ui.createEmbed();
+    const newEmbed = await ui.createEmbed();
     const newComponents = ui.createComponents();
 
     await interaction.update({
@@ -376,7 +376,7 @@ export class FishBarnHandler {
 
     // Cập nhật UI
     const ui = new FishBarnUI(updatedInventory, userId, guildId);
-    const newEmbed = ui.createEmbed();
+    const newEmbed = await ui.createEmbed();
     const newComponents = ui.createComponents();
 
     await interaction.update({
@@ -396,7 +396,7 @@ export class FishBarnHandler {
     
     // Cập nhật UI
     const ui = new FishBarnUI(inventory, userId, guildId, this.selectedFishMap.get(userId));
-    const newEmbed = ui.createEmbed();
+    const newEmbed = await ui.createEmbed();
     const newComponents = ui.createComponents();
 
     await interaction.update({

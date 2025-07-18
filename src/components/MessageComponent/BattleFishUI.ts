@@ -38,15 +38,38 @@ export class BattleFishUI {
         });
 
         // Hiển thị cá trong túi đấu
-        if (this.inventory.items.length > 0) {
+        if (this.inventory.items.length === 0) {
+            embed.addFields({
+                name: '🐟 Cá Trong Túi Đấu',
+                value: '❌ Chưa có cá nào trong túi đấu!\nSử dụng nút "Thêm Cá" bên dưới.',
+                inline: false
+            });
+        } else if (this.selectedFishId && this.selectedFishId.startsWith('battle_')) {
+            // Chỉ hiển thị cá được chọn
+            const actualFishId = this.selectedFishId.replace('battle_', '');
+            const selectedItem = this.inventory.items.find((item: any) => item.fish.id === actualFishId);
+            
+            if (selectedItem) {
+                const fish = selectedItem.fish;
+                const stats = fish.stats || {};
+                const power = this.calculatePower(fish);
+                
+                embed.addFields({
+                    name: '🎯 Cá Được Chọn',
+                    value: `**${fish.name}** (Lv.${fish.level}, Gen.${fish.generation})\n` +
+                           `💪 Power: ${power} | 💰 ${fish.value.toLocaleString()} coins\n` +
+                           `📊 Stats: 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}`,
+                    inline: false
+                });
+            }
+        } else {
+            // Hiển thị tất cả cá trong túi đấu
             const battleFishList = this.inventory.items.map((item: any, index: number) => {
                 const fish = item.fish;
                 const stats = fish.stats || {};
                 const power = this.calculatePower(fish);
-                const isSelected = fish.id === this.selectedFishId;
-                const selectedIcon = isSelected ? '🎯 ' : '';
                 
-                return `${selectedIcon}**${index + 1}. ${fish.name}** (Lv.${fish.level}, Gen.${fish.generation})\n` +
+                return `**${index + 1}. ${fish.name}** (Lv.${fish.level}, Gen.${fish.generation})\n` +
                        `💪 Power: ${power} | 💰 ${fish.value.toLocaleString()} coins\n` +
                        `📊 Stats: 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}`;
             }).join('\n\n');
@@ -54,12 +77,6 @@ export class BattleFishUI {
             embed.addFields({
                 name: '🐟 Cá Trong Túi Đấu',
                 value: battleFishList,
-                inline: false
-            });
-        } else {
-            embed.addFields({
-                name: '🐟 Cá Trong Túi Đấu',
-                value: '❌ Chưa có cá nào trong túi đấu!\nSử dụng nút "Thêm Cá" bên dưới.',
                 inline: false
             });
         }
@@ -91,7 +108,7 @@ export class BattleFishUI {
         // Thông tin hướng dẫn
         embed.addFields({
             name: '🎯 Cách Sử Dụng',
-            value: '1. **Chọn cá** từ dropdown bên dưới\n2. **Thêm cá** vào túi đấu\n3. **Tìm đối thủ** để đấu\n4. **Xóa cá** khỏi túi đấu nếu cần',
+            value: '1. **Chọn cá** từ dropdown bên dưới để xem chi tiết\n2. **Thêm cá** vào túi đấu\n3. **Tìm đối thủ** để đấu\n4. **Xóa cá** khỏi túi đấu nếu cần',
             inline: false
         });
 

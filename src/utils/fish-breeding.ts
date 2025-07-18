@@ -501,6 +501,15 @@ export class FishBreedingService {
       return { success: false, error: 'Fish not found or doesn\'t belong to you!' };
     }
     
+    // Kiểm tra xem cá có trong battle inventory không
+    const isInBattleInventory = await prisma.battleFishInventoryItem.findFirst({
+      where: { fishId },
+    });
+
+    if (isInBattleInventory) {
+      return { success: false, error: 'Không thể bán cá đang trong túi đấu! Hãy xóa cá khỏi túi đấu trước.' };
+    }
+    
     // Get user balance
     const user = await prisma.user.findUnique({
       where: { userId_guildId: { userId, guildId: fish.guildId } }
