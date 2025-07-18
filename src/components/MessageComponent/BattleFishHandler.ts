@@ -17,6 +17,8 @@ export class BattleFishHandler {
         inventory: any;
         eligibleFish: any[];
         selectedFishId?: string;
+        currentOpponent?: any;
+        currentUserFish?: any;
     }>();
 
     static async handleInteraction(interaction: ButtonInteraction | StringSelectMenuInteraction) {
@@ -25,14 +27,53 @@ export class BattleFishHandler {
         const userId = interaction.user.id;
         const guildId = interaction.guildId!;
 
+        console.log(`🔍 [DEBUG] handleInteraction called:`);
+        console.log(`  - customId: ${customId}`);
+        console.log(`  - messageId: ${messageId}`);
+        console.log(`  - userId: ${userId}`);
+        console.log(`  - guildId: ${guildId}`);
+        console.log(`  - Cache size: ${this.battleFishMessages.size}`);
+
         // Lấy thông tin message từ cache
-        const messageData = this.battleFishMessages.get(messageId);
-        if (!messageData || messageData.userId !== userId) {
+        let messageData = this.battleFishMessages.get(messageId);
+        
+        // Fallback: Tìm data bằng user ID và guild ID nếu không tìm thấy bằng message ID
+        if (!messageData) {
+            console.log(`  - ❌ No messageData found for messageId: ${messageId}`);
+            console.log(`  - Available keys: ${Array.from(this.battleFishMessages.keys()).join(', ')}`);
+            
+            // Tìm data bằng user ID và guild ID
+            for (const [key, data] of this.battleFishMessages.entries()) {
+                if (data.userId === userId && data.guildId === guildId) {
+                    messageData = data;
+                    console.log(`  - ✅ Found messageData using fallback key: ${key}`);
+                    break;
+                }
+            }
+        }
+        
+        console.log(`  - Found messageData: ${!!messageData}`);
+        
+        if (!messageData) {
+            console.log(`  - ❌ No messageData found for messageId: ${messageId}`);
+            console.log(`  - Available keys: ${Array.from(this.battleFishMessages.keys()).join(', ')}`);
             return interaction.reply({ 
                 content: '❌ Không tìm thấy dữ liệu hoặc bạn không phải chủ sở hữu!', 
                 ephemeral: true 
             });
         }
+
+        if (messageData.userId !== userId) {
+            console.log(`  - ❌ User ID mismatch: ${messageData.userId} !== ${userId}`);
+            return interaction.reply({ 
+                content: '❌ Không tìm thấy dữ liệu hoặc bạn không phải chủ sở hữu!', 
+                ephemeral: true 
+            });
+        }
+
+        console.log(`  - ✅ MessageData found and validated`);
+        console.log(`  - Current User Fish: ${messageData.currentUserFish?.name || 'undefined'}`);
+        console.log(`  - Current Opponent: ${messageData.currentOpponent?.name || 'undefined'}`);
 
         try {
             if (interaction.isStringSelectMenu()) {
@@ -95,6 +136,9 @@ export class BattleFishHandler {
                 break;
             case 'battle_fish_refresh':
                 await this.handleRefresh(interaction, messageData);
+                break;
+            case 'battle_fish_confirm_fight':
+                await this.handleConfirmFight(interaction, messageData);
                 break;
             case 'battle_fish_help':
                 await this.handleShowHelp(interaction, messageData);
@@ -183,7 +227,14 @@ export class BattleFishHandler {
     }
 
     private static async handleFindOpponent(interaction: ButtonInteraction, messageData: any) {
+        console.log(`🔍 [DEBUG] handleFindOpponent called:`);
+        console.log(`  - messageId: ${interaction.message.id}`);
+        console.log(`  - userId: ${messageData.userId}`);
+        console.log(`  - guildId: ${messageData.guildId}`);
+        console.log(`  - inventory items: ${messageData.inventory?.items?.length || 0}`);
+        
         if (messageData.inventory.items.length === 0) {
+            console.log(`  - ❌ No fish in battle inventory`);
             await interaction.reply({ 
                 content: '❌ Không có cá nào trong túi đấu!', 
                 ephemeral: true 
@@ -193,6 +244,7 @@ export class BattleFishHandler {
 
         // Chọn cá đầu tiên trong túi đấu
         const selectedFish = messageData.inventory.items[0].fish;
+        console.log(`  - Selected fish: ${selectedFish.name} (ID: ${selectedFish.id})`);
         
         const opponentResult = await FishBattleService.findRandomOpponent(
             messageData.userId, 
@@ -201,12 +253,19 @@ export class BattleFishHandler {
         );
 
         if (!opponentResult.success) {
+            console.log(`  - ❌ No opponent found: ${opponentResult.error}`);
             await interaction.reply({ 
                 content: `❌ Không tìm thấy đối thủ: ${opponentResult.error}`, 
                 ephemeral: true 
             });
             return;
         }
+
+        console.log(`  - ✅ Found opponent: ${opponentResult.opponent.name} (ID: ${opponentResult.opponent.id})`);
+
+        // Lưu thông tin đối thủ để sử dụng sau
+        messageData.currentOpponent = opponentResult.opponent;
+        messageData.currentUserFish = selectedFish;
 
         // Tạo embed thông tin trước khi đấu
         const stats = selectedFish.stats || {};
@@ -235,11 +294,27 @@ export class BattleFishHandler {
                     .setStyle(ButtonStyle.Danger)
             );
 
-        await interaction.reply({ 
+        const reply = await interaction.reply({ 
             embeds: [embed], 
             components: [battleButton],
             ephemeral: true 
         });
+
+        // Lưu messageData cho reply mới
+        this.battleFishMessages.set(reply.id, messageData);
+        
+        // Fallback: Lưu data bằng cách khác nếu reply.id không hoạt động
+        const fallbackKey = `battle_${messageData.userId}_${messageData.guildId}_${Date.now()}`;
+        this.battleFishMessages.set(fallbackKey, messageData);
+        
+        console.log(`🔍 [DEBUG] handleFindOpponent completed:`);
+        console.log(`  - Original messageId: ${interaction.message.id}`);
+        console.log(`  - Reply messageId: ${reply.id}`);
+        console.log(`  - Fallback key: ${fallbackKey}`);
+        console.log(`  - Cache size after save: ${this.battleFishMessages.size}`);
+        console.log(`  - Available keys: ${Array.from(this.battleFishMessages.keys()).join(', ')}`);
+        console.log(`  - Current User Fish saved: ${messageData.currentUserFish?.name || 'undefined'}`);
+        console.log(`  - Current Opponent saved: ${messageData.currentOpponent?.name || 'undefined'}`);
     }
 
     private static async handleShowStats(interaction: ButtonInteraction, messageData: any) {
@@ -281,13 +356,14 @@ export class BattleFishHandler {
 
         battles.forEach((battle: any, index: number) => {
             const result = battle.userWon ? '🏆' : '💀';
-            const fishName = battle.fish?.name || 'Unknown';
+            const userFishName = battle.userFish?.name || 'Unknown Fish';
+            const opponentFishName = battle.opponentFish?.name || 'Unknown Opponent';
             const reward = battle.reward.toLocaleString();
             const date = new Date(battle.battledAt).toLocaleDateString('vi-VN');
 
             embed.addFields({
                 name: `${result} Trận ${index + 1} (${date})`,
-                value: `🐟 ${fishName} | 💰 ${reward} coins | 💪 ${battle.userPower} vs ${battle.opponentPower}`,
+                value: `🐟 ${userFishName} vs ${opponentFishName} | 💰 ${reward} coins | 💪 ${battle.userPower} vs ${battle.opponentPower}`,
                 inline: false
             });
         });
@@ -317,10 +393,15 @@ export class BattleFishHandler {
         leaderboard.forEach((user: any, index: number) => {
             const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
             const winRate = user.totalBattles > 0 ? Math.round((user.wins / user.totalBattles) * 100) : 0;
+            
+            // Chuyển đổi BigInt thành Number để tránh lỗi
+            const totalEarnings = typeof user.totalEarnings === 'bigint' 
+                ? Number(user.totalEarnings) 
+                : user.totalEarnings;
 
             embed.addFields({
                 name: `${medal} <@${user.userId}>`,
-                value: `🏆 ${user.wins}W/${user.totalBattles}L (${winRate}%) | 💰 ${user.totalEarnings.toLocaleString()} coins`,
+                value: `🏆 ${user.wins}W/${user.totalBattles}L (${winRate}%) | 💰 ${totalEarnings.toLocaleString()} coins`,
                 inline: false
             });
         });
@@ -339,6 +420,92 @@ export class BattleFishHandler {
             content: '✅ Đã làm mới dữ liệu!', 
             ephemeral: true 
         });
+    }
+
+    private static async handleConfirmFight(interaction: ButtonInteraction, messageData: any) {
+        // Kiểm tra xem có thông tin đối thủ đã tìm thấy không
+        if (!messageData.currentOpponent || !messageData.currentUserFish) {
+            await interaction.reply({ 
+                content: '❌ Vui lòng tìm đối thủ trước khi đấu!', 
+                ephemeral: true 
+            });
+            return;
+        }
+
+        const selectedFish = messageData.currentUserFish;
+        const opponent = messageData.currentOpponent;
+
+        // Bắt đầu animation
+        await interaction.deferReply({ ephemeral: true });
+
+        // Animation frames
+        const animationFrames = [
+            '⚔️ **Bắt đầu chiến đấu!** ⚔️',
+            '🐟 **${selectedFish.name}** vs **${opponent.name}** 🐟',
+            '💥 **Đang đấu...** 💥',
+            '⚡ **Chiến đấu gay cấn!** ⚡',
+            '🔥 **Kết quả sắp có!** 🔥'
+        ];
+
+        const animationEmbed = new EmbedBuilder()
+            .setTitle('⚔️ Chiến Đấu Đang Diễn Ra...')
+            .setColor('#FF6B6B')
+            .setDescription(animationFrames[0])
+            .setTimestamp();
+
+        const animationMessage = await interaction.editReply({ 
+            embeds: [animationEmbed]
+        });
+
+        // Chạy animation trong 3 giây
+        for (let i = 1; i < animationFrames.length; i++) {
+            await new Promise(resolve => setTimeout(resolve, 600)); // 600ms mỗi frame
+            
+            const currentFrame = animationFrames[i]
+                .replace('${selectedFish.name}', selectedFish.name)
+                .replace('${opponent.name}', opponent.name);
+            
+            animationEmbed.setDescription(currentFrame);
+            await interaction.editReply({ embeds: [animationEmbed] });
+        }
+
+        // Thực hiện battle
+        const battleResult = await FishBattleService.battleFish(
+            messageData.userId, 
+            messageData.guildId, 
+            selectedFish.id, 
+            opponent.id
+        );
+
+        if ('success' in battleResult && !battleResult.success) {
+            const errorEmbed = new EmbedBuilder()
+                .setTitle('❌ Lỗi đấu cá!')
+                .setColor('#FF0000')
+                .setDescription(battleResult.error)
+                .setTimestamp();
+
+            await interaction.editReply({ embeds: [errorEmbed] });
+            return;
+        }
+
+        const result = battleResult as any;
+        const isUserWinner = result.winner.id === selectedFish.id;
+        const reward = isUserWinner ? result.rewards.winner : result.rewards.loser;
+
+        // Hiển thị kết quả
+        const battleEmbed = new EmbedBuilder()
+            .setTitle(isUserWinner ? '🏆 Chiến Thắng!' : '💀 Thất Bại!')
+            .setColor(isUserWinner ? '#00FF00' : '#FF0000')
+            .addFields(
+                { name: '🐟 Người thắng', value: result.winner.name, inline: true },
+                { name: '🐟 Người thua', value: result.loser.name, inline: true },
+                { name: '💰 Phần thưởng', value: `${reward.toLocaleString()} coins`, inline: true },
+                { name: '💪 Sức mạnh', value: `${result.winnerPower} vs ${result.loserPower}`, inline: true }
+            )
+            .setDescription(result.battleLog.join('\n'))
+            .setTimestamp();
+
+        await interaction.editReply({ embeds: [battleEmbed] });
     }
 
     private static async handleShowHelp(interaction: ButtonInteraction, messageData: any) {
@@ -395,7 +562,18 @@ export class BattleFishHandler {
 
     // Lưu message data vào cache
     static setMessageData(messageId: string, data: any) {
+        console.log(`🔍 [DEBUG] setMessageData called:`);
+        console.log(`  - messageId: ${messageId}`);
+        console.log(`  - userId: ${data.userId}`);
+        console.log(`  - guildId: ${data.guildId}`);
+        console.log(`  - inventory items: ${data.inventory?.items?.length || 0}`);
+        console.log(`  - eligibleFish: ${data.eligibleFish?.length || 0}`);
+        console.log(`  - Cache size before: ${this.battleFishMessages.size}`);
+        
         this.battleFishMessages.set(messageId, data);
+        
+        console.log(`  - Cache size after: ${this.battleFishMessages.size}`);
+        console.log(`  - Available keys: ${Array.from(this.battleFishMessages.keys()).join(', ')}`);
     }
 
     // Xóa message data khỏi cache

@@ -108,6 +108,24 @@ export default Bot.createEvent({
                 return;
             }
 
+            // Kiểm tra xem có phải fish market interaction không
+            if (interaction.customId.startsWith("market_")) {
+                console.log("FishMarket interaction:", interaction.customId);
+                
+                try {
+                    const { FishMarketHandler } = await import("../components/MessageComponent/FishMarketHandler");
+                    if (interaction.isButton() || interaction.isStringSelectMenu()) {
+                        await FishMarketHandler.handleInteraction(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling FishMarket interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác fish market!`);
+                    }
+                }
+                return;
+            }
+
             // Kiểm tra xem có phải vote kick button không
             try {
                 const voteKickData = JSON.parse(interaction.customId);

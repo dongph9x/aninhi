@@ -118,6 +118,8 @@ export class FishBarnUI {
         const levelBonus = fish.level > 1 ? (fish.level - 1) * 0.02 : 0;
         const finalValue = Math.floor(fish.value * (1 + levelBonus));
         
+
+        
         const isInBattleInventory = await this.isFishInBattleInventory(fish.id);
         embed.addFields({
           name: `${statusEmoji} ${fish.name} (Lv.${fish.level}) - Đã chọn`,

@@ -241,7 +241,36 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
     const collector = battleMessage.createReactionCollector({ filter, time: 30000, max: 1 });
 
     collector.on('collect', async () => {
-        // Bắt đầu đấu
+        // Bắt đầu animation
+        const animationFrames = [
+            '⚔️ **Bắt đầu chiến đấu!** ⚔️',
+            '🐟 **${selectedFish.name}** vs **${opponentResult.opponent.name}** 🐟',
+            '💥 **Đang đấu...** 💥',
+            '⚡ **Chiến đấu gay cấn!** ⚡',
+            '🔥 **Kết quả sắp có!** 🔥'
+        ];
+
+        const animationEmbed = new EmbedBuilder()
+            .setTitle('⚔️ Chiến Đấu Đang Diễn Ra...')
+            .setColor('#FF6B6B')
+            .setDescription(animationFrames[0])
+            .setTimestamp();
+
+        await battleMessage.edit({ embeds: [animationEmbed] });
+
+        // Chạy animation trong 3 giây
+        for (let i = 1; i < animationFrames.length; i++) {
+            await new Promise(resolve => setTimeout(resolve, 600)); // 600ms mỗi frame
+            
+            const currentFrame = animationFrames[i]
+                .replace('${selectedFish.name}', selectedFish.name)
+                .replace('${opponentResult.opponent.name}', opponentResult.opponent.name);
+            
+            animationEmbed.setDescription(currentFrame);
+            await battleMessage.edit({ embeds: [animationEmbed] });
+        }
+
+        // Thực hiện battle
         const battleResult = await FishBattleService.battleFish(userId, guildId, selectedFish.id, opponentResult.opponent.id);
         
         if ('success' in battleResult && !battleResult.success) {
