@@ -42,7 +42,7 @@ export default Bot.createCommand({
         aliases: ["fish", "f"],
     },
     options: {
-        cooldown: 3000,
+        cooldown: 1000, // Giảm cooldown xuống 1 giây để tránh spam
         permissions: ["SendMessages", "EmbedLinks"],
     },
     run: async ({ message, t }) => {
@@ -96,13 +96,34 @@ export default Bot.createCommand({
     },
 });
 
+// Map để lưu trạng thái đang câu cá của user
+const fishingInProgress = new Map<string, boolean>();
+
 async function fishWithAnimation(message: Message) {
     const userId = message.author.id;
     const guildId = message.guildId!;
 
+    // Kiểm tra xem user có đang câu cá không
+    if (fishingInProgress.get(userId)) {
+        const errorEmbed = new EmbedBuilder()
+            .setTitle("⏳ Đang Câu Cá...")
+            .setDescription("Bạn đang câu cá, vui lòng đợi hoàn thành!")
+            .setColor("#ff9900")
+            .setTimestamp();
+
+        return await message.reply({ embeds: [errorEmbed] });
+    }
+
     try {
-        // Kiểm tra điều kiện câu cá trước khi bắt đầu animation
-        const cooldownCheck = await FishingService.canFish(userId, guildId);
+        // Đánh dấu user đang câu cá
+        fishingInProgress.set(userId, true);
+
+        // Kiểm tra quyền Admin
+        const member = await message.guild?.members.fetch(userId);
+        const isAdmin = member?.permissions.has('Administrator') || false;
+
+        // Kiểm tra điều kiện câu cá trước khi bắt đầu animation (Admin bypass)
+        const cooldownCheck = await FishingService.canFish(userId, guildId, isAdmin);
         if (!cooldownCheck.canFish) {
             const errorEmbed = new EmbedBuilder()
                 .setTitle("❌ Không thể câu cá")
@@ -182,10 +203,6 @@ async function fishWithAnimation(message: Message) {
             await fishingMsg.edit({ embeds: [updatedEmbed] });
         }
 
-        // Kiểm tra quyền Admin
-        const member = await message.guild?.members.fetch(userId);
-        const isAdmin = member?.permissions.has('Administrator') || false;
-
         // Thực hiện câu cá
         const result = await FishingService.fish(userId, guildId, isAdmin);
         const { fish, value, newBalance } = result;
@@ -249,6 +266,9 @@ async function fishWithAnimation(message: Message) {
             .setTimestamp();
 
         await message.reply({ embeds: [errorEmbed] });
+    } finally {
+        // Xóa trạng thái đang câu cá
+        fishingInProgress.delete(userId);
     }
 }
 

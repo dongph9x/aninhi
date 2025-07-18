@@ -8,20 +8,21 @@ datasource db {
 }
 
 model User {
-  id            String                  @id @default(cuid())
-  userId        String
-  guildId       String
-  balance       Int                     @default(0)
-  dailyStreak   Int                     @default(0)
-  createdAt     DateTime                @default(now())
-  updatedAt     DateTime                @updatedAt
-  dailyClaims   DailyClaim[]
-  fishInventory FishInventory?
-  fishingData   FishingData?
-  gameStats     GameStats[]
-  inventory     Inventory?
-  tournaments   TournamentParticipant[]
-  transactions  Transaction[]
+  id                    String                  @id @default(cuid())
+  userId                String
+  guildId               String
+  balance               Int                     @default(0)
+  dailyStreak           Int                     @default(0)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  dailyClaims           DailyClaim[]
+  fishInventory         FishInventory?
+  battleFishInventory   BattleFishInventory?
+  fishingData           FishingData?
+  gameStats             GameStats[]
+  inventory             Inventory?
+  tournaments           TournamentParticipant[]
+  transactions          Transaction[]
 
   @@unique([userId, guildId])
   @@index([userId])
@@ -313,21 +314,23 @@ model BanRecord {
 }
 
 model Fish {
-  id            String             @id @default(cuid())
-  userId        String
-  guildId       String
-  species       String
-  level         Int                @default(1)
-  experience    Int                @default(0)
-  rarity        String
-  value         Int                @default(0)
-  generation    Int                @default(1)
-  specialTraits String?
-  status        String             @default("growing")
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  inventoryItem FishInventoryItem?
-  marketListing FishMarket?
+  id                    String                    @id @default(cuid())
+  userId                String
+  guildId               String
+  species               String
+  level                 Int                       @default(1)
+  experience            Int                       @default(0)
+  rarity                String
+  value                 Int                       @default(0)
+  generation            Int                       @default(1)
+  specialTraits         String?
+  stats                 String?                   // JSON string chứa stats: strength, agility, intelligence, defense, luck
+  status                String                    @default("growing")
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  inventoryItem         FishInventoryItem?
+  battleInventoryItem   BattleFishInventoryItem?
+  marketListing         FishMarket?
 
   @@index([userId])
   @@index([guildId])
@@ -349,6 +352,20 @@ model FishInventory {
   @@index([userId, guildId])
 }
 
+model BattleFishInventory {
+  id        String                    @id @default(cuid())
+  userId    String
+  guildId   String
+  capacity  Int                       @default(5)
+  createdAt DateTime                  @default(now())
+  updatedAt DateTime                  @updatedAt
+  user      User                      @relation(fields: [userId, guildId], references: [userId, guildId])
+  items     BattleFishInventoryItem[]
+
+  @@unique([userId, guildId])
+  @@index([userId, guildId])
+}
+
 model FishInventoryItem {
   id              String        @id @default(cuid())
   fishInventoryId String
@@ -361,6 +378,21 @@ model FishInventoryItem {
   @@index([fishInventoryId])
   @@index([fishId])
 }
+
+model BattleFishInventoryItem {
+  id                    String              @id @default(cuid())
+  battleFishInventoryId String
+  fishId                String              @unique
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  battleFishInventory   BattleFishInventory @relation(fields: [battleFishInventoryId], references: [id], onDelete: Cascade)
+  fish                  Fish                @relation(fields: [fishId], references: [id], onDelete: Cascade)
+
+  @@index([battleFishInventoryId])
+  @@index([fishId])
+}
+
+
 
 model FishMarket {
   id        String   @id @default(cuid())
@@ -408,4 +440,25 @@ model FishPrice {
 
   @@index([fishName])
   @@index([lastUpdated])
+}
+
+model BattleHistory {
+  id             String   @id @default(cuid())
+  userId         String
+  guildId        String
+  fishId         String
+  opponentId     String
+  opponentUserId String
+  userPower      Int
+  opponentPower  Int
+  userWon        Boolean
+  reward         Int
+  battleLog      String   // JSON string chứa log trận đấu
+  battledAt      DateTime @default(now())
+
+  @@index([userId])
+  @@index([guildId])
+  @@index([fishId])
+  @@index([opponentId])
+  @@index([battledAt])
 }

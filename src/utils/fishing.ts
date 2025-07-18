@@ -352,15 +352,16 @@ export class FishingService {
 
     /**
      * Kiểm tra có thể câu cá không
+     * Admin bypass tất cả yêu cầu về cần câu, mồi và cooldown
      */
-    static async canFish(userId: string, guildId: string): Promise<{ canFish: boolean; remainingTime: number; message?: string }> {
+    static async canFish(userId: string, guildId: string, isAdmin: boolean = false): Promise<{ canFish: boolean; remainingTime: number; message?: string }> {
         try {
             const fishingData = await this.getFishingData(userId, guildId);
             const now = new Date();
             const timeSinceLastFish = now.getTime() - fishingData.lastFished.getTime();
 
-            // Kiểm tra cooldown
-            if (timeSinceLastFish < FISHING_COOLDOWN) {
+            // Kiểm tra cooldown (Admin bypass cooldown)
+            if (!isAdmin && timeSinceLastFish < FISHING_COOLDOWN) {
                 return {
                     canFish: false,
                     remainingTime: FISHING_COOLDOWN - timeSinceLastFish,
@@ -368,42 +369,45 @@ export class FishingService {
                 };
             }
 
-            // Kiểm tra có cần câu không
-            if (!fishingData.currentRod || fishingData.currentRod === "") {
-                return {
-                    canFish: false,
-                    remainingTime: 0,
-                    message: "Bạn cần mua cần câu trước khi câu cá! Dùng `n.fishing shop` để xem cửa hàng."
-                };
-            }
+            // Admin bypass tất cả yêu cầu về cần câu và mồi
+            if (!isAdmin) {
+                // Kiểm tra có cần câu không
+                if (!fishingData.currentRod || fishingData.currentRod === "") {
+                    return {
+                        canFish: false,
+                        remainingTime: 0,
+                        message: "Bạn cần mua cần câu trước khi câu cá! Dùng `n.fishing shop` để xem cửa hàng."
+                    };
+                }
 
-            // Kiểm tra có mồi không
-            if (!fishingData.currentBait || fishingData.currentBait === "") {
-                return {
-                    canFish: false,
-                    remainingTime: 0,
-                    message: "Bạn cần mua mồi trước khi câu cá! Dùng `n.fishing shop` để xem cửa hàng."
-                };
-            }
+                // Kiểm tra có mồi không
+                if (!fishingData.currentBait || fishingData.currentBait === "") {
+                    return {
+                        canFish: false,
+                        remainingTime: 0,
+                        message: "Bạn cần mua mồi trước khi câu cá! Dùng `n.fishing shop` để xem cửa hàng."
+                    };
+                }
 
-            // Kiểm tra cần câu có độ bền không
-            const currentRod = fishingData.rods.find((r: { rodType: string; durability: number; id: string }) => r.rodType === fishingData.currentRod);
-            if (!currentRod || currentRod.durability <= 0) {
-                return {
-                    canFish: false,
-                    remainingTime: 0,
-                    message: "Cần câu của bạn đã hết độ bền! Hãy mua cần câu mới."
-                };
-            }
+                // Kiểm tra cần câu có độ bền không
+                const currentRod = fishingData.rods.find((r: { rodType: string; durability: number; id: string }) => r.rodType === fishingData.currentRod);
+                if (!currentRod || currentRod.durability <= 0) {
+                    return {
+                        canFish: false,
+                        remainingTime: 0,
+                        message: "Cần câu của bạn đã hết độ bền! Hãy mua cần câu mới."
+                    };
+                }
 
-            // Kiểm tra có mồi không
-            const currentBait = fishingData.baits.find((b: { baitType: string; quantity: number; id: string }) => b.baitType === fishingData.currentBait);
-            if (!currentBait || currentBait.quantity <= 0) {
-                return {
-                    canFish: false,
-                    remainingTime: 0,
-                    message: "Bạn đã hết mồi! Hãy mua thêm mồi."
-                };
+                // Kiểm tra có mồi không
+                const currentBait = fishingData.baits.find((b: { baitType: string; quantity: number; id: string }) => b.baitType === fishingData.currentBait);
+                if (!currentBait || currentBait.quantity <= 0) {
+                    return {
+                        canFish: false,
+                        remainingTime: 0,
+                        message: "Bạn đã hết mồi! Hãy mua thêm mồi."
+                    };
+                }
             }
 
             return { canFish: true, remainingTime: 0 };
@@ -424,12 +428,10 @@ export class FishingService {
         try {
             const fishingData = await this.getFishingData(userId, guildId);
             
-            // Kiểm tra điều kiện câu cá (Admin bypass cooldown)
-            if (!isAdmin) {
-                const cooldownCheck = await this.canFish(userId, guildId);
-                if (!cooldownCheck.canFish) {
-                    throw new Error(cooldownCheck.message || `Bạn cần đợi ${Math.ceil(cooldownCheck.remainingTime / 1000)} giây nữa để câu cá!`);
-                }
+            // Kiểm tra điều kiện câu cá (Admin bypass tất cả yêu cầu)
+            const cooldownCheck = await this.canFish(userId, guildId, isAdmin);
+            if (!cooldownCheck.canFish) {
+                throw new Error(cooldownCheck.message || `Bạn cần đợi ${Math.ceil(cooldownCheck.remainingTime / 1000)} giây nữa để câu cá!`);
             }
 
             // Kiểm tra số dư
@@ -510,37 +512,39 @@ export class FishingService {
                 }
             });
 
-            // Giảm độ bền cần câu
-            const currentRod = fishingData.rods.find((r: { rodType: string; durability: number; id: string }) => r.rodType === fishingData.currentRod);
-            if (currentRod && currentRod.durability > 0) {
-                await prisma.fishingRod.update({
-                    where: { id: currentRod.id },
-                    data: { durability: { decrement: 1 } }
-                });
-
-                // Nếu cần câu hết độ bền, xóa cần câu hiện tại
-                if (currentRod.durability <= 1) {
-                    await prisma.fishingData.update({
-                        where: { id: fishingData.id },
-                        data: { currentRod: "" }
+            // Giảm độ bền cần câu (Admin không bị giảm)
+            if (!isAdmin) {
+                const currentRod = fishingData.rods.find((r: { rodType: string; durability: number; id: string }) => r.rodType === fishingData.currentRod);
+                if (currentRod && currentRod.durability > 0) {
+                    await prisma.fishingRod.update({
+                        where: { id: currentRod.id },
+                        data: { durability: { decrement: 1 } }
                     });
+
+                    // Nếu cần câu hết độ bền, xóa cần câu hiện tại
+                    if (currentRod.durability <= 1) {
+                        await prisma.fishingData.update({
+                            where: { id: fishingData.id },
+                            data: { currentRod: "" }
+                        });
+                    }
                 }
-            }
 
-            // Giảm số lượng mồi
-            const currentBait = fishingData.baits.find((b: { baitType: string; quantity: number; id: string }) => b.baitType === fishingData.currentBait);
-            if (currentBait && currentBait.quantity > 0) {
-                await prisma.fishingBait.update({
-                    where: { id: currentBait.id },
-                    data: { quantity: { decrement: 1 } }
-                });
-
-                // Nếu hết mồi, xóa mồi hiện tại
-                if (currentBait.quantity <= 0) {
-                    await prisma.fishingData.update({
-                        where: { id: fishingData.id },
-                        data: { currentBait: "" }
+                // Giảm số lượng mồi (Admin không bị giảm)
+                const currentBait = fishingData.baits.find((b: { baitType: string; quantity: number; id: string }) => b.baitType === fishingData.currentBait);
+                if (currentBait && currentBait.quantity > 0) {
+                    await prisma.fishingBait.update({
+                        where: { id: currentBait.id },
+                        data: { quantity: { decrement: 1 } }
                     });
+
+                    // Nếu hết mồi, xóa mồi hiện tại
+                    if (currentBait.quantity <= 0) {
+                        await prisma.fishingData.update({
+                            where: { id: fishingData.id },
+                            data: { currentBait: "" }
+                        });
+                    }
                 }
             }
 

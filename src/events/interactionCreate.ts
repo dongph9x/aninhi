@@ -90,6 +90,24 @@ export default Bot.createEvent({
                 return;
             }
 
+            // Kiểm tra xem có phải battle fish interaction không
+            if (interaction.customId.startsWith("battle_fish_")) {
+                console.log("BattleFish interaction:", interaction.customId);
+                
+                try {
+                    const { BattleFishHandler } = await import("../components/MessageComponent/BattleFishHandler");
+                    if (interaction.isButton() || interaction.isStringSelectMenu()) {
+                        await BattleFishHandler.handleInteraction(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling BattleFish interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác đấu cá!`);
+                    }
+                }
+                return;
+            }
+
             // Kiểm tra xem có phải vote kick button không
             try {
                 const voteKickData = JSON.parse(interaction.customId);

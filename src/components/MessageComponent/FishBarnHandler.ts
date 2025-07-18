@@ -6,6 +6,12 @@ import { FishBarnUI } from './FishBarnUI';
 export class FishBarnHandler {
   // Lưu trữ cá được chọn cho mỗi user
   private static selectedFishMap = new Map<string, string>();
+  // Lưu trữ chế độ lai tạo cho mỗi user
+  private static breedingModeMap = new Map<string, {
+    breedingMode: boolean;
+    selectedParent1Id?: string;
+    selectedParent2Id?: string;
+  }>();
 
   static async handleInteraction(interaction: ButtonInteraction | StringSelectMenuInteraction) {
     const customId = interaction.customId;
@@ -41,6 +47,20 @@ export class FishBarnHandler {
           }
           break;
           
+        case 'fishbarn_select_parent':
+          if (interaction.isStringSelectMenu()) {
+            await this.handleSelectParent(interaction, userId, guildId);
+          }
+          break;
+          
+        case 'fishbarn_confirm_breed':
+          await this.handleConfirmBreed(interaction, userId, guildId);
+          break;
+          
+        case 'fishbarn_cancel_breed':
+          await this.handleCancelBreed(interaction, userId, guildId);
+          break;
+          
         default:
           await interaction.reply({ content: '❌ Lỗi: Không nhận diện được action!', ephemeral: true });
       }
@@ -51,56 +71,33 @@ export class FishBarnHandler {
   }
 
   private static async handleClose(interaction: ButtonInteraction | StringSelectMenuInteraction) {
+    // Xóa dữ liệu lưu trữ
+    const userId = interaction.user.id;
+    this.selectedFishMap.delete(userId);
+    this.breedingModeMap.delete(userId);
+    
     await interaction.update({
-      content: '✅ Đã đóng rương nuôi cá!',
+      content: '🐟 Rương nuôi cá đã được đóng!',
       embeds: [],
       components: [],
     });
   }
 
   private static async handleFeed(interaction: ButtonInteraction | StringSelectMenuInteraction, userId: string, guildId: string) {
+    const selectedFishId = this.selectedFishMap.get(userId);
+    
+    if (!selectedFishId) {
+      return interaction.reply({ 
+        content: '❌ Vui lòng chọn một con cá trước khi cho ăn!', 
+        ephemeral: true 
+      });
+    }
+
     // Kiểm tra quyền admin
     const member = await interaction.guild?.members.fetch(userId);
     const isAdmin = member?.permissions.has('Administrator') || false;
 
-    console.log(`Admin status for ${userId}: ${isAdmin}`);
-
-    // Lấy inventory hiện tại
-    const inventory = await FishInventoryService.getFishInventory(userId, guildId);
-    
-    if (inventory.items.length === 0) {
-      return interaction.reply({ content: '❌ Bạn không có cá nào để cho ăn!', ephemeral: true });
-    }
-
-    // Kiểm tra xem có cá được chọn không
-    const selectedFishId = this.selectedFishMap.get(userId);
-    let targetFish;
-
-    if (selectedFishId) {
-      // Tìm cá được chọn trong inventory
-      targetFish = inventory.items.find((item: any) => item.fish.id === selectedFishId);
-      
-      if (!targetFish) {
-        // Cá được chọn không còn trong inventory (có thể đã bị xóa)
-        this.selectedFishMap.delete(userId);
-        return interaction.reply({ content: '❌ Cá được chọn không còn trong rương! Vui lòng chọn lại.', ephemeral: true });
-      }
-
-      // Kiểm tra xem cá có đang lớn không
-      if (targetFish.fish.status === 'adult') {
-        return interaction.reply({ content: '❌ Cá này đã trưởng thành! Không thể cho ăn thêm.', ephemeral: true });
-      }
-    } else {
-      // Nếu chưa chọn cá, tìm cá đang lớn đầu tiên
-      targetFish = inventory.items.find((item: any) => item.fish.status === 'growing');
-      
-      if (!targetFish) {
-        return interaction.reply({ content: '❌ Tất cả cá đã trưởng thành!', ephemeral: true });
-      }
-    }
-
-    // Cho cá ăn
-    const result = await FishBreedingService.feedFish(userId, targetFish.fish.id, isAdmin);
+    const result = await FishBreedingService.feedFish(userId, selectedFishId, isAdmin);
     
     if (!result.success) {
       return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });
@@ -114,21 +111,31 @@ export class FishBarnHandler {
       .setTitle('🍽️ Cho Cá Ăn Thành Công!')
       .setColor('#00FF00')
       .addFields(
-        { name: '🐟 Cá', value: result.fish.name, inline: true },
+        { name: '🐟 Cá', value: result.fish?.name || 'Unknown', inline: true },
         { name: '📈 Kinh nghiệm', value: `+${result.experienceGained}`, inline: true },
-        { name: '💰 Giá trị mới', value: (result.newValue || result.fish.value).toLocaleString(), inline: true }
+        { name: '🎯 Level', value: `${result.fish?.level || 0}`, inline: true },
+        { name: '💰 Giá trị mới', value: (result.newValue || 0).toLocaleString(), inline: true }
       );
 
     if (result.leveledUp) {
-      embed.addFields({ name: '🎉 Lên cấp!', value: `Cấp ${result.fish.level}`, inline: true });
+      embed.addFields({ name: '🎉 Lên Level!', value: 'Cá đã lên level mới!', inline: false });
     }
 
     if (result.becameAdult) {
-      embed.addFields({ name: '🐟 Trưởng thành!', value: 'Cá đã có thể lai tạo!', inline: true });
+      embed.addFields({ name: '🐟 Trưởng Thành!', value: 'Cá đã trưởng thành và có thể lai tạo!', inline: false });
     }
 
-    // Cập nhật UI với cá được chọn
-    const ui = new FishBarnUI(updatedInventory, userId, guildId, selectedFishId);
+    // Cập nhật UI
+    const breedingData = this.breedingModeMap.get(userId);
+    const ui = new FishBarnUI(
+      updatedInventory, 
+      userId, 
+      guildId, 
+      selectedFishId,
+      breedingData?.breedingMode || false,
+      breedingData?.selectedParent1Id,
+      breedingData?.selectedParent2Id
+    );
     const newEmbed = ui.createEmbed();
     const newComponents = ui.createComponents();
 
@@ -142,42 +149,23 @@ export class FishBarnHandler {
   }
 
   private static async handleSell(interaction: ButtonInteraction | StringSelectMenuInteraction, userId: string, guildId: string) {
-    const inventory = await FishInventoryService.getFishInventory(userId, guildId);
-    
-    if (inventory.items.length === 0) {
-      return interaction.reply({ content: '❌ Bạn không có cá nào để bán!', ephemeral: true });
-    }
-
-    // Kiểm tra xem có cá được chọn không
     const selectedFishId = this.selectedFishMap.get(userId);
-    let targetFish;
-
-    if (selectedFishId) {
-      // Tìm cá được chọn trong inventory
-      targetFish = inventory.items.find((item: any) => item.fish.id === selectedFishId);
-      
-      if (!targetFish) {
-        // Cá được chọn không còn trong inventory (có thể đã bị xóa)
-        this.selectedFishMap.delete(userId);
-        return interaction.reply({ content: '❌ Cá được chọn không còn trong rương! Vui lòng chọn lại.', ephemeral: true });
-      }
-    } else {
-      // Nếu chưa chọn cá, bán cá có giá trị cao nhất
-      targetFish = inventory.items.reduce((prev: any, current: any) => 
-        prev.fish.value > current.fish.value ? prev : current
-      );
+    
+    if (!selectedFishId) {
+      return interaction.reply({ 
+        content: '❌ Vui lòng chọn một con cá trước khi bán!', 
+        ephemeral: true 
+      });
     }
 
-    const result = await FishInventoryService.sellFishFromInventory(userId, guildId, targetFish.fish.id);
+    const result = await FishInventoryService.sellFishFromInventory(userId, guildId, selectedFishId);
     
     if (!result.success) {
       return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });
     }
 
-    // Xóa cá được chọn khỏi map nếu đã bán
-    if (selectedFishId) {
-      this.selectedFishMap.delete(userId);
-    }
+    // Xóa cá khỏi selected
+    this.selectedFishMap.delete(userId);
 
     // Cập nhật inventory
     const updatedInventory = await FishInventoryService.getFishInventory(userId, guildId);
@@ -187,13 +175,22 @@ export class FishBarnHandler {
       .setTitle('💰 Bán Cá Thành Công!')
       .setColor('#FFD700')
       .addFields(
-        { name: '🐟 Cá đã bán', value: result.fish.name, inline: true },
-        { name: '💰 Số tiền nhận', value: result.coinsEarned.toLocaleString(), inline: true },
-        { name: '💳 Số dư mới', value: result.newBalance.toLocaleString(), inline: true }
+        { name: '🐟 Cá đã bán', value: result.fish?.name || 'Unknown', inline: true },
+        { name: '💰 Số tiền nhận', value: (result.coinsEarned || 0).toLocaleString(), inline: true },
+        { name: '💳 Số dư mới', value: (result.newBalance || 0).toLocaleString(), inline: true }
       );
 
-    // Cập nhật UI (không có cá được chọn vì đã bán)
-    const ui = new FishBarnUI(updatedInventory, userId, guildId);
+    // Cập nhật UI
+    const breedingData = this.breedingModeMap.get(userId);
+    const ui = new FishBarnUI(
+      updatedInventory, 
+      userId, 
+      guildId, 
+      undefined,
+      breedingData?.breedingMode || false,
+      breedingData?.selectedParent1Id,
+      breedingData?.selectedParent2Id
+    );
     const newEmbed = ui.createEmbed();
     const newComponents = ui.createComponents();
 
@@ -209,7 +206,7 @@ export class FishBarnHandler {
   private static async handleBreed(interaction: ButtonInteraction | StringSelectMenuInteraction, userId: string, guildId: string) {
     const inventory = await FishInventoryService.getFishInventory(userId, guildId);
     
-    // Tìm 2 cá trưởng thành
+    // Tìm cá trưởng thành
     const adultFish = inventory.items.filter((item: any) => item.fish.status === 'adult');
     
     if (adultFish.length < 2) {
@@ -219,18 +216,139 @@ export class FishBarnHandler {
       });
     }
 
-    // Chọn 2 cá đầu tiên
-    const fish1 = adultFish[0].fish;
-    const fish2 = adultFish[1].fish;
+    // Bật chế độ lai tạo
+    this.breedingModeMap.set(userId, {
+      breedingMode: true,
+      selectedParent1Id: undefined,
+      selectedParent2Id: undefined
+    });
 
-    const result = await FishBreedingService.breedFish(userId, fish1.id, fish2.id);
+    // Cập nhật UI
+    const ui = new FishBarnUI(inventory, userId, guildId, undefined, true);
+    const newEmbed = ui.createEmbed();
+    const newComponents = ui.createComponents();
+
+    await interaction.update({
+      embeds: [newEmbed],
+      components: newComponents,
+    });
+  }
+
+  private static async handleSelectFish(interaction: StringSelectMenuInteraction, userId: string, guildId: string) {
+    const selectedFishId = interaction.values[0];
+    this.selectedFishMap.set(userId, selectedFishId);
+
+    const inventory = await FishInventoryService.getFishInventory(userId, guildId);
+    
+    // Cập nhật UI
+    const breedingData = this.breedingModeMap.get(userId);
+    const ui = new FishBarnUI(
+      inventory, 
+      userId, 
+      guildId, 
+      selectedFishId,
+      breedingData?.breedingMode || false,
+      breedingData?.selectedParent1Id,
+      breedingData?.selectedParent2Id
+    );
+    const newEmbed = ui.createEmbed();
+    const newComponents = ui.createComponents();
+
+    await interaction.update({
+      embeds: [newEmbed],
+      components: newComponents,
+    });
+  }
+
+  private static async handleSelectParent(interaction: StringSelectMenuInteraction, userId: string, guildId: string) {
+    const selectedFishId = interaction.values[0];
+    const breedingData = this.breedingModeMap.get(userId) || { breedingMode: true };
+
+    // Lấy thông tin cá được chọn
+    const inventory = await FishInventoryService.getFishInventory(userId, guildId);
+    const selectedFish = inventory.items.find((item: any) => item.fish.id === selectedFishId);
+    
+    if (!selectedFish) {
+      return interaction.reply({ content: '❌ Không tìm thấy cá!', ephemeral: true });
+    }
+
+    // Chọn cá bố mẹ với validation cùng thế hệ
+    if (!breedingData.selectedParent1Id) {
+      breedingData.selectedParent1Id = selectedFishId;
+    } else if (!breedingData.selectedParent2Id && selectedFishId !== breedingData.selectedParent1Id) {
+      // Kiểm tra cùng thế hệ
+      const parent1 = inventory.items.find((item: any) => item.fish.id === breedingData.selectedParent1Id);
+      if (parent1 && parent1.fish.generation !== selectedFish.fish.generation) {
+        return interaction.reply({ 
+          content: `❌ Chỉ cá cùng thế hệ mới được lai tạo! Cá bố là thế hệ ${parent1.fish.generation}, cá mẹ là thế hệ ${selectedFish.fish.generation}`, 
+          ephemeral: true 
+        });
+      }
+      breedingData.selectedParent2Id = selectedFishId;
+    } else if (selectedFishId === breedingData.selectedParent1Id) {
+      // Bỏ chọn cá bố
+      breedingData.selectedParent1Id = undefined;
+    } else if (selectedFishId === breedingData.selectedParent2Id) {
+      // Bỏ chọn cá mẹ
+      breedingData.selectedParent2Id = undefined;
+    } else {
+      // Thay thế cá bố - kiểm tra cùng thế hệ với cá mẹ
+      if (breedingData.selectedParent2Id) {
+        const parent2 = inventory.items.find((item: any) => item.fish.id === breedingData.selectedParent2Id);
+        if (parent2 && parent2.fish.generation !== selectedFish.fish.generation) {
+          return interaction.reply({ 
+            content: `❌ Chỉ cá cùng thế hệ mới được lai tạo! Cá mẹ là thế hệ ${parent2.fish.generation}, cá bố mới là thế hệ ${selectedFish.fish.generation}`, 
+            ephemeral: true 
+          });
+        }
+      }
+      breedingData.selectedParent1Id = selectedFishId;
+    }
+
+    this.breedingModeMap.set(userId, breedingData);
+
+    // Cập nhật UI
+    const ui = new FishBarnUI(
+      inventory, 
+      userId, 
+      guildId, 
+      undefined,
+      true,
+      breedingData.selectedParent1Id,
+      breedingData.selectedParent2Id
+    );
+    const newEmbed = ui.createEmbed();
+    const newComponents = ui.createComponents();
+
+    await interaction.update({
+      embeds: [newEmbed],
+      components: newComponents,
+    });
+  }
+
+  private static async handleConfirmBreed(interaction: ButtonInteraction | StringSelectMenuInteraction, userId: string, guildId: string) {
+    const breedingData = this.breedingModeMap.get(userId);
+    
+    if (!breedingData?.selectedParent1Id || !breedingData?.selectedParent2Id) {
+      return interaction.reply({ 
+        content: '❌ Vui lòng chọn đủ 2 cá để lai tạo!', 
+        ephemeral: true 
+      });
+    }
+
+    const result = await FishBreedingService.breedFish(userId, breedingData.selectedParent1Id, breedingData.selectedParent2Id);
     
     if (!result.success) {
       return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });
     }
 
     // Thêm cá con vào inventory
-    await FishInventoryService.addFishToInventory(userId, guildId, result.offspring.id);
+    if (result.offspring) {
+      await FishInventoryService.addFishToInventory(userId, guildId, result.offspring.id);
+    }
+
+    // Tắt chế độ lai tạo
+    this.breedingModeMap.delete(userId);
 
     // Cập nhật inventory
     const updatedInventory = await FishInventoryService.getFishInventory(userId, guildId);
@@ -240,14 +358,23 @@ export class FishBarnHandler {
       .setTitle('❤️ Lai Tạo Thành Công!')
       .setColor('#FF69B4')
       .addFields(
-        { name: '🐟 Cá bố', value: result.parent1.name, inline: true },
-        { name: '🐟 Cá mẹ', value: result.parent2.name, inline: true },
-        { name: '🐠 Cá con', value: result.offspring.name, inline: true },
-        { name: '💰 Giá trị', value: result.offspring.value.toLocaleString(), inline: true },
-        { name: '🏷️ Thế hệ', value: result.offspring.generation.toString(), inline: true }
+        { name: '🐟 Cá bố', value: result.parent1?.name || 'Unknown', inline: true },
+        { name: '🐟 Cá mẹ', value: result.parent2?.name || 'Unknown', inline: true },
+        { name: '🐠 Cá con', value: result.offspring?.name || 'Unknown', inline: true },
+        { name: '💰 Giá trị', value: (result.offspring?.value || 0).toLocaleString(), inline: true },
+        { name: '🏷️ Thế hệ', value: (result.offspring?.generation || 0).toString(), inline: true },
+        { name: '💪 Tổng sức mạnh', value: result.offspring ? FishBreedingService.calculateTotalPower(result.offspring).toString() : '0', inline: true }
       );
 
-    // Cập nhật UI (không có cá được chọn vì đã lai tạo)
+    if (result.offspring?.stats) {
+      embed.addFields({
+        name: '📊 Stats Di Truyền',
+        value: `💪${result.offspring.stats.strength || 0} 🏃${result.offspring.stats.agility || 0} 🧠${result.offspring.stats.intelligence || 0} 🛡️${result.offspring.stats.defense || 0} 🍀${result.offspring.stats.luck || 0}`,
+        inline: false
+      });
+    }
+
+    // Cập nhật UI
     const ui = new FishBarnUI(updatedInventory, userId, guildId);
     const newEmbed = ui.createEmbed();
     const newComponents = ui.createComponents();
@@ -261,47 +388,20 @@ export class FishBarnHandler {
     await interaction.followUp({ embeds: [embed], ephemeral: true });
   }
 
-  private static async handleSelectFish(interaction: StringSelectMenuInteraction, userId: string, guildId: string) {
-    const selectedFishId = interaction.values[0];
-    
-    console.log(`🔍 handleSelectFish - selectedFishId: ${selectedFishId}`);
-    
-    if (!selectedFishId) {
-      return interaction.reply({ content: '❌ Không tìm thấy cá được chọn!', ephemeral: true });
-    }
+  private static async handleCancelBreed(interaction: ButtonInteraction | StringSelectMenuInteraction, userId: string, guildId: string) {
+    // Tắt chế độ lai tạo
+    this.breedingModeMap.delete(userId);
 
-    // Lưu cá được chọn
-    this.selectedFishMap.set(userId, selectedFishId);
-    console.log(`💾 Saved selectedFishId for user ${userId}: ${selectedFishId}`);
-
-    // Lấy thông tin cá
-    const fish = await FishBreedingService.getFishById(userId, selectedFishId);
-    
-    if (!fish) {
-      return interaction.reply({ content: '❌ Không tìm thấy cá!', ephemeral: true });
-    }
-
-    // Cập nhật UI với cá được chọn
     const inventory = await FishInventoryService.getFishInventory(userId, guildId);
-    const ui = new FishBarnUI(inventory, userId, guildId, selectedFishId);
+    
+    // Cập nhật UI
+    const ui = new FishBarnUI(inventory, userId, guildId, this.selectedFishMap.get(userId));
     const newEmbed = ui.createEmbed();
     const newComponents = ui.createComponents();
-
-    console.log(`🎨 Creating UI with selectedFishId: ${selectedFishId}`);
-    console.log(`📊 Embed fields count: ${newEmbed.data.fields?.length || 0}`);
 
     await interaction.update({
       embeds: [newEmbed],
       components: newComponents,
     });
-
-    // Gửi thông báo xác nhận
-    const confirmEmbed = new EmbedBuilder()
-      .setTitle(`✅ ${fish.name} đã được chọn!`)
-      .setColor('#00FF00')
-      .setDescription('Bây giờ bạn có thể sử dụng các nút bên trên để thao tác với cá này.')
-      .setTimestamp();
-
-    await interaction.followUp({ embeds: [confirmEmbed], ephemeral: true });
   }
 } 

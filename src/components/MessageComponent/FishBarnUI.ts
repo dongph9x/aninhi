@@ -5,12 +5,18 @@ export class FishBarnUI {
   private userId: string;
   private guildId: string;
   private selectedFishId?: string;
+  private breedingMode: boolean = false;
+  private selectedParent1Id?: string;
+  private selectedParent2Id?: string;
 
-  constructor(inventory: any, userId: string, guildId: string, selectedFishId?: string) {
+  constructor(inventory: any, userId: string, guildId: string, selectedFishId?: string, breedingMode: boolean = false, selectedParent1Id?: string, selectedParent2Id?: string) {
     this.inventory = inventory;
     this.userId = userId;
     this.guildId = guildId;
     this.selectedFishId = selectedFishId;
+    this.breedingMode = breedingMode;
+    this.selectedParent1Id = selectedParent1Id;
+    this.selectedParent2Id = selectedParent2Id;
   }
 
   createEmbed(): EmbedBuilder {
@@ -26,6 +32,72 @@ export class FishBarnUI {
         value: 'Bạn chưa có cá huyền thoại nào trong rương!\nHãy câu cá huyền thoại trước.',
         inline: false,
       });
+    } else if (this.breedingMode) {
+      // Hiển thị chế độ lai tạo
+      embed.setTitle('❤️ Chế Độ Lai Tạo')
+        .setColor('#FF69B4')
+        .setDescription('Chọn 2 cá trưởng thành để lai tạo');
+
+      // Hiển thị cá bố mẹ đã chọn
+      if (this.selectedParent1Id) {
+        const parent1 = this.inventory.items.find((item: any) => item.fish.id === this.selectedParent1Id);
+        if (parent1) {
+          const stats = parent1.fish.stats || {};
+          const totalPower = this.calculateTotalPower(parent1.fish);
+          embed.addFields({
+            name: '🐟 Cá Bố (Đã chọn)',
+            value: this.createFishDisplayText(parent1.fish, stats, totalPower),
+            inline: true,
+          });
+        }
+      }
+
+      if (this.selectedParent2Id) {
+        const parent2 = this.inventory.items.find((item: any) => item.fish.id === this.selectedParent2Id);
+        if (parent2) {
+          const stats = parent2.fish.stats || {};
+          const totalPower = this.calculateTotalPower(parent2.fish);
+          embed.addFields({
+            name: '🐟 Cá Mẹ (Đã chọn)',
+            value: this.createFishDisplayText(parent2.fish, stats, totalPower),
+            inline: true,
+          });
+        }
+      }
+
+      // Hiển thị danh sách cá có thể chọn (nhóm theo thế hệ)
+      const breedableFish = this.inventory.items.filter((item: any) => item.fish.status === 'adult');
+      if (breedableFish.length > 0) {
+        // Nhóm cá theo thế hệ
+        const fishByGeneration: { [generation: number]: any[] } = {};
+        breedableFish.forEach((item: any) => {
+          const generation = item.fish.generation;
+          if (!fishByGeneration[generation]) {
+            fishByGeneration[generation] = [];
+          }
+          fishByGeneration[generation].push(item);
+        });
+
+        // Hiển thị từng thế hệ
+        Object.keys(fishByGeneration).sort((a, b) => parseInt(a) - parseInt(b)).forEach(generation => {
+          const genFish = fishByGeneration[parseInt(generation)];
+          const displayFish = genFish.slice(0, 3); // Tối đa 3 cá mỗi thế hệ
+          
+          embed.addFields({
+            name: `🏷️ Thế Hệ ${generation} (${genFish.length} cá)`,
+            value: displayFish.map((item: any) => {
+              const fish = item.fish;
+              const stats = fish.stats || {};
+              const totalPower = this.calculateTotalPower(fish);
+              const isSelected = fish.id === this.selectedParent1Id || fish.id === this.selectedParent2Id;
+              const statusEmoji = isSelected ? '✅' : '🐟';
+              
+              return `${statusEmoji} **${fish.name}** (Lv.${fish.level}) - Power: ${totalPower}`;
+            }).join('\n') + (genFish.length > 3 ? `\n... và ${genFish.length - 3} cá khác` : ''),
+            inline: false,
+          });
+        });
+      }
     } else if (this.selectedFishId) {
       // Chỉ show cá được chọn
       console.log(`🔍 Looking for fish with ID: ${this.selectedFishId}`);
@@ -36,13 +108,16 @@ export class FishBarnUI {
       
       if (selected) {
         const fish = selected.fish;
+        const stats = fish.stats || {};
+        const totalPower = this.calculateTotalPower(fish);
         const statusEmoji = fish.status === 'adult' ? '🐟' : '🐠';
         const levelBar = this.createLevelBar(fish.level, fish.experience, fish.experienceToNext);
         const levelBonus = fish.level > 1 ? (fish.level - 1) * 0.02 : 0;
         const finalValue = Math.floor(fish.value * (1 + levelBonus));
+        
         embed.addFields({
           name: `${statusEmoji} ${fish.name} (Lv.${fish.level}) - Đã chọn`,
-          value: `**Trạng thái:** ${fish.status === 'adult' ? 'Trưởng thành' : 'Đang lớn'}\n**Giá trị:** ${finalValue.toLocaleString()} coins${levelBonus > 0 ? ` (+${Math.round(levelBonus * 100)}%)` : ''}\n**Kinh nghiệm:** ${levelBar}\n**Thế hệ:** ${fish.generation}`,
+          value: this.createFishDisplayText(fish, stats, totalPower, levelBar, finalValue, levelBonus),
           inline: false,
         });
       } else {
@@ -51,13 +126,16 @@ export class FishBarnUI {
         const displayItems = this.inventory.items.slice(0, 5);
         displayItems.forEach((item: any, index: number) => {
           const fish = item.fish;
+          const stats = fish.stats || {};
+          const totalPower = this.calculateTotalPower(fish);
           const statusEmoji = fish.status === 'adult' ? '🐟' : '🐠';
           const levelBar = this.createLevelBar(fish.level, fish.experience, fish.experienceToNext);
           const levelBonus = fish.level > 1 ? (fish.level - 1) * 0.02 : 0;
           const finalValue = Math.floor(fish.value * (1 + levelBonus));
+          
           embed.addFields({
             name: `${statusEmoji} ${fish.name} (Lv.${fish.level})`,
-            value: `**Trạng thái:** ${fish.status === 'adult' ? 'Trưởng thành' : 'Đang lớn'}\n**Giá trị:** ${finalValue.toLocaleString()} coins${levelBonus > 0 ? ` (+${Math.round(levelBonus * 100)}%)` : ''}\n**Kinh nghiệm:** ${levelBar}\n**Thế hệ:** ${fish.generation}`,
+            value: this.createFishDisplayText(fish, stats, totalPower, levelBar, finalValue, levelBonus),
             inline: true,
           });
         });
@@ -87,6 +165,73 @@ export class FishBarnUI {
             .setEmoji('❌')
         );
       components.push(closeRow);
+    } else if (this.breedingMode) {
+      // Chế độ lai tạo
+      const breedableFish = this.inventory.items.filter((item: any) => item.fish.status === 'adult');
+      
+      if (breedableFish.length < 2) {
+        // Không đủ cá để lai tạo
+        const closeRow = new ActionRowBuilder<ButtonBuilder>()
+          .addComponents(
+            new ButtonBuilder()
+              .setCustomId('fishbarn_close')
+              .setLabel('Đóng')
+              .setStyle(ButtonStyle.Secondary)
+              .setEmoji('❌')
+          );
+        components.push(closeRow);
+      } else {
+        // Row 1: Chọn cá bố mẹ
+        const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>()
+          .addComponents(
+            new StringSelectMenuBuilder()
+              .setCustomId('fishbarn_select_parent')
+              .setPlaceholder('Chọn cá cùng thế hệ để lai tạo...')
+              .addOptions(
+                breedableFish.map((item: any) => {
+                  const fish = item.fish;
+                  const stats = fish.stats || {};
+                  const totalPower = this.calculateTotalPower(fish);
+                  const isSelected = fish.id === this.selectedParent1Id || fish.id === this.selectedParent2Id;
+                  
+                  return {
+                    label: `${fish.name} (Gen ${fish.generation}, Lv.${fish.level})`,
+                    description: `Power: ${totalPower} - ${isSelected ? 'Đã chọn' : 'Chưa chọn'}`,
+                    value: fish.id,
+                    emoji: isSelected ? '✅' : '🐟',
+                  };
+                })
+              )
+          );
+
+        // Row 2: Nút lai tạo và hủy
+        const actionRow = new ActionRowBuilder<ButtonBuilder>()
+          .addComponents(
+            new ButtonBuilder()
+              .setCustomId('fishbarn_confirm_breed')
+              .setLabel('Lai Tạo')
+              .setStyle(ButtonStyle.Success)
+              .setEmoji('❤️')
+              .setDisabled(!this.selectedParent1Id || !this.selectedParent2Id),
+            new ButtonBuilder()
+              .setCustomId('fishbarn_cancel_breed')
+              .setLabel('Hủy')
+              .setStyle(ButtonStyle.Danger)
+              .setEmoji('❌')
+          );
+
+        // Row 3: Đóng
+        const closeRow = new ActionRowBuilder<ButtonBuilder>()
+          .addComponents(
+            new ButtonBuilder()
+              .setCustomId('fishbarn_close')
+              .setLabel('Đóng')
+              .setStyle(ButtonStyle.Secondary)
+              .setEmoji('❌')
+          );
+
+        components.push(selectRow, actionRow, closeRow);
+      }
     } else {
       // Row 1: Feed và Sell
       const actionRow1 = new ActionRowBuilder<ButtonBuilder>()
@@ -116,15 +261,18 @@ export class FishBarnUI {
             .setPlaceholder(this.selectedFishId ? 'Đổi cá khác...' : 'Chọn cá để thao tác...')
             .addOptions(
               this.inventory.items.map((item: any, index: number) => {
+                const fish = item.fish;
+                const stats = fish.stats || {};
+                const totalPower = this.calculateTotalPower(fish);
                 // Tính giá theo level (tăng 2% mỗi level)
-                const levelBonus = item.fish.level > 1 ? (item.fish.level - 1) * 0.02 : 0;
-                const finalValue = Math.floor(item.fish.value * (1 + levelBonus));
+                const levelBonus = fish.level > 1 ? (fish.level - 1) * 0.02 : 0;
+                const finalValue = Math.floor(fish.value * (1 + levelBonus));
                 
                 return {
-                  label: `${item.fish.name} (Lv.${item.fish.level})`,
-                  description: `${item.fish.status === 'adult' ? 'Trưởng thành' : 'Đang lớn'} - ${finalValue.toLocaleString()} coins${levelBonus > 0 ? ` (+${Math.round(levelBonus * 100)}%)` : ''}`,
-                  value: item.fish.id,
-                  emoji: item.fish.status === 'adult' ? '🐟' : '🐠',
+                  label: `${fish.name} (Lv.${fish.level})`,
+                  description: `Power: ${totalPower} - ${fish.status === 'adult' ? 'Trưởng thành' : 'Đang lớn'} - ${finalValue.toLocaleString()} coins`,
+                  value: fish.id,
+                  emoji: fish.status === 'adult' ? '🐟' : '🐠',
                 };
               })
             )
@@ -162,5 +310,31 @@ export class FishBarnUI {
     const safeProgress = Math.max(0, Math.min(10, progress));
     const bar = '🟦'.repeat(safeProgress) + '⬜'.repeat(10 - safeProgress);
     return `${bar} ${exp}/${expNeeded}`;
+  }
+
+  private calculateTotalPower(fish: any): number {
+    const stats = fish.stats || {};
+    const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0);
+    return totalPower;
+  }
+
+  private createFishDisplayText(fish: any, stats: any, totalPower: number, levelBar?: string, finalValue?: number, levelBonus?: number): string {
+    let text = `**Trạng thái:** ${fish.status === 'adult' ? 'Trưởng thành' : 'Đang lớn'}\n`;
+    
+    if (finalValue !== undefined) {
+      text += `**Giá trị:** ${finalValue.toLocaleString()} coins${levelBonus && levelBonus > 0 ? ` (+${Math.round(levelBonus * 100)}%)` : ''}\n`;
+    } else {
+      text += `**Giá trị:** ${fish.value.toLocaleString()} coins\n`;
+    }
+    
+    if (levelBar) {
+      text += `**Kinh nghiệm:** ${levelBar}\n`;
+    }
+    
+    text += `**Thế hệ:** ${fish.generation}\n`;
+    text += `**Tổng sức mạnh:** ${totalPower}\n`;
+    text += `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}`;
+    
+    return text;
   }
 } 
