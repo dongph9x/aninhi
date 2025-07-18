@@ -45,7 +45,7 @@ export const FISH_LIST: Fish[] = [
     { name: "Cá mè", emoji: "🐟", rarity: "common", minValue: 15, maxValue: 60, chance: 10 },
 
     // Cá hiếm (20-25%)
-    { name: "Cá lóc", emoji: "🐠", rarity: "rare", minValue: 100, maxValue: 300, chance: 8 },
+    { name: "Cá lóc", emoji: "🐡", rarity: "rare", minValue: 100, maxValue: 300, chance: 8 },
     { name: "Cá trê", emoji: "🐠", rarity: "rare", minValue: 150, maxValue: 400, chance: 7 },
     { name: "Cá quả", emoji: "🐠", rarity: "rare", minValue: 200, maxValue: 500, chance: 6 },
     { name: "Cá chình", emoji: "🐠", rarity: "rare", minValue: 300, maxValue: 800, chance: 4 },
@@ -53,14 +53,14 @@ export const FISH_LIST: Fish[] = [
     // Cá quý hiếm (8-12%)
     { name: "Cá tầm", emoji: "🦈", rarity: "epic", minValue: 500, maxValue: 1500, chance: 3 },
     { name: "Cá hồi", emoji: "🦈", rarity: "epic", minValue: 800, maxValue: 2000, chance: 2.5 },
-    { name: "Cá ngừ", emoji: "🦈", rarity: "epic", minValue: 1000, maxValue: 3000, chance: 2 },
+    { name: "Cá ngừ", emoji: "🐋", rarity: "epic", minValue: 1000, maxValue: 3000, chance: 2 },
     { name: "Cá mập", emoji: "🦈", rarity: "epic", minValue: 2000, maxValue: 5000, chance: 1.5 },
 
     // Cá huyền thoại (1-3%)
-    { name: "Cá voi", emoji: "🐋", rarity: "legendary", minValue: 5000, maxValue: 15000, chance: 0.8 },
+    { name: "Cá voi", emoji: "🐳", rarity: "legendary", minValue: 5000, maxValue: 15000, chance: 0.8 },
     { name: "Cá mực khổng lồ", emoji: "🦑", rarity: "legendary", minValue: 8000, maxValue: 20000, chance: 0.6 },
     { name: "Cá rồng biển", emoji: "🐉", rarity: "legendary", minValue: 15000, maxValue: 50000, chance: 0.4 },
-    { name: "Cá thần", emoji: "✨", rarity: "legendary", minValue: 50000, maxValue: 100000, chance: 0.2 },
+    { name: "Cá thần", emoji: "🧜", rarity: "legendary", minValue: 50000, maxValue: 100000, chance: 0.2 },
 ];
 
 // Danh sách cần câu
@@ -77,7 +77,7 @@ export const BAITS: Record<string, Bait> = {
     "basic": { name: "Mồi cơ bản", emoji: "🪱", price: 10, rarityBonus: 0, description: "Mồi cơ bản, tỷ lệ thường" },
     "good": { name: "Mồi ngon", emoji: "🦐", price: 50, rarityBonus: 3, description: "Tăng 3% tỷ lệ hiếm" },
     "premium": { name: "Mồi thượng hạng", emoji: "🦀", price: 200, rarityBonus: 6, description: "Tăng 6% tỷ lệ hiếm" },
-    "divine": { name: "Mồi thần", emoji: "🌟", price: 1000, rarityBonus: 10, description: "Tăng 10% tỷ lệ hiếm" },
+    "divine": { name: "Mồi thần", emoji: "🧜‍♀️", price: 1000, rarityBonus: 10, description: "Tăng 10% tỷ lệ hiếm" },
 };
 
 // Cooldown cho câu cá (30 giây)
@@ -96,6 +96,11 @@ export class FishPriceService {
     static async initializeFishPrices() {
         try {
             for (const fish of FISH_LIST) {
+                // Bỏ qua cá huyền thoại - chỉ dành cho fishbarn
+                if (fish.rarity === 'legendary') {
+                    continue;
+                }
+                
                 const basePrice = Math.floor((fish.minValue + fish.maxValue) / 2);
                 
                 await prisma.fishPrice.upsert({
@@ -114,7 +119,7 @@ export class FishPriceService {
                     }
                 });
             }
-            console.log("✅ Đã khởi tạo giá cá ban đầu");
+            console.log("✅ Đã khởi tạo giá cá ban đầu (không bao gồm cá huyền thoại)");
         } catch (error) {
             console.error("❌ Lỗi khởi tạo giá cá:", error);
         }
@@ -128,6 +133,12 @@ export class FishPriceService {
             const fishPrices = await prisma.fishPrice.findMany();
             
             for (const fishPrice of fishPrices) {
+                // Kiểm tra xem có phải cá huyền thoại không (để đảm bảo an toàn)
+                const fish = FISH_LIST.find(f => f.name === fishPrice.fishName);
+                if (fish && fish.rarity === 'legendary') {
+                    continue; // Bỏ qua cá huyền thoại
+                }
+                
                 // Tạo biến động ngẫu nhiên ±10%
                 const fluctuation = (Math.random() - 0.5) * 0.2; // -10% đến +10%
                 const newPrice = Math.max(1, Math.floor(fishPrice.basePrice * (1 + fluctuation)));
@@ -157,7 +168,7 @@ export class FishPriceService {
                     }
                 });
             }
-            console.log(`✅ Đã cập nhật giá cá lúc ${new Date().toLocaleString()}`);
+            console.log(`✅ Đã cập nhật giá cá lúc ${new Date().toLocaleString()} (không bao gồm cá huyền thoại)`);
         } catch (error) {
             console.error("❌ Lỗi cập nhật giá cá:", error);
         }
@@ -168,14 +179,20 @@ export class FishPriceService {
      */
     static async getCurrentPrice(fishName: string): Promise<number> {
         try {
+            // Kiểm tra xem có phải cá huyền thoại không
+            const fish = FISH_LIST.find(f => f.name === fishName);
+            if (fish && fish.rarity === 'legendary') {
+                // Cá huyền thoại không có trong hệ thống giá biến động
+                return 0;
+            }
+
             const fishPrice = await prisma.fishPrice.findUnique({
                 where: { fishName }
             });
 
             if (!fishPrice) {
-                // Nếu chưa có giá, tạo giá mặc định
-                const fish = FISH_LIST.find(f => f.name === fishName);
-                if (fish) {
+                // Nếu chưa có giá, tạo giá mặc định (chỉ cho cá không phải huyền thoại)
+                if (fish && fish.rarity !== 'legendary') {
                     const basePrice = Math.floor((fish.minValue + fish.maxValue) / 2);
                     await this.initializeFishPrices();
                     return basePrice;
@@ -195,6 +212,13 @@ export class FishPriceService {
      */
     static async getFishPriceInfo(fishName: string) {
         try {
+            // Kiểm tra xem có phải cá huyền thoại không
+            const fish = FISH_LIST.find(f => f.name === fishName);
+            if (fish && fish.rarity === 'legendary') {
+                // Cá huyền thoại không có trong hệ thống giá biến động
+                return null;
+            }
+
             const fishPrice = await prisma.fishPrice.findUnique({
                 where: { fishName }
             });
@@ -227,7 +251,13 @@ export class FishPriceService {
                 orderBy: { fishName: 'asc' }
             });
 
-            return fishPrices.map(fp => ({
+            // Lọc bỏ cá huyền thoại (để đảm bảo an toàn)
+            const filteredPrices = fishPrices.filter(fp => {
+                const fish = FISH_LIST.find(f => f.name === fp.fishName);
+                return !fish || fish.rarity !== 'legendary';
+            });
+
+            return filteredPrices.map(fp => ({
                 fishName: fp.fishName,
                 basePrice: fp.basePrice,
                 currentPrice: fp.currentPrice,
@@ -390,14 +420,16 @@ export class FishingService {
     /**
      * Câu cá
      */
-    static async fish(userId: string, guildId: string) {
+    static async fish(userId: string, guildId: string, isAdmin: boolean = false) {
         try {
             const fishingData = await this.getFishingData(userId, guildId);
             
-            // Kiểm tra điều kiện câu cá
-            const cooldownCheck = await this.canFish(userId, guildId);
-            if (!cooldownCheck.canFish) {
-                throw new Error(cooldownCheck.message || `Bạn cần đợi ${Math.ceil(cooldownCheck.remainingTime / 1000)} giây nữa để câu cá!`);
+            // Kiểm tra điều kiện câu cá (Admin bypass cooldown)
+            if (!isAdmin) {
+                const cooldownCheck = await this.canFish(userId, guildId);
+                if (!cooldownCheck.canFish) {
+                    throw new Error(cooldownCheck.message || `Bạn cần đợi ${Math.ceil(cooldownCheck.remainingTime / 1000)} giây nữa để câu cá!`);
+                }
             }
 
             // Kiểm tra số dư
@@ -415,8 +447,8 @@ export class FishingService {
                 data: { balance: { decrement: FISHING_COST } }
             });
 
-            // Chọn cá ngẫu nhiên
-            const fish = this.getRandomFish(fishingData);
+            // Chọn cá ngẫu nhiên (Admin luôn câu được cá huyền thoại)
+            const fish = isAdmin ? this.getAdminFish() : this.getRandomFish(fishingData);
             const fishValue = Math.floor(Math.random() * (fish.maxValue - fish.minValue + 1)) + fish.minValue;
 
             // Cập nhật fishing data
@@ -747,6 +779,15 @@ export class FishingService {
             console.error("Error selling fish:", error);
             throw error;
         }
+    }
+
+    /**
+     * Chọn cá huyền thoại cho Admin
+     */
+    private static getAdminFish(): Fish {
+        const legendaryFish = FISH_LIST.filter(fish => fish.rarity === "legendary");
+        const randomIndex = Math.floor(Math.random() * legendaryFish.length);
+        return legendaryFish[randomIndex];
     }
 
     /**

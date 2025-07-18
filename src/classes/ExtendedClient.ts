@@ -43,6 +43,14 @@ export class ExtendedClient<Ready extends boolean = boolean> extends Client<Read
         commands: new Collection<string, ReadySlashCommandProps>(),
     };
 
+    // Fish barn messages storage
+    fishBarnMessages = new Collection<string, {
+        userId: string;
+        guildId: string;
+        inventory: any;
+        selectedFishId?: string;
+    }>();
+
     constructor(options: ClientOptions) {
         super(options);
 

@@ -4,7 +4,7 @@ import { Bot } from "@/classes";
 import { config } from "@/config";
 import { EcommerceService } from "@/utils/ecommerce-db";
 import { FishingService, FISH_LIST, FISHING_RODS, BAITS } from "@/utils/fishing";
-import { prisma } from "@/utils/database";
+import prisma from "@/utils/prisma";
 
 function getRarityColor(rarity: string): number {
     switch (rarity) {
@@ -182,9 +182,50 @@ async function fishWithAnimation(message: Message) {
             await fishingMsg.edit({ embeds: [updatedEmbed] });
         }
 
+        // Kiểm tra quyền Admin
+        const member = await message.guild?.members.fetch(userId);
+        const isAdmin = member?.permissions.has('Administrator') || false;
+
         // Thực hiện câu cá
-        const result = await FishingService.fish(userId, guildId);
+        const result = await FishingService.fish(userId, guildId, isAdmin);
         const { fish, value, newBalance } = result;
+
+        // Tự động thêm cá huyền thoại vào fish inventory
+        let fishInventoryMessage = '';
+        if (fish.rarity === 'legendary') {
+            try {
+                const { FishBreedingService } = await import('@/utils/fish-breeding');
+                const { FishInventoryService } = await import('@/utils/fish-inventory');
+                
+                // Tạo cá trong hệ thống nuôi
+                const fishData = {
+                    userId,
+                    guildId,
+                    species: fish.name,
+                    level: 1,
+                    experience: 0,
+                    rarity: 'legendary',
+                    value: value, // Sử dụng value từ kết quả câu cá
+                    generation: 1,
+                    specialTraits: JSON.stringify(['Caught']),
+                    status: 'growing',
+                };
+                
+                const createdFish = await prisma.fish.create({ data: fishData });
+                
+                // Thêm vào fish inventory
+                const addResult = await FishInventoryService.addFishToInventory(userId, guildId, createdFish.id);
+                
+                if (addResult.success) {
+                    fishInventoryMessage = '\n\n🐟 **Cá huyền thoại đã được thêm vào rương nuôi!**\nDùng `n.fishbarn` để mở rương nuôi cá.';
+                } else {
+                    fishInventoryMessage = '\n\n⚠️ **Không thể thêm vào rương nuôi:** ' + addResult.error;
+                }
+            } catch (error) {
+                console.error('Error adding legendary fish to inventory:', error);
+                fishInventoryMessage = '\n\n⚠️ **Lỗi khi thêm vào rương nuôi!**';
+            }
+        }
 
         const successEmbed = new EmbedBuilder()
             .setTitle("🎣 Câu Cá Thành Công!")
@@ -192,7 +233,8 @@ async function fishWithAnimation(message: Message) {
                 `**${message.author.username}** đã câu được:\n\n` +
                 `${fish.emoji} **${fish.name}**\n` +
                 `${getRarityEmoji(fish.rarity)} **${getRarityText(fish.rarity)}**\n` +
-                `💰 **Giá trị:** ${value} AniCoin\n\n`
+                `💰 **Giá trị:** ${value} AniCoin${fishInventoryMessage}` +
+                (isAdmin && fish.rarity === 'legendary' ? '\n\n👑 **Admin đã câu được cá huyền thoại!**' : '')
             )
             .setColor(getRarityColor(fish.rarity))
             .setThumbnail(message.author.displayAvatarURL())
@@ -628,6 +670,24 @@ async function showFishPrices(message: Message, args: string[]) {
         if (args.length > 0) {
             // Xem giá của một loại cá cụ thể
             const fishName = args.join(" ");
+            
+            // Kiểm tra xem có phải cá huyền thoại không
+            const legendaryFish = FISH_LIST.find(f => f.name === fishName);
+            if (legendaryFish && legendaryFish.rarity === 'legendary') {
+                const errorEmbed = new EmbedBuilder()
+                    .setTitle("✨ Cá Huyền Thoại")
+                    .setDescription(
+                        `**${fishName}** là cá huyền thoại và chỉ có thể bán trong rương nuôi cá!\n\n` +
+                        `🐟 **Sử dụng:** \`n.fishbarn\` để mở rương nuôi cá\n` +
+                        `💰 **Giá trị:** Cá huyền thoại có giá trị cố định và không biến động\n` +
+                        `🎣 **Cách có:** Chỉ có thể câu được cá huyền thoại khi câu cá`
+                    )
+                    .setColor("#FFD700")
+                    .setTimestamp();
+
+                return await message.reply({ embeds: [errorEmbed] });
+            }
+            
             const fishPriceInfo = await FishPriceService.getFishPriceInfo(fishName);
             
             if (!fishPriceInfo) {
@@ -640,12 +700,12 @@ async function showFishPrices(message: Message, args: string[]) {
                 return await message.reply({ embeds: [errorEmbed] });
             }
 
-            const fish = FISH_LIST.find(f => f.name === fishName);
+            const fishInfo = FISH_LIST.find(f => f.name === fishName);
             const changeEmoji = fishPriceInfo.changePercent > 0 ? "📈" : fishPriceInfo.changePercent < 0 ? "📉" : "➡️";
             const changeColor = fishPriceInfo.changePercent > 0 ? "#00ff00" : fishPriceInfo.changePercent < 0 ? "#ff0000" : "#ffff00";
 
             const embed = new EmbedBuilder()
-                .setTitle(`${fish?.emoji || "🐟"} Giá ${fishName}`)
+                .setTitle(`${fishInfo?.emoji || "🐟"} Giá ${fishName}`)
                 .setDescription(
                     `**Giá hiện tại:** ${fishPriceInfo.currentPrice} AniCoin\n` +
                     `**Giá gốc:** ${fishPriceInfo.basePrice} AniCoin\n` +
@@ -672,23 +732,23 @@ async function showFishPrices(message: Message, args: string[]) {
 
             // Nhóm theo rarity
             const commonFish = allPrices.filter(p => {
-                const fish = FISH_LIST.find(f => f.name === p.fishName);
-                return fish?.rarity === "common";
+                const fishInfo = FISH_LIST.find(f => f.name === p.fishName);
+                return fishInfo?.rarity === "common";
             });
             
             const rareFish = allPrices.filter(p => {
-                const fish = FISH_LIST.find(f => f.name === p.fishName);
-                return fish?.rarity === "rare";
+                const fishInfo = FISH_LIST.find(f => f.name === p.fishName);
+                return fishInfo?.rarity === "rare";
             });
             
             const epicFish = allPrices.filter(p => {
-                const fish = FISH_LIST.find(f => f.name === p.fishName);
-                return fish?.rarity === "epic";
+                const fishInfo = FISH_LIST.find(f => f.name === p.fishName);
+                return fishInfo?.rarity === "epic";
             });
             
-            const legendaryFish = allPrices.filter(p => {
-                const fish = FISH_LIST.find(f => f.name === p.fishName);
-                return fish?.rarity === "legendary";
+            const legendaryFishPrices = allPrices.filter(p => {
+                const fishInfo = FISH_LIST.find(f => f.name === p.fishName);
+                return fishInfo?.rarity === "legendary";
             });
 
             const embed = new EmbedBuilder()
@@ -697,28 +757,25 @@ async function showFishPrices(message: Message, args: string[]) {
                     `**Cập nhật lúc:** ${new Date().toLocaleString("vi-VN")}\n\n` +
                     `**🐟 Cá thường:**\n` +
                     commonFish.map(p => {
-                        const fish = FISH_LIST.find(f => f.name === p.fishName);
+                        const fishInfo = FISH_LIST.find(f => f.name === p.fishName);
                         const changeEmoji = p.changePercent > 0 ? "📈" : p.changePercent < 0 ? "📉" : "➡️";
-                        return `${fish?.emoji || "🐟"} **${p.fishName}:** ${p.currentPrice} (${p.changePercent > 0 ? "+" : ""}${p.changePercent.toFixed(1)}%) ${changeEmoji}`;
+                        return `${fishInfo?.emoji || "🐟"} **${p.fishName}:** ${p.currentPrice} (${p.changePercent > 0 ? "+" : ""}${p.changePercent.toFixed(1)}%) ${changeEmoji}`;
                     }).join("\n") +
                     `\n\n**🐠 Cá hiếm:**\n` +
                     rareFish.map(p => {
-                        const fish = FISH_LIST.find(f => f.name === p.fishName);
+                        const fishInfo = FISH_LIST.find(f => f.name === p.fishName);
                         const changeEmoji = p.changePercent > 0 ? "📈" : p.changePercent < 0 ? "📉" : "➡️";
-                        return `${fish?.emoji || "🐠"} **${p.fishName}:** ${p.currentPrice} (${p.changePercent > 0 ? "+" : ""}${p.changePercent.toFixed(1)}%) ${changeEmoji}`;
+                        return `${fishInfo?.emoji || "🐠"} **${p.fishName}:** ${p.currentPrice} (${p.changePercent > 0 ? "+" : ""}${p.changePercent.toFixed(1)}%) ${changeEmoji}`;
                     }).join("\n") +
                     `\n\n**🦈 Cá quý hiếm:**\n` +
                     epicFish.map(p => {
-                        const fish = FISH_LIST.find(f => f.name === p.fishName);
+                        const fishInfo = FISH_LIST.find(f => f.name === p.fishName);
                         const changeEmoji = p.changePercent > 0 ? "📈" : p.changePercent < 0 ? "📉" : "➡️";
-                        return `${fish?.emoji || "🦈"} **${p.fishName}:** ${p.currentPrice} (${p.changePercent > 0 ? "+" : ""}${p.changePercent.toFixed(1)}%) ${changeEmoji}`;
+                        return `${fishInfo?.emoji || "🦈"} **${p.fishName}:** ${p.currentPrice} (${p.changePercent > 0 ? "+" : ""}${p.changePercent.toFixed(1)}%) ${changeEmoji}`;
                     }).join("\n") +
                     `\n\n**✨ Cá huyền thoại:**\n` +
-                    legendaryFish.map(p => {
-                        const fish = FISH_LIST.find(f => f.name === p.fishName);
-                        const changeEmoji = p.changePercent > 0 ? "📈" : p.changePercent < 0 ? "📉" : "➡️";
-                        return `${fish?.emoji || "✨"} **${p.fishName}:** ${p.currentPrice} (${p.changePercent > 0 ? "+" : ""}${p.changePercent.toFixed(1)}%) ${changeEmoji}`;
-                    }).join("\n") +
+                    `*Cá huyền thoại chỉ có thể bán trong rương nuôi cá (\`n.fishbarn\`)*\n` +
+                    `*Giá trị cố định, không biến động theo thị trường*` +
                     `\n\n**💡 Lưu ý:** Giá cá thay đổi mỗi 10 phút với biến động ±10%`
                 )
                 .setColor("#0099ff")

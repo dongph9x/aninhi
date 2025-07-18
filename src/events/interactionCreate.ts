@@ -72,6 +72,24 @@ export default Bot.createEvent({
                 return;
             }
 
+            // Kiểm tra xem có phải fishbarn interaction không
+            if (interaction.customId.startsWith("fishbarn_")) {
+                console.log("FishBarn interaction:", interaction.customId);
+                
+                try {
+                    const { FishBarnHandler } = await import("../components/MessageComponent/FishBarnHandler");
+                    if (interaction.isButton() || interaction.isStringSelectMenu()) {
+                        await FishBarnHandler.handleInteraction(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling FishBarn interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác rương nuôi cá!`);
+                    }
+                }
+                return;
+            }
+
             // Kiểm tra xem có phải vote kick button không
             try {
                 const voteKickData = JSON.parse(interaction.customId);
