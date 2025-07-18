@@ -355,8 +355,8 @@ model FishInventoryItem {
   fishId          String        @unique
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
-  fish            Fish          @relation(fields: [fishId], references: [id], onDelete: Cascade)
   fishInventory   FishInventory @relation(fields: [fishInventoryId], references: [id], onDelete: Cascade)
+  fish            Fish          @relation(fields: [fishId], references: [id], onDelete: Cascade)
 
   @@index([fishInventoryId])
   @@index([fishId])
