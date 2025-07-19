@@ -184,6 +184,22 @@ export default Bot.createEvent({
         }
 
         if (interaction.isModalSubmit()) {
+            // Kiểm tra xem có phải market modal không
+            if (interaction.customId === 'market_sell_modal') {
+                console.log("Market sell modal submitted");
+                
+                try {
+                    const { FishMarketHandler } = await import("../components/MessageComponent/FishMarketHandler");
+                    await FishMarketHandler.handleModalSubmit(interaction);
+                } catch (error) {
+                    console.error("Error handling Market modal:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý modal fish market!`);
+                    }
+                }
+                return;
+            }
+
             const payload: CustomIdData = JSON.parse(interaction.customId);
             const component = client.components.modalSubmit.get(payload.n);
 

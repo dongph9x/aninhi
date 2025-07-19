@@ -13,6 +13,7 @@ export class FishMarketUI {
   private filterOptions: any;
   private userId: string;
   private guildId: string;
+  private listedFishIds: string[];
 
   constructor(
     listings: any[],
@@ -24,7 +25,8 @@ export class FishMarketUI {
     totalPages: number = 1,
     mode: 'browse' | 'sell' | 'my' | 'search' = 'browse',
     searchQuery: string = '',
-    filterOptions: any = {}
+    filterOptions: any = {},
+    listedFishIds: string[] = []
   ) {
     this.listings = listings;
     this.userListings = userListings;
@@ -36,6 +38,7 @@ export class FishMarketUI {
     this.filterOptions = filterOptions;
     this.userId = userId;
     this.guildId = guildId;
+    this.listedFishIds = listedFishIds;
   }
 
   createEmbed(): EmbedBuilder {
@@ -91,21 +94,35 @@ export class FishMarketUI {
   private createSellEmbed(embed: EmbedBuilder): EmbedBuilder {
     const eligibleFish = this.userInventory.items.filter((item: any) => {
       const fish = item.fish;
-      return fish.generation >= 2 && fish.status === 'adult';
+      return fish.generation >= 2 && fish.status === 'adult' && fish.userId === this.userId;
     });
 
-    if (eligibleFish.length === 0) {
+    // Lọc ra những cá đang được bán trên market
+    const listedFishIds = this.getListedFishIds();
+    const availableFish = eligibleFish.filter((item: any) => {
+      return !listedFishIds.includes(item.fish.id);
+    });
+
+    if (availableFish.length === 0) {
       embed.setDescription("Bạn không có cá nào đủ điều kiện để bán!")
         .addFields({
           name: "📋 Điều kiện bán cá",
-          value: "• Thế hệ 2 trở lên\n• Cá trưởng thành (level 10)\n• Không trong túi đấu"
+          value: "• Thế hệ 2 trở lên\n• Cá trưởng thành (level 10)\n• Không trong túi đấu\n• Chưa được bán trên market\n• Thuộc về bạn"
         });
+      
+      if (eligibleFish.length > 0 && listedFishIds.length > 0) {
+        embed.addFields({
+          name: "ℹ️ Thông tin",
+          value: `Bạn có ${eligibleFish.length} cá đủ điều kiện, nhưng ${listedFishIds.length} cá đã được bán trên market.`
+        });
+      }
+      
       return embed;
     }
 
-    embed.setDescription(`**${eligibleFish.length}** cá có thể bán`);
+    embed.setDescription(`**${availableFish.length}** cá có thể bán (${eligibleFish.length - availableFish.length} cá đã được bán)`);
 
-    for (const item of eligibleFish.slice(0, 5)) {
+    for (const item of availableFish.slice(0, 5)) {
       const fish = item.fish;
       const stats = fish.stats || {};
       const totalPower = this.calculateTotalPower(fish);
@@ -119,10 +136,10 @@ export class FishMarketUI {
       });
     }
 
-    if (eligibleFish.length > 5) {
+    if (availableFish.length > 5) {
       embed.addFields({
         name: "📄 Còn lại",
-        value: `${eligibleFish.length - 5} cá khác...`,
+        value: `${availableFish.length - 5} cá khác...`,
         inline: false
       });
     }
@@ -281,10 +298,16 @@ export class FishMarketUI {
 
     const eligibleFish = this.userInventory.items.filter((item: any) => {
       const fish = item.fish;
-      return fish.generation >= 2 && fish.status === 'adult';
+      return fish.generation >= 2 && fish.status === 'adult' && fish.userId === this.userId;
     });
 
-    if (eligibleFish.length > 0) {
+    // Lọc ra những cá đang được bán trên market
+    const listedFishIds = this.getListedFishIds();
+    const availableFish = eligibleFish.filter((item: any) => {
+      return !listedFishIds.includes(item.fish.id);
+    });
+
+    if (availableFish.length > 0) {
       // Row 1: Select fish to sell
       const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>()
         .addComponents(
@@ -292,13 +315,13 @@ export class FishMarketUI {
             .setCustomId('market_select_fish_to_sell')
             .setPlaceholder('Chọn cá để bán...')
             .addOptions(
-              eligibleFish.slice(0, 25).map((item: any) => {
+              availableFish.slice(0, 25).map((item: any) => {
                 const fish = item.fish;
                 const stats = fish.stats || {};
                 const totalPower = this.calculateTotalPower(fish);
                 
                 return {
-                  label: `${fish.name} (Lv.${fish.level}, Gen.${fish.generation})`,
+                  label: `${fish.name} (Gen.${fish.generation}, Lv.${fish.level})`,
                   description: `Power: ${totalPower} - ${fish.rarity}`,
                   value: fish.id,
                   emoji: '🐟',
@@ -440,5 +463,9 @@ export class FishMarketUI {
   private calculateTotalPower(fish: any): number {
     const stats = fish.stats || {};
     return (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0);
+  }
+
+  private getListedFishIds(): string[] {
+    return this.listedFishIds;
   }
 } 

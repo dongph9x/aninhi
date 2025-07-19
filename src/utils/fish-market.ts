@@ -383,6 +383,25 @@ export class FishMarketService {
   }
 
   /**
+   * Lấy danh sách fish IDs đang được bán trên market
+   */
+  static async getListedFishIds(guildId: string): Promise<string[]> {
+    const listings = await prisma.fishMarket.findMany({
+      where: {
+        guildId,
+        expiresAt: {
+          gt: new Date()
+        }
+      },
+      select: {
+        fishId: true
+      }
+    });
+
+    return listings.map(listing => listing.fishId);
+  }
+
+  /**
    * Lấy thống kê market
    */
   static async getMarketStats(guildId: string) {

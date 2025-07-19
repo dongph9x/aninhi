@@ -13,6 +13,8 @@ interface MarketMessageData {
   mode: 'browse' | 'sell' | 'my' | 'search';
   searchQuery: string;
   filterOptions: any;
+  listedFishIds: string[];
+  selectedFishId?: string;
 }
 
 export class FishMarketHandler {
@@ -111,6 +113,102 @@ export class FishMarketHandler {
     return true;
   }
 
+  static async handleModalSubmit(interaction: any): Promise<boolean> {
+    const customId = interaction.customId;
+    
+    if (customId === 'market_sell_modal') {
+      return await this.handleSellModalSubmit(interaction);
+    }
+    
+    return false;
+  }
+
+  private static async handleSellModalSubmit(interaction: any) {
+    try {
+      const priceInput = interaction.fields.getTextInputValue('market_price_input');
+      const durationInput = interaction.fields.getTextInputValue('market_duration_input');
+      
+      // Validate price
+      const price = parseInt(priceInput);
+      if (isNaN(price) || price <= 0) {
+        await interaction.reply({ content: '❌ Giá phải là số dương!', ephemeral: true });
+        return true;
+      }
+      
+      // Validate duration
+      const duration = parseInt(durationInput) || 24;
+      if (isNaN(duration) || duration <= 0 || duration > 168) { // Max 7 days
+        await interaction.reply({ content: '❌ Thời gian phải từ 1-168 giờ!', ephemeral: true });
+        return true;
+      }
+      
+      // Get message data
+      const messageData = this.getMessageData(interaction.message.id);
+      if (!messageData || !messageData.selectedFishId) {
+        await interaction.reply({ content: '❌ Không tìm thấy thông tin cá!', ephemeral: true });
+        return true;
+      }
+      
+      // Sell the fish
+      const result = await FishMarketService.listFish(
+        messageData.userId, 
+        messageData.guildId, 
+        messageData.selectedFishId, 
+        price, 
+        duration
+      );
+      
+      if (result.success) {
+        // Cập nhật dữ liệu
+        const userListings = await FishMarketService.getUserListings(messageData.userId, messageData.guildId);
+        const userInventory = await FishInventoryService.getFishInventory(messageData.userId, messageData.guildId);
+        const listedFishIds = await FishMarketService.getListedFishIds(messageData.guildId);
+        
+        const updatedData: MarketMessageData = {
+          ...messageData,
+          userListings,
+          userInventory,
+          listedFishIds,
+          selectedFishId: undefined // Reset selected fish
+        };
+
+        this.setMessageData(interaction.message.id, updatedData);
+
+        const ui = new FishMarketUI(
+          updatedData.listings,
+          updatedData.userListings,
+          updatedData.userInventory,
+          updatedData.userId,
+          updatedData.guildId,
+          updatedData.currentPage,
+          updatedData.totalPages,
+          updatedData.mode,
+          updatedData.searchQuery,
+          updatedData.filterOptions,
+          updatedData.listedFishIds
+        );
+
+        await interaction.update({
+          embeds: [ui.createEmbed()],
+          components: ui.createComponents()
+        });
+        
+        await interaction.followUp({ 
+          content: `✅ Đã treo bán **${result.listing.fish.name}** với giá **${price.toLocaleString()}** coins trong **${duration}h**!`, 
+          ephemeral: true 
+        });
+      } else {
+        await interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });
+      }
+      
+    } catch (error) {
+      console.error('Error handling sell modal:', error);
+      await interaction.reply({ content: '❌ Có lỗi xảy ra khi bán cá!', ephemeral: true });
+    }
+    
+    return true;
+  }
+
   private static async handleClose(interaction: any) {
     this.removeMessageData(interaction.message.id);
     await interaction.update({ content: '🏪 Fish Market đã đóng', embeds: [], components: [] });
@@ -193,9 +291,13 @@ export class FishMarketHandler {
     // Lấy inventory mới
     const userInventory = await FishInventoryService.getFishInventory(messageData.userId, messageData.guildId);
     
+    // Lấy danh sách fish IDs đang được bán
+    const listedFishIds = await FishMarketService.getListedFishIds(messageData.guildId);
+    
     const updatedData: MarketMessageData = {
       ...messageData,
       userInventory,
+      listedFishIds,
       mode: 'sell'
     };
 
@@ -209,7 +311,10 @@ export class FishMarketHandler {
       updatedData.guildId,
       updatedData.currentPage,
       updatedData.totalPages,
-      updatedData.mode
+      updatedData.mode,
+      updatedData.searchQuery,
+      updatedData.filterOptions,
+      updatedData.listedFishIds
     );
 
     await interaction.update({
@@ -270,27 +375,51 @@ export class FishMarketHandler {
 
     this.setMessageData(interaction.message.id, updatedData);
 
-    // Hiển thị thông tin cá và yêu cầu nhập giá
+    // Hiển thị modal nhập giá
     const fish = messageData.userInventory.items.find((item: any) => item.fish.id === fishId)?.fish;
     
-    if (fish) {
+    // Kiểm tra xem cá có thuộc về user hiện tại không
+    if (fish && fish.userId === messageData.userId) {
       const stats = fish.stats || {};
       const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0);
       
-      const embed = new (await import('discord.js')).EmbedBuilder()
-        .setTitle("💰 Bán Cá")
-        .setColor("#4ECDC4")
-        .setDescription(`Bạn đã chọn **${fish.name}** để bán`)
-        .addFields(
-          { name: "📊 Thông tin cá", value: `Level: ${fish.level} | Gen: ${fish.generation} | Power: ${totalPower}`, inline: true },
-          { name: "📈 Stats", value: `💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}`, inline: false },
-          { name: "💡 Hướng dẫn", value: "Sử dụng lệnh: `n.fishmarket sell " + fishId + " <giá> [thời_gian_giờ]`\nVí dụ: `n.fishmarket sell " + fishId + " 50000 48`", inline: false }
-        )
-        .setTimestamp();
+      // Tính giá gợi ý dựa trên level và power
+      const suggestedPrice = Math.floor(fish.value * (1 + (fish.level - 1) * 0.1) + totalPower * 100);
+      
+      const modal = new (await import('discord.js')).ModalBuilder()
+        .setCustomId('market_sell_modal')
+        .setTitle(`Bán ${fish.name}`);
 
-      await interaction.update({
-        embeds: [embed],
-        components: []
+      const priceInput = new (await import('discord.js')).TextInputBuilder()
+        .setCustomId('market_price_input')
+        .setLabel('Giá bán (coins)')
+        .setStyle((await import('discord.js')).TextInputStyle.Short)
+        .setPlaceholder(`Nhập giá bán (gợi ý: ${suggestedPrice.toLocaleString()})`)
+        .setValue(suggestedPrice.toString())
+        .setRequired(true)
+        .setMinLength(1)
+        .setMaxLength(10);
+
+      const durationInput = new (await import('discord.js')).TextInputBuilder()
+        .setCustomId('market_duration_input')
+        .setLabel('Thời gian bán (giờ)')
+        .setStyle((await import('discord.js')).TextInputStyle.Short)
+        .setPlaceholder('Nhập số giờ (mặc định: 24)')
+        .setValue('24')
+        .setRequired(false)
+        .setMinLength(1)
+        .setMaxLength(3);
+
+      const firstActionRow = new (await import('discord.js')).ActionRowBuilder<TextInputBuilder>().addComponents(priceInput);
+      const secondActionRow = new (await import('discord.js')).ActionRowBuilder<TextInputBuilder>().addComponents(durationInput);
+
+      modal.addComponents(firstActionRow, secondActionRow);
+
+      await interaction.showModal(modal);
+    } else {
+      await interaction.reply({ 
+        content: '❌ Cá không tồn tại hoặc không thuộc về bạn!', 
+        ephemeral: true 
       });
     }
   }

@@ -276,7 +276,7 @@ export class FishBarnUI {
                 const finalValue = Math.floor(fish.value * (1 + levelBonus));
                 
                 return {
-                  label: `${fish.name} (Lv.${fish.level})`,
+                  label: `${fish.name} (Gen.${fish.generation}, Lv.${fish.level})`,
                   description: `Power: ${totalPower} - ${fish.status === 'adult' ? 'Trưởng thành' : 'Đang lớn'} - ${finalValue.toLocaleString()} coins`,
                   value: fish.id,
                   emoji: fish.status === 'adult' ? '🐟' : '🐠',

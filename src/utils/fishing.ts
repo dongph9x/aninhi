@@ -61,6 +61,7 @@ export const FISH_LIST: Fish[] = [
     { name: "Cá mực khổng lồ", emoji: "🦑", rarity: "legendary", minValue: 8000, maxValue: 20000, chance: 0.6 },
     { name: "Cá rồng biển", emoji: "🐉", rarity: "legendary", minValue: 15000, maxValue: 50000, chance: 0.4 },
     { name: "Cá thần", emoji: "🧜", rarity: "legendary", minValue: 50000, maxValue: 100000, chance: 0.2 },
+    { name: "Vua biển", emoji: "🔱", rarity: "legendary", minValue: 100000, maxValue: 150000, chance: 0.1 },
 ];
 
 // Danh sách cần câu

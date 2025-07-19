@@ -61,6 +61,7 @@ async function showMarketUI(message: any, userId: string, guildId: string) {
         const result = await FishMarketService.getMarketListings(guildId, 1, 5);
         const userListings = await FishMarketService.getUserListings(userId, guildId);
         const userInventory = await FishInventoryService.getFishInventory(userId, guildId);
+        const listedFishIds = await FishMarketService.getListedFishIds(guildId);
 
         // Tạo UI
         const ui = new FishMarketUI(
@@ -71,7 +72,10 @@ async function showMarketUI(message: any, userId: string, guildId: string) {
             guildId,
             1,
             result.totalPages,
-            'browse'
+            'browse',
+            '',
+            {},
+            listedFishIds
         );
         const embed = ui.createEmbed();
         const components = ui.createComponents();
@@ -93,7 +97,8 @@ async function showMarketUI(message: any, userId: string, guildId: string) {
             totalPages: result.totalPages,
             mode: 'browse',
             searchQuery: '',
-            filterOptions: {}
+            filterOptions: {},
+            listedFishIds
         });
 
     } catch (error) {
