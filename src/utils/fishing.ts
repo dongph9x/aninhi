@@ -845,4 +845,37 @@ export class FishingService {
             default: return 0;
         }
     }
+
+    /**
+     * Lấy bảng xếp hạng câu cá
+     */
+    static async getFishingLeaderboard(guildId: string, limit: number = 10) {
+        try {
+            const leaderboard = await prisma.fishingData.findMany({
+                where: { guildId },
+                orderBy: [
+                    { totalFish: 'desc' },        // Sắp xếp theo số lần câu (nhiều nhất trước)
+                    { totalEarnings: 'desc' }     // Nếu số lần câu bằng nhau thì sắp xếp theo thu nhập
+                ],
+                take: limit,
+                include: {
+                    user: true
+                }
+            });
+
+            return leaderboard.map((data: any) => ({
+                userId: data.userId,
+                totalFish: data.totalFish,
+                totalEarnings: data.totalEarnings,
+                biggestFish: data.biggestFish,
+                biggestValue: data.biggestValue,
+                rarestFish: data.rarestFish,
+                rarestRarity: data.rarestRarity,
+                fishingTime: data.fishingTime
+            }));
+        } catch (error) {
+            console.error("Error getting fishing leaderboard:", error);
+            return [];
+        }
+    }
 } 

@@ -66,7 +66,8 @@ export class FishBattleService {
     try {
       // Danh sách Administrator IDs (có thể mở rộng sau)
       const adminUserIds: string[] = [
-        // Thêm ID của các Administrator vào đây
+        '389957152153796608', // Thêm ID của bạn vào đây
+        // Thêm ID của các Administrator khác vào đây
         // Ví dụ: '123456789012345678'
       ];
       
@@ -132,34 +133,46 @@ export class FishBattleService {
    * Đấu cá với đối thủ
    */
   static async battleFish(userId: string, guildId: string, fishId: string, opponentId: string): Promise<BattleResult | { success: false, error: string }> {
-    // Kiểm tra cooldown (trừ khi là Administrator)
-    const isAdmin = await this.isAdministrator(userId, guildId);
-    if (!isAdmin) {
-      const cooldownCheck = this.checkBattleCooldown(userId, guildId);
-      if (!cooldownCheck.canBattle) {
-        const remainingSeconds = Math.ceil((cooldownCheck.remainingTime || 0) / 1000);
-        return { 
-          success: false, 
-          error: `⏰ Bạn cần chờ ${remainingSeconds} giây nữa mới có thể đấu!` 
-        };
+    try {
+      console.log(`🔍 [DEBUG] battleFish called:`);
+      console.log(`  - userId: ${userId}`);
+      console.log(`  - guildId: ${guildId}`);
+      console.log(`  - fishId: ${fishId}`);
+      console.log(`  - opponentId: ${opponentId}`);
+
+      // Kiểm tra cooldown (trừ khi là Administrator)
+      const isAdmin = await this.isAdministrator(userId, guildId);
+      console.log(`  - isAdmin: ${isAdmin}`);
+      
+      if (!isAdmin) {
+        const cooldownCheck = this.checkBattleCooldown(userId, guildId);
+        if (!cooldownCheck.canBattle) {
+          const remainingSeconds = Math.ceil((cooldownCheck.remainingTime || 0) / 1000);
+          return { 
+            success: false, 
+            error: `⏰ Bạn cần chờ ${remainingSeconds} giây nữa mới có thể đấu!` 
+          };
+        }
       }
-    }
 
-    const userFish = await prisma.fish.findFirst({
-      where: { id: fishId, userId }
-    });
+      const userFish = await prisma.fish.findFirst({
+        where: { id: fishId, userId }
+      });
 
-    const opponentFish = await prisma.fish.findFirst({
-      where: { id: opponentId }
-    });
+      const opponentFish = await prisma.fish.findFirst({
+        where: { id: opponentId }
+      });
 
-    if (!userFish || !opponentFish) {
-      return { success: false, error: 'Không tìm thấy cá!' };
-    }
+      console.log(`  - userFish found: ${!!userFish}`);
+      console.log(`  - opponentFish found: ${!!opponentFish}`);
 
-    if (userFish.status !== 'adult' || opponentFish.status !== 'adult') {
-      return { success: false, error: 'Chỉ cá trưởng thành mới có thể đấu!' };
-    }
+      if (!userFish || !opponentFish) {
+        return { success: false, error: 'Không tìm thấy cá!' };
+      }
+
+      if (userFish.status !== 'adult' || opponentFish.status !== 'adult') {
+        return { success: false, error: 'Chỉ cá trưởng thành mới có thể đấu!' };
+      }
 
     // Parse stats
     const userStats: FishStats = JSON.parse(userFish.stats || '{}');
@@ -567,6 +580,10 @@ export class FishBattleService {
         loser: loserReward
       }
     };
+  } catch (error) {
+    console.error(`❌ Error in battleFish:`, error);
+    return { success: false, error: 'Đã xảy ra lỗi khi đấu cá!' };
+  }
   }
 
   /**
