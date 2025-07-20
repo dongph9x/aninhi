@@ -113,6 +113,12 @@ export class FishBarnHandler {
           await this.handleNoFood(interaction, userId, guildId);
           break;
           
+        case 'fishbarn_buy_fish_food':
+          if (interaction.isStringSelectMenu()) {
+            await this.handleBuyFishFood(interaction, userId, guildId);
+          }
+          break;
+          
         case 'fishbarn_back_to_barn':
           await this.handleBackToBarn(interaction, userId, guildId);
           break;
@@ -563,16 +569,18 @@ export class FishBarnHandler {
     const row = new ActionRowBuilder<StringSelectMenuBuilder>()
       .addComponents(
         new StringSelectMenuBuilder()
-          .setCustomId(JSON.stringify({ n: "BuyFishFood", d: {} }))
+          .setCustomId('fishbarn_buy_fish_food')
           .setPlaceholder("Chọn loại thức ăn...")
           .addOptions(
-            Object.entries(FISH_FOOD_TYPES).map(([key, food]) => 
-              new StringSelectMenuOptionBuilder()
-                .setLabel(`${food.name} - ${food.price.toLocaleString()}₳`)
-                .setDescription(`Exp: +${food.expBonus} | ${food.description}`)
-                .setValue(key)
-                .setEmoji(food.emoji)
-            )
+            Object.entries(FISH_FOOD_TYPES)
+              .slice(0, 25) // Giới hạn tối đa 25 options
+              .map(([key, food]) => 
+                new StringSelectMenuOptionBuilder()
+                  .setLabel(`${food.name} - ${food.price.toLocaleString()}₳`)
+                  .setDescription(`Exp: +${food.expBonus} | ${food.description}`)
+                  .setValue(key)
+                  .setEmoji(food.emoji)
+              )
           )
       );
 
@@ -588,6 +596,33 @@ export class FishBarnHandler {
       embeds: [embed], 
       components: [row, backRow]
     });
+  }
+
+  private static async handleBuyFishFood(interaction: StringSelectMenuInteraction, userId: string, guildId: string) {
+    const foodType = interaction.values[0];
+    
+    // Mua thức ăn
+    const { FishFoodService } = await import('@/utils/fish-food');
+    const result = await FishFoodService.buyFishFood(userId, guildId, foodType as any, 1);
+    
+    if (!result.success) {
+      return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });
+    }
+    
+    // Quay lại FishBarn
+    await this.handleBackToBarn(interaction, userId, guildId);
+    
+    // Gửi thông báo thành công
+    const embed = new EmbedBuilder()
+      .setTitle('🛒 Mua Thức Ăn Thành Công!')
+      .setColor('#00FF00')
+      .addFields(
+        { name: '🍽️ Thức Ăn', value: result.foodInfo?.name || 'Unknown', inline: true },
+        { name: '💰 Giá', value: (result.totalCost || 0).toLocaleString(), inline: true },
+        { name: '📦 Số lượng', value: (result.quantity || 0).toString(), inline: true }
+      );
+    
+    await interaction.followUp({ embeds: [embed], ephemeral: true });
   }
 
   private static async handleBackToBarn(interaction: ButtonInteraction | StringSelectMenuInteraction, userId: string, guildId: string) {
