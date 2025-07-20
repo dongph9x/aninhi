@@ -84,14 +84,14 @@ export default Bot.createCommand({
 
             // Xử lý bet "all"
             if (bet === "all") {
-                bet = currentBalance;
+                bet = Number(currentBalance);
             }
 
             // Chuyển bet thành number để xử lý
             const betAmount = bet as number;
 
             // Kiểm tra số dư
-            if (currentBalance === 0 || currentBalance < betAmount) {
+            if (currentBalance === 0n || currentBalance < BigInt(betAmount)) {
                 const errorEmbed = new EmbedBuilder()
                     .setTitle("🚫 Không Đủ Tiền")
                     .setDescription(
@@ -127,9 +127,9 @@ export default Bot.createCommand({
 
             // Cập nhật số dư
             if (win) {
-                await EcommerceService.addMoney(userId, guildId, bet, `Coinflip win - bet: ${bet}`);
+                await EcommerceService.addMoney(userId, guildId, betAmount, `Coinflip win - bet: ${betAmount}`);
             } else {
-                await EcommerceService.subtractMoney(userId, guildId, bet, `Coinflip lose - bet: ${bet}`);
+                await EcommerceService.subtractMoney(userId, guildId, betAmount, `Coinflip lose - bet: ${betAmount}`);
             }
 
             // Ghi lại thống kê game

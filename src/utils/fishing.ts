@@ -142,8 +142,9 @@ export class FishPriceService {
                 
                 // Tạo biến động ngẫu nhiên ±10%
                 const fluctuation = (Math.random() - 0.5) * 0.2; // -10% đến +10%
-                const newPrice = Math.max(1, Math.floor(fishPrice.basePrice * (1 + fluctuation)));
-                const priceChange = newPrice - fishPrice.basePrice;
+                const basePrice = Number(fishPrice.basePrice);
+                const newPrice = Math.max(1, Math.floor(basePrice * (1 + fluctuation)));
+                const priceChange = newPrice - basePrice;
                 const changePercent = (fluctuation * 100);
 
                 // Cập nhật lịch sử giá
@@ -440,7 +441,7 @@ export class FishingService {
                 where: { userId_guildId: { userId, guildId } }
             });
 
-            if (!balance || balance.balance < FISHING_COST) {
+            if (!balance || Number(balance.balance) < FISHING_COST) {
                 throw new Error(`Bạn cần ít nhất ${FISHING_COST} AniCoin để câu cá!`);
             }
 
@@ -552,7 +553,7 @@ export class FishingService {
             return {
                 fish,
                 value: fishValue,
-                newBalance: balance.balance - FISHING_COST + fishValue
+                newBalance: Number(balance.balance) - FISHING_COST + fishValue
             };
         } catch (error) {
             console.error("Error fishing:", error);
@@ -574,7 +575,7 @@ export class FishingService {
                 where: { userId_guildId: { userId, guildId } }
             });
 
-            if (!user || user.balance < rod.price) {
+            if (!user || Number(user.balance) < rod.price) {
                 throw new Error(`Không đủ tiền! Cần ${rod.price} AniCoin`);
             }
 
@@ -638,7 +639,7 @@ export class FishingService {
                 where: { userId_guildId: { userId, guildId } }
             });
 
-            if (!user || user.balance < totalCost) {
+            if (!user || Number(user.balance) < totalCost) {
                 throw new Error(`Không đủ tiền! Cần ${totalCost} AniCoin`);
             }
 
@@ -764,7 +765,7 @@ export class FishingService {
             await prisma.$transaction(async (tx: any) => {
                 await tx.user.update({
                     where: { userId_guildId: { userId, guildId } },
-                    data: { balance: { increment: totalValue } }
+                    data: { balance: { increment: BigInt(totalValue) } }
                 });
 
                 if (caughtFish.quantity === quantity) {

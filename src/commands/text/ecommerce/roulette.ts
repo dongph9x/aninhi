@@ -217,6 +217,46 @@ function createRouletteEmbed(
     return embed;
 }
 
+function createRouletteAnimationEmbed(
+    message: Message,
+    betType: string,
+    betValue: number | null,
+    betAmount: number,
+    spinningNumber: number,
+    isSpinning: boolean = true
+): EmbedBuilder {
+    const color = getNumberColor(spinningNumber);
+    const colorEmoji = color === "red" ? "🔴" : color === "black" ? "⚫" : "🟢";
+
+    const betTypeInfo = betTypes[betType as keyof typeof betTypes];
+    const betDescription = betType === "number"
+        ? `Số ${betValue}`
+        : betTypeInfo.description;
+
+    const embed = new EmbedBuilder()
+        .setTitle("🎰 Roulette")
+        .setDescription(
+            `**${message.author.username}**\n\n` +
+            `🎯 **Cược:** ${betDescription}\n` +
+            `💰 **Số tiền:** ${betAmount.toLocaleString()} AniCoin\n` +
+            `🎲 **Đang quay:** ${colorEmoji} **${spinningNumber}**\n\n` +
+            (isSpinning ? "🎰 **Đang quay roulette...** 🎰" : "⏳ **Chuẩn bị kết quả...** ⏳")
+        )
+        .setColor("#ffd93d")
+        .setThumbnail(message.author.displayAvatarURL())
+        .setFooter({
+            text: isSpinning ? "🎰 Roulette đang quay..." : "🎯 Sắp có kết quả!",
+            iconURL: message.author.displayAvatarURL(),
+        })
+        .setTimestamp();
+
+    return embed;
+}
+
+function getRandomRouletteNumber(): number {
+    return Math.floor(Math.random() * 37); // 0-36
+}
+
 function createHelpEmbed(message: Message): EmbedBuilder {
     const embed = new EmbedBuilder()
         .setTitle("🎰 Roulette - Hướng dẫn")
@@ -283,7 +323,7 @@ export default Bot.createCommand({
         // Xử lý số tiền cược
         let betAmount: number;
         if (betAmountInput.toLowerCase() === "all") {
-            betAmount = await EcommerceService.getBalance(userId, guildId);
+            betAmount = Number(await EcommerceService.getBalance(userId, guildId));
         } else {
             betAmount = parseInt(betAmountInput);
             if (isNaN(betAmount)) {
@@ -301,7 +341,7 @@ export default Bot.createCommand({
 
         // Kiểm tra số dư
         const balance = await EcommerceService.getBalance(userId, guildId);
-        if (balance < betAmount) {
+        if (balance < BigInt(betAmount)) {
             return message.reply(`❌ Không đủ tiền! Số dư: ${balance} AniCoin`);
         }
 
@@ -312,7 +352,31 @@ export default Bot.createCommand({
             // Trừ tiền cược
             await EcommerceService.subtractMoney(userId, guildId, betAmount, `Roulette bet - ${betInfo.type}`);
 
-            // Quay roulette
+            // Tạo embed ban đầu
+            const initialEmbed = createRouletteAnimationEmbed(message, betInfo.type, betInfo.value, betAmount, getRandomRouletteNumber(), true);
+            const messageSent = await message.reply({ embeds: [initialEmbed] });
+
+            // Animation sequence
+            const animationSteps = 8; // Số bước animation
+            const stepDelay = 800; // Delay giữa các bước (ms)
+
+            // Bước 1-6: Quay số ngẫu nhiên
+            for (let i = 0; i < 6; i++) {
+                await new Promise(resolve => setTimeout(resolve, stepDelay));
+                const spinningNumber = getRandomRouletteNumber();
+                const spinningEmbed = createRouletteAnimationEmbed(message, betInfo.type, betInfo.value, betAmount, spinningNumber, true);
+                await messageSent.edit({ embeds: [spinningEmbed] });
+            }
+
+            // Bước 7: Chuẩn bị kết quả
+            await new Promise(resolve => setTimeout(resolve, stepDelay));
+            const preparingEmbed = createRouletteAnimationEmbed(message, betInfo.type, betInfo.value, betAmount, getRandomRouletteNumber(), false);
+            await messageSent.edit({ embeds: [preparingEmbed] });
+
+            // Bước 8: Hiển thị kết quả cuối cùng
+            await new Promise(resolve => setTimeout(resolve, stepDelay));
+
+            // Quay roulette thật
             const result = spinWheel();
             const won = checkWin(betInfo.type, betInfo.value, result);
 
@@ -332,14 +396,15 @@ export default Bot.createCommand({
                 winnings: winnings
             });
 
-            // Tạo embed kết quả
-            const embed = createRouletteEmbed(message, betInfo.type, betInfo.value, betAmount, result, won, winnings);
-            embed.setFooter({
+            // Tạo embed kết quả cuối cùng
+            const finalEmbed = createRouletteEmbed(message, betInfo.type, betInfo.value, betAmount, result, won, winnings);
+            finalEmbed.setFooter({
                 text: `Số dư mới: ${await EcommerceService.getBalance(userId, guildId)} AniCoin`,
                 iconURL: message.author.displayAvatarURL(),
             });
 
-            await message.reply({ embeds: [embed] });
+            await messageSent.edit({ embeds: [finalEmbed] });
+
         } catch (error) {
             console.error("Error in roulette command:", error);
             await message.reply("❌ Đã xảy ra lỗi khi xử lý roulette!");

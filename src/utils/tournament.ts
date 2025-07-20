@@ -33,6 +33,7 @@ export interface TournamentData {
     entryFee: number;
     prizePool: number;
     maxParticipants: number;
+    winnerCount?: number;
     startTime: Date;
     endTime: Date;
     createdBy: string;
@@ -176,7 +177,7 @@ export class TournamentService {
     /**
      * Bắt đầu tournament
      */
-    static async startTournament(tournamentId: string) {
+    static async startTournament(tournamentId: string, winnerCount: number = 1) {
         try {
             const tournament = await prisma.tournament.findUnique({
                 where: { id: tournamentId },
@@ -199,18 +200,42 @@ export class TournamentService {
 
             // Chọn người chiến thắng ngẫu nhiên
             const participants = tournament.participants;
-            const winner = participants[Math.floor(Math.random() * participants.length)];
+            const actualWinnerCount = Math.min(winnerCount, participants.length);
+            
+            // Shuffle participants và chọn winners
+            const shuffledParticipants = [...participants].sort(() => Math.random() - 0.5);
+            const winners = shuffledParticipants.slice(0, actualWinnerCount);
+            
+            // Tính toán giải thưởng cho mỗi người
+            const prizePerWinner = Math.floor(Number(tournament.prizePool) / actualWinnerCount);
+            const remainingPrize = Number(tournament.prizePool) - (prizePerWinner * actualWinnerCount);
 
-            // Cập nhật tournament
+            // Cập nhật tournament với winner đầu tiên (để tương thích ngược)
             await prisma.tournament.update({
                 where: { id: tournamentId },
                 data: {
                     status: "completed",
-                    winnerId: winner.userId
+                    winnerId: winners[0].userId
                 }
             });
 
-            return winner;
+            // Phát thưởng cho tất cả winners
+            for (let i = 0; i < winners.length; i++) {
+                let prize = prizePerWinner;
+                // Người đầu tiên nhận thêm phần dư
+                if (i === 0) {
+                    prize += remainingPrize;
+                }
+                
+                await EcommerceService.addMoney(
+                    winners[i].userId, 
+                    tournament.guildId, 
+                    prize, 
+                    `Tournament win - ${tournament.name} (${i + 1}/${actualWinnerCount})`
+                );
+            }
+
+            return { winners, prizePerWinner };
         } catch (error) {
             console.error("Error starting tournament:", error);
             throw error;
@@ -220,7 +245,7 @@ export class TournamentService {
     /**
      * Kết thúc tournament sớm
      */
-    static async endTournament(tournamentId: string, userId: string) {
+    static async endTournament(tournamentId: string, userId: string, winnerCount: number = 1) {
         try {
             const tournament = await prisma.tournament.findUnique({
                 where: { id: tournamentId }
@@ -252,18 +277,40 @@ export class TournamentService {
                 return null;
             }
 
-            const winner = participants[Math.floor(Math.random() * participants.length)];
+            const actualWinnerCount = Math.min(winnerCount, participants.length);
+            const shuffledParticipants = [...participants].sort(() => Math.random() - 0.5);
+            const winners = shuffledParticipants.slice(0, actualWinnerCount);
 
-            // Cập nhật tournament
+            // Tính toán giải thưởng cho mỗi người
+            const prizePerWinner = Math.floor(Number(tournament.prizePool) / actualWinnerCount);
+            const remainingPrize = Number(tournament.prizePool) - (prizePerWinner * actualWinnerCount);
+
+            // Cập nhật tournament với winner đầu tiên
             await prisma.tournament.update({
                 where: { id: tournamentId },
                 data: {
                     status: "completed",
-                    winnerId: winner.userId
+                    winnerId: winners[0].userId
                 }
             });
 
-            return winner;
+            // Phát thưởng cho tất cả winners
+            for (let i = 0; i < winners.length; i++) {
+                let prize = prizePerWinner;
+                // Người đầu tiên nhận thêm phần dư
+                if (i === 0) {
+                    prize += remainingPrize;
+                }
+                
+                await EcommerceService.addMoney(
+                    winners[i].userId, 
+                    tournament.guildId, 
+                    prize, 
+                    `Tournament win - ${tournament.name} (${i + 1}/${actualWinnerCount})`
+                );
+            }
+
+            return { winners, prizePerWinner };
         } catch (error) {
             console.error("Error ending tournament:", error);
             throw error;

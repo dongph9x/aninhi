@@ -31,6 +31,8 @@ export default Bot.createCommand({
                 await showGameLeaderboard(message, guildId, "coinflip", "Coin Flip");
             } else if (subcommand === "fishing") {
                 await showFishingLeaderboard(message, guildId);
+            } else if (subcommand === "lose" || subcommand === "losers") {
+                await showOverallLoseLeaderboard(message, guildId);
             } else if (subcommand === "help") {
                 await showHelp(message);
             } else {
@@ -67,8 +69,8 @@ async function showAllGameStats(message: any, guildId: string) {
     // Thêm thống kê từng game
     for (const stat of serverStats) {
         const winRate = stat.totalGames > 0 ? Math.round((stat.totalWins / stat.totalGames) * 100) : 0;
-        const avgBet = stat.totalGames > 0 ? Math.round(stat.totalBet / stat.totalGames) : 0;
-        const profit = stat.totalWon - stat.totalLost;
+        const avgBet = stat.totalGames > 0 ? Math.round(Number(stat.totalBet) / stat.totalGames) : 0;
+        const profit = Number(stat.totalWon) - Number(stat.totalLost);
 
         embed.addFields({
             name: `🎮 ${getGameEmoji(stat.gameType)} ${getGameDisplayName(stat.gameType)}`,
@@ -107,7 +109,7 @@ async function showGameLeaderboard(message: any, guildId: string, gameType: stri
     leaderboard.forEach((player: any, index: number) => {
         const medal = index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `${index + 1}.`;
         const winRate = player.gamesPlayed > 0 ? Math.round((player.gamesWon / player.gamesPlayed) * 100) : 0;
-        const profit = player.totalWon - player.totalLost;
+        const profit = Number(player.totalWon) - Number(player.totalLost);
 
         leaderboardText += `${medal} <@${player.userId}>\n`;
         leaderboardText += `   📊 ${player.gamesPlayed} trận | 🏆 ${player.gamesWon} thắng (${winRate}%)\n`;
@@ -146,7 +148,7 @@ async function showFishingLeaderboard(message: any, guildId: string) {
         let leaderboardText = "";
         fishingLeaderboard.forEach((fisher: any, index: number) => {
             const medal = index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `${index + 1}.`;
-            const avgValue = fisher.totalFish > 0 ? Math.round(fisher.totalEarnings / fisher.totalFish) : 0;
+            const avgValue = fisher.totalFish > 0 ? Math.round(Number(fisher.totalEarnings) / fisher.totalFish) : 0;
 
             leaderboardText += `${medal} <@${fisher.userId}>\n`;
             leaderboardText += `   🎣 **${fisher.totalFish.toLocaleString()}** lần câu | 💰 ${fisher.totalEarnings.toLocaleString()} coins\n`;
@@ -176,6 +178,45 @@ async function showFishingLeaderboard(message: any, guildId: string) {
     }
 }
 
+async function showOverallLoseLeaderboard(message: any, guildId: string) {
+    const embed = new EmbedBuilder()
+        .setTitle("💸 Top 10 Người Thua Lỗ Nhiều Nhất")
+        .setColor("#ff6b6b")
+        .setDescription("Những người chơi thua nhiều AniCoin nhất trong tất cả game")
+        .setTimestamp();
+
+    const loseLeaderboard = await GameStatsService.getOverallLoseLeaderboard(guildId, 10);
+
+    if (loseLeaderboard.length === 0) {
+        embed.setDescription("Chưa có dữ liệu thua lỗ nào!");
+        return message.reply({ embeds: [embed] });
+    }
+
+    // Tạo danh sách top losers
+    let leaderboardText = "";
+    loseLeaderboard.forEach((player: any, index: number) => {
+        const medal = index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `${index + 1}.`;
+        const winRate = player.gamesPlayed > 0 ? Math.round((player.gamesWon / player.gamesPlayed) * 100) : 0;
+        const totalProfit = Number(player.totalBet) - Number(player.totalLost);
+
+        leaderboardText += `${medal} <@${player.userId}>\n`;
+        leaderboardText += `   💸 **${player.totalLost.toLocaleString()}** AniCoin thua\n`;
+        leaderboardText += `   📊 ${player.gamesPlayed} trận | 🏆 ${player.gamesWon} thắng (${winRate}%)\n`;
+        leaderboardText += `   💰 Tổng cược: ${player.totalBet.toLocaleString()} | 💵 Lỗ: ${totalProfit.toLocaleString()}\n`;
+        leaderboardText += `   🎯 Thua lớn nhất: ${player.biggestLoss.toLocaleString()} AniCoin\n\n`;
+    });
+
+    embed.setDescription(leaderboardText);
+
+    // Thêm footer
+    embed.setFooter({
+        text: "Top 10 người thua lỗ nhiều nhất | Sử dụng n.toplose để xem chi tiết hơn",
+        iconURL: message.client.user.displayAvatarURL()
+    });
+
+    message.reply({ embeds: [embed] });
+}
+
 async function showHelp(message: any) {
     const embed = new EmbedBuilder()
         .setTitle("🎮 Hướng Dẫn Thống Kê Game")
@@ -187,7 +228,8 @@ async function showHelp(message: any) {
             { name: "🎰 Top Slots", value: "`n.gamestats slots`", inline: true },
             { name: "🎲 Top Roulette", value: "`n.gamestats roulette`", inline: true },
             { name: "🪙 Top Coin Flip", value: "`n.gamestats coinflip` hoặc `n.gamestats cf`", inline: true },
-            { name: "🎣 Top Câu Cá", value: "`n.gamestats fishing`", inline: true }
+            { name: "🎣 Top Câu Cá", value: "`n.gamestats fishing`", inline: true },
+            { name: "💸 Top Thua Lỗ", value: "`n.gamestats lose` hoặc `n.gamestats losers`", inline: true }
         )
         .setFooter({
             text: "Thống kê được cập nhật theo thời gian thực",

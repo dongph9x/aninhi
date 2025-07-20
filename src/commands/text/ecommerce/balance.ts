@@ -43,7 +43,8 @@ export default Bot.createCommand({
                     .map(tx => {
                         const emoji = tx.amount > 0 ? "➕" : "➖";
                         const date = tx.createdAt.toLocaleDateString('vi-VN');
-                        return `${emoji} **${Math.abs(tx.amount).toLocaleString()}** AniCoin - ${tx.description || tx.type} (${date})`;
+                        const absAmount = tx.amount > 0 ? tx.amount : -tx.amount;
+                        return `${emoji} **${absAmount.toLocaleString()}** AniCoin - ${tx.description || tx.type} (${date})`;
                     })
                     .join('\n');
 

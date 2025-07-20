@@ -77,8 +77,8 @@ export class FishFoodService {
       return { success: false, error: 'User không tồn tại!' };
     }
 
-    if (user.balance < totalCost) {
-      return { success: false, error: `Không đủ tiền! Cần ${totalCost.toLocaleString()} coins, hiện có ${user.balance.toLocaleString()} coins` };
+    if (Number(user.balance) < totalCost) {
+      return { success: false, error: `Không đủ tiền! Cần ${totalCost.toLocaleString()} coins, hiện có ${Number(user.balance).toLocaleString()} coins` };
     }
 
     // Trừ tiền

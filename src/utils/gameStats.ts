@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -61,7 +61,7 @@ export class GameStatsService {
                     data: { biggestWin: winnings }
                 });
             }
-            
+
             if (!won && bet > gameStats.biggestLoss) {
                 await prisma.gameStats.update({
                     where: { id: gameStats.id },
@@ -70,6 +70,7 @@ export class GameStatsService {
             }
         } catch (error) {
             console.error("Error recording game result:", error);
+            throw error;
         }
     }
 
@@ -131,6 +132,98 @@ export class GameStatsService {
     }
 
     /**
+     * Lấy top lose leaderboard cho một loại game
+     */
+    static async getGameLoseLeaderboard(
+        guildId: string,
+        gameType: string,
+        limit: number = 10
+    ) {
+        try {
+            const loseLeaderboard = await prisma.gameStats.findMany({
+                where: {
+                    guildId,
+                    gameType,
+                    totalLost: { gt: 0 } // Chỉ lấy những người có thua
+                },
+                orderBy: [
+                    { totalLost: 'desc' },
+                    { biggestLoss: 'desc' }
+                ],
+                take: limit,
+                include: {
+                    user: true
+                }
+            });
+
+            return loseLeaderboard;
+        } catch (error) {
+            console.error("Error getting game lose leaderboard:", error);
+            return [];
+        }
+    }
+
+    /**
+     * Lấy top lose tổng hợp tất cả game
+     */
+    static async getOverallLoseLeaderboard(
+        guildId: string,
+        limit: number = 10
+    ) {
+        try {
+            const overallLoseLeaderboard = await prisma.gameStats.groupBy({
+                by: ['userId'],
+                where: {
+                    guildId,
+                    totalLost: { gt: 0 }
+                },
+                _sum: {
+                    totalLost: true,
+                    totalBet: true,
+                    gamesPlayed: true,
+                    gamesWon: true,
+                    biggestLoss: true
+                },
+                orderBy: {
+                    _sum: {
+                        totalLost: 'desc'
+                    }
+                },
+                take: limit
+            });
+
+            // Lấy thông tin user cho mỗi entry
+            const leaderboardWithUsers = await Promise.all(
+                overallLoseLeaderboard.map(async (entry) => {
+                    const user = await prisma.user.findUnique({
+                        where: {
+                            userId_guildId: {
+                                userId: entry.userId,
+                                guildId
+                            }
+                        }
+                    });
+
+                    return {
+                        userId: entry.userId,
+                        totalLost: entry._sum.totalLost || 0n,
+                        totalBet: entry._sum.totalBet || 0n,
+                        gamesPlayed: entry._sum.gamesPlayed || 0,
+                        gamesWon: entry._sum.gamesWon || 0,
+                        biggestLoss: entry._sum.biggestLoss || 0n,
+                        user: user
+                    };
+                })
+            );
+
+            return leaderboardWithUsers;
+        } catch (error) {
+            console.error("Error getting overall lose leaderboard:", error);
+            return [];
+        }
+    }
+
+    /**
      * Lấy tổng thống kê game của server
      */
     static async getServerGameStats(guildId: string) {
@@ -161,6 +254,44 @@ export class GameStatsService {
             }));
         } catch (error) {
             console.error("Error getting server game stats:", error);
+            return [];
+        }
+    }
+
+    /**
+     * Lấy thống kê lose tổng hợp của server
+     */
+    static async getServerLoseStats(guildId: string) {
+        try {
+            const loseStats = await prisma.gameStats.groupBy({
+                by: ['gameType'],
+                where: {
+                    guildId,
+                    totalLost: { gt: 0 }
+                },
+                _sum: {
+                    totalLost: true,
+                    totalBet: true,
+                    gamesPlayed: true,
+                    gamesWon: true,
+                    biggestLoss: true
+                },
+                _count: {
+                    userId: true
+                }
+            });
+
+            return loseStats.map((stat: any) => ({
+                gameType: stat.gameType,
+                totalLost: stat._sum.totalLost || 0n,
+                totalBet: stat._sum.totalBet || 0n,
+                totalGames: stat._sum.gamesPlayed || 0,
+                totalWins: stat._sum.gamesWon || 0,
+                biggestLoss: stat._sum.biggestLoss || 0n,
+                uniqueLosers: stat._count.userId
+            }));
+        } catch (error) {
+            console.error("Error getting server lose stats:", error);
             return [];
         }
     }
