@@ -158,8 +158,12 @@ export class FishBarnHandler {
       });
     }
 
+    // Kiểm tra quyền admin
+    const { FishBattleService } = await import('@/utils/fish-battle');
+    const isAdmin = await FishBattleService.isAdministrator(userId, guildId);
+    
     // Cho cá ăn với thức ăn
-    const result = await FishBreedingService.feedFishWithFood(userId, selectedFishId, selectedFoodType as any);
+    const result = await FishBreedingService.feedFishWithFood(userId, selectedFishId, selectedFoodType as any, isAdmin);
     
     if (!result.success) {
       return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });

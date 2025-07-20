@@ -183,7 +183,7 @@ export class FishBreedingService {
   /**
    * Cho cá ăn với thức ăn
    */
-  static async feedFishWithFood(userId: string, fishId: string, foodType: 'basic' | 'premium' | 'luxury' | 'legendary') {
+  static async feedFishWithFood(userId: string, fishId: string, foodType: 'basic' | 'premium' | 'luxury' | 'legendary', isAdmin: boolean = false) {
     const fish = await prisma.fish.findFirst({ where: { id: fishId, userId } });
     if (!fish) return { success: false, error: 'Không tìm thấy cá!' };
     
@@ -192,15 +192,25 @@ export class FishBreedingService {
       return { success: false, error: 'Cá đã trưởng thành và đạt cấp tối đa (10)!' };
     }
     
-    // Kiểm tra có thức ăn không
-    const { FishFoodService } = await import('./fish-food');
-    const useFoodResult = await FishFoodService.useFishFood(userId, fish.guildId, foodType);
+    let expGained = 0;
+    let foodUsed = null;
     
-    if (!useFoodResult.success) {
-      return { success: false, error: useFoodResult.error };
+    // Admin không cần thức ăn và luôn nhận 100 exp
+    if (isAdmin) {
+      expGained = 100;
+      foodUsed = { name: 'Admin Feed', type: 'admin' };
+    } else {
+      // Kiểm tra có thức ăn không
+      const { FishFoodService } = await import('./fish-food');
+      const useFoodResult = await FishFoodService.useFishFood(userId, fish.guildId, foodType);
+      
+      if (!useFoodResult.success) {
+        return { success: false, error: useFoodResult.error };
+      }
+      
+      expGained = useFoodResult.expBonus || 0;
+      foodUsed = useFoodResult.foodInfo;
     }
-    
-    const expGained = useFoodResult.expBonus || 0;
     
     // Hàm tính exp cần cho level tiếp theo
     function getExpForLevel(level: number) {
@@ -221,7 +231,7 @@ export class FishBreedingService {
     
     // Tính giá mới (tăng 2% mỗi level)
     const valueIncrease = (newLevel - fish.level) * 0.02;
-    const newValue = Math.floor(fish.value * (1 + valueIncrease));
+    const newValue = Math.floor(Number(fish.value) * (1 + valueIncrease));
     
     // Cập nhật stats nếu lên cấp và là cá thế hệ 2+
     let newStats = fish.stats;
@@ -264,7 +274,7 @@ export class FishBreedingService {
       leveledUp: newLevel > fish.level,
       becameAdult,
       newValue,
-      foodUsed: useFoodResult.foodInfo,
+      foodUsed: foodUsed,
     };
   }
 
@@ -320,7 +330,7 @@ export class FishBreedingService {
     
     // Tính giá mới (tăng 2% mỗi level)
     const valueIncrease = (newLevel - fish.level) * 0.02;
-    const newValue = Math.floor(fish.value * (1 + valueIncrease));
+    const newValue = Math.floor(Number(fish.value) * (1 + valueIncrease));
     
     // Cập nhật stats nếu lên cấp và là cá thế hệ 2+
     let newStats = fish.stats;
@@ -417,7 +427,7 @@ export class FishBreedingService {
     const offspringSpecies = this.generateOffspringName(fish1.species, fish2.species);
     
     // Tính giá trị cá con (trung bình + bonus ngẫu nhiên)
-    const baseValue = Math.floor((fish1.value + fish2.value) / 2);
+    const baseValue = Math.floor((Number(fish1.value) + Number(fish2.value)) / 2);
     const valueBonus = Math.floor(Math.random() * 1000) + 500; // +500-1500
     const offspringValue = baseValue + valueBonus;
     

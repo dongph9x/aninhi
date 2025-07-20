@@ -384,7 +384,7 @@ export class FishMarketHandler {
       const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0);
       
       // Tính giá gợi ý dựa trên level và power
-      const suggestedPrice = Math.floor(fish.value * (1 + (fish.level - 1) * 0.1) + totalPower * 100);
+      const suggestedPrice = Math.floor(Number(fish.value) * (1 + (fish.level - 1) * 0.1) + totalPower * 100);
       
       const modal = new (await import('discord.js')).ModalBuilder()
         .setCustomId('market_sell_modal')

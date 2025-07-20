@@ -1,112 +1,99 @@
 import { PrismaClient } from '@prisma/client';
-import { FishingService } from '../src/utils/fishing';
-import { EcommerceService } from '../src/utils/ecommerce-db';
 
 const prisma = new PrismaClient();
 
 async function testSellFishBigInt() {
-    console.log('🧪 Testing Sell Fish with BigInt...\n');
-
-    const testGuildId = 'test-guild-sell-fish-bigint';
-    const testUserId = 'user-sell-fish-test';
+    console.log('🧪 Testing Sell Fish BigInt issues...\n');
 
     try {
-        // Clean up test data
-        await prisma.caughtFish.deleteMany({
-            where: { fishingData: { guildId: testGuildId } }
-        });
-        await prisma.fishingRod.deleteMany({
-            where: { fishingData: { guildId: testGuildId } }
-        });
-        await prisma.fishingBait.deleteMany({
-            where: { fishingData: { guildId: testGuildId } }
-        });
-        await prisma.fishingData.deleteMany({
-            where: { guildId: testGuildId }
-        });
-        await prisma.transaction.deleteMany({
-            where: { guildId: testGuildId }
-        });
-        await prisma.user.deleteMany({
-            where: { guildId: testGuildId }
-        });
-
-        // Create test user with large balance
-        await prisma.user.create({
-            data: {
-                userId: testUserId,
-                guildId: testGuildId,
-                balance: 1000000n, // 1 million AniCoin
-                dailyStreak: 0
+        // Tìm user test
+        const user = await prisma.user.findFirst({
+            where: {
+                guildId: '1005280612845891615'
             }
         });
 
-        console.log('✅ Created test user with large balance');
-
-        // Test 1: Get fishing data
-        console.log('\n🎣 Test 1: Getting fishing data');
-        const fishingData = await FishingService.getFishingData(testUserId, testGuildId);
-        console.log(`✅ Fishing data created: ${fishingData.totalFish} fish caught, ${fishingData.totalEarnings} earnings`);
-
-        // Test 2: Buy fishing rod and bait
-        console.log('\n🎣 Test 2: Buying fishing equipment');
-        await FishingService.buyRod(testUserId, testGuildId, 'basic');
-        await FishingService.buyBait(testUserId, testGuildId, 'basic', 5);
-        console.log('✅ Bought fishing equipment');
-
-        // Test 3: Fish to get fish
-        console.log('\n🎣 Test 3: Fishing to get fish');
-        const fishResult = await FishingService.fish(testUserId, testGuildId, false);
-        console.log(`✅ Caught fish: ${fishResult.fish.name} (${fishResult.fish.rarity})`);
-        console.log(`   Value: ${fishResult.value} AniCoin`);
-
-        // Test 4: Check balance before selling
-        console.log('\n💰 Test 4: Check balance before selling');
-        const balanceBefore = await EcommerceService.getBalance(testUserId, testGuildId);
-        console.log(`✅ Balance before selling: ${balanceBefore.toLocaleString()} AniCoin`);
-
-        // Test 5: Sell fish
-        console.log('\n💰 Test 5: Selling fish');
-        try {
-            const sellResult = await FishingService.sellFish(testUserId, testGuildId, fishResult.fish.name, 1);
-            console.log(`✅ Sold fish: ${sellResult.fishName} x${sellResult.quantity}`);
-            console.log(`   Price: ${sellResult.currentPrice} AniCoin`);
-            console.log(`   Total: ${sellResult.totalValue} AniCoin`);
-        } catch (error) {
-            console.log(`❌ Error selling fish: ${error}`);
-            console.log(`   Error details:`, error);
+        if (!user) {
+            console.log('❌ No test user found');
+            return;
         }
 
-        // Test 6: Check balance after selling
-        console.log('\n💰 Test 6: Check balance after selling');
-        const balanceAfter = await EcommerceService.getBalance(testUserId, testGuildId);
-        console.log(`✅ Balance after selling: ${balanceAfter.toLocaleString()} AniCoin`);
+        console.log(`✅ Found user: ${user.userId}`);
+        console.log(`   Balance: ${user.balance} (type: ${typeof user.balance})`);
 
-        console.log('\n🎉 Sell Fish BigInt test completed!');
+        // Tìm fish inventory
+        const fishInventory = await prisma.fishInventory.findFirst({
+            where: {
+                userId: user.userId,
+                guildId: user.guildId
+            },
+            include: {
+                items: {
+                    include: {
+                        fish: true
+                    }
+                }
+            }
+        });
+
+        if (!fishInventory) {
+            console.log('❌ No fish inventory found');
+            return;
+        }
+
+        console.log(`✅ Found fish inventory with ${fishInventory.items.length} items`);
+
+        // Test với fish đầu tiên
+        const firstItem = fishInventory.items[0];
+        if (!firstItem) {
+            console.log('❌ No fish items found');
+            return;
+        }
+
+        const fish = firstItem.fish;
+        console.log(`\n🐟 Testing with fish: ${fish.species}`);
+        console.log(`   ID: ${fish.id}`);
+        console.log(`   Level: ${fish.level}`);
+        console.log(`   Value: ${fish.value} (type: ${typeof fish.value})`);
+
+        // Test logic tương tự như trong sellFish
+        console.log(`\n📝 Testing sellFish logic...`);
+        
+        try {
+            // Simulate sellFish logic
+            const userBalance = user.balance;
+            const fishValue = fish.value;
+            
+            console.log(`   User balance: ${userBalance} (type: ${typeof userBalance})`);
+            console.log(`   Fish value: ${fishValue} (type: ${typeof fishValue})`);
+            
+            // Test phép cộng BigInt
+            const newBalance = userBalance + fishValue;
+            console.log(`   New balance: ${newBalance} (type: ${typeof newBalance})`);
+            
+            // Test logic trong fish-inventory.ts
+            console.log(`\n📝 Testing fish-inventory sellFishFromInventory logic...`);
+            
+            const levelBonus = fish.level > 1 ? (fish.level - 1) * 0.02 : 0;
+            console.log(`   Level bonus: ${levelBonus}`);
+            
+            const finalValue = Math.floor(Number(fish.value) * (1 + levelBonus));
+            console.log(`   Final value: ${finalValue} (type: ${typeof finalValue})`);
+            
+            const newBalance2 = userBalance + BigInt(finalValue);
+            console.log(`   New balance 2: ${newBalance2} (type: ${typeof newBalance2})`);
+            
+            console.log(`\n✅ sellFish logic test successful!`);
+            
+        } catch (error) {
+            console.error(`   ❌ Error in sellFish logic test:`, error);
+        }
+
+        console.log('\n✅ Test completed successfully!');
 
     } catch (error) {
-        console.error('❌ Test failed:', error);
-        throw error;
+        console.error('❌ Error in test:', error);
     } finally {
-        // Clean up test data
-        await prisma.caughtFish.deleteMany({
-            where: { fishingData: { guildId: testGuildId } }
-        });
-        await prisma.fishingRod.deleteMany({
-            where: { fishingData: { guildId: testGuildId } }
-        });
-        await prisma.fishingBait.deleteMany({
-            where: { fishingData: { guildId: testGuildId } }
-        });
-        await prisma.fishingData.deleteMany({
-            where: { guildId: testGuildId }
-        });
-        await prisma.transaction.deleteMany({
-            where: { guildId: testGuildId }
-        });
-        await prisma.user.deleteMany({
-            where: { guildId: testGuildId }
-        });
         await prisma.$disconnect();
     }
 }

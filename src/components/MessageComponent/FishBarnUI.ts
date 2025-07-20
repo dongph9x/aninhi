@@ -124,7 +124,7 @@ export class FishBarnUI {
         const statusEmoji = fish.status === 'adult' ? '🐟' : '🐠';
         const levelBar = this.createLevelBar(fish.level, fish.experience, fish.experienceToNext);
         const levelBonus = fish.level > 1 ? (fish.level - 1) * 0.02 : 0;
-        const finalValue = Math.floor(fish.value * (1 + levelBonus));
+        const finalValue = Math.floor(Number(fish.value) * (1 + levelBonus));
         
         const isInBattleInventory = await this.isFishInBattleInventory(fish.id);
         embed.addFields({
@@ -158,7 +158,7 @@ export class FishBarnUI {
           const statusEmoji = fish.status === 'adult' ? '🐟' : '🐠';
           const levelBar = this.createLevelBar(fish.level, fish.experience, fish.experienceToNext);
           const levelBonus = fish.level > 1 ? (fish.level - 1) * 0.02 : 0;
-          const finalValue = Math.floor(fish.value * (1 + levelBonus));
+          const finalValue = Math.floor(Number(fish.value) * (1 + levelBonus));
           
           const isInBattleInventory = await this.isFishInBattleInventory(fish.id);
           embed.addFields({
@@ -299,7 +299,7 @@ export class FishBarnUI {
                   const totalPower = this.calculateTotalPower(fish);
                   // Tính giá theo level (tăng 2% mỗi level)
                   const levelBonus = fish.level > 1 ? (fish.level - 1) * 0.02 : 0;
-                  const finalValue = Math.floor(fish.value * (1 + levelBonus));
+                  const finalValue = Math.floor(Number(fish.value) * (1 + levelBonus));
                   
                   return {
                     label: `${fish.name} (Gen.${fish.generation}, Lv.${fish.level})`,
@@ -364,22 +364,26 @@ export class FishBarnUI {
     return components;
   }
 
-  private createLevelBar(level: number, exp: number, expNeeded: number): string {
+  private createLevelBar(level: number, exp: number | BigInt, expNeeded: number | BigInt): string {
     const maxLevel = 10;
     if (level >= maxLevel) {
       return '🟢 MAX';
     }
 
+    // Convert BigInt to number if needed
+    const expNum = typeof exp === 'bigint' ? Number(exp) : Number(exp);
+    const expNeededNum = typeof expNeeded === 'bigint' ? Number(expNeeded) : Number(expNeeded);
+
     // Tránh lỗi khi expNeeded = 0 hoặc âm
-    if (expNeeded <= 0) {
+    if (expNeededNum <= 0) {
       return '🟢 MAX';
     }
 
-    const progress = Math.floor((exp / expNeeded) * 10);
+    const progress = Math.floor((expNum / expNeededNum) * 10);
     // Đảm bảo progress không âm và không vượt quá 10
     const safeProgress = Math.max(0, Math.min(10, progress));
     const bar = '🟦'.repeat(safeProgress) + '⬜'.repeat(10 - safeProgress);
-    return `${bar} ${exp}/${expNeeded}`;
+    return `${bar} ${expNum}/${expNeededNum}`;
   }
 
   private calculateTotalPower(fish: any): number {
@@ -405,7 +409,7 @@ export class FishBarnUI {
     if (finalValue !== undefined) {
       text += `**Giá trị:** ${finalValue.toLocaleString()} coins${levelBonus && levelBonus > 0 ? ` (+${Math.round(levelBonus * 100)}%)` : ''}\n`;
     } else {
-      text += `**Giá trị:** ${fish.value.toLocaleString()} coins\n`;
+      text += `**Giá trị:** ${Number(fish.value).toLocaleString()} coins\n`;
     }
     
     if (levelBar) {

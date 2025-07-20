@@ -156,7 +156,7 @@ export class FishInventoryService {
 
     // Tính giá theo level (tăng 2% mỗi level)
     const levelBonus = fish.level > 1 ? (fish.level - 1) * 0.02 : 0;
-    const finalValue = Math.floor(fish.value * (1 + levelBonus));
+    const finalValue = Math.floor(Number(fish.value) * (1 + levelBonus));
 
     // Xóa khỏi inventory
     await prisma.fishInventoryItem.delete({
@@ -177,7 +177,7 @@ export class FishInventoryService {
       return { success: false, error: 'User not found!' };
     }
 
-    const newBalance = user.balance + finalValue;
+    const newBalance = user.balance + BigInt(finalValue);
     await prisma.user.update({
       where: { userId_guildId: { userId, guildId } },
       data: { balance: newBalance },
