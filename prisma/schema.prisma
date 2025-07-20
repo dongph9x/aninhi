@@ -11,7 +11,7 @@ model User {
   id                    String                  @id @default(cuid())
   userId                String
   guildId               String
-  balance               Int                     @default(0)
+  balance               BigInt                  @default(0)
   dailyStreak           Int                     @default(0)
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
@@ -23,6 +23,7 @@ model User {
   inventory             Inventory?
   tournaments           TournamentParticipant[]
   transactions          Transaction[]
+  fishFood              FishFood[]
 
   @@unique([userId, guildId])
   @@index([userId])
@@ -33,7 +34,7 @@ model Transaction {
   id          String   @id @default(cuid())
   userId      String
   guildId     String
-  amount      Int
+  amount      BigInt
   type        String
   description String?
   createdAt   DateTime @default(now())
@@ -62,11 +63,11 @@ model GameStats {
   gameType    String
   gamesPlayed Int      @default(0)
   gamesWon    Int      @default(0)
-  totalBet    Int      @default(0)
-  totalWon    Int      @default(0)
-  totalLost   Int      @default(0)
-  biggestWin  Int      @default(0)
-  biggestLoss Int      @default(0)
+  totalBet    BigInt   @default(0)
+  totalWon    BigInt   @default(0)
+  totalLost   BigInt   @default(0)
+  biggestWin  BigInt   @default(0)
+  biggestLoss BigInt   @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   user        User     @relation(fields: [userId, guildId], references: [userId, guildId])
@@ -81,9 +82,9 @@ model FishingData {
   userId        String
   guildId       String
   totalFish     Int           @default(0)
-  totalEarnings Int           @default(0)
+  totalEarnings BigInt        @default(0)
   biggestFish   String        @default("")
-  biggestValue  Int           @default(0)
+  biggestValue  BigInt        @default(0)
   rarestFish    String        @default("")
   rarestRarity  String        @default("")
   fishingTime   Int           @default(0)
@@ -132,7 +133,7 @@ model CaughtFish {
   fishingDataId String
   fishName      String
   fishRarity    String
-  fishValue     Int         @default(0)
+  fishValue     BigInt      @default(0)
   quantity      Int         @default(0)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -147,8 +148,8 @@ model Tournament {
   id                  String                  @id @default(cuid())
   name                String
   description         String
-  entryFee            Int
-  prizePool           Int
+  entryFee            BigInt
+  prizePool           BigInt
   maxParticipants     Int
   currentParticipants Int                     @default(0)
   status              String
@@ -244,7 +245,7 @@ model ItemTemplate {
   itemType      String
   itemRarity    String
   description   String
-  baseValue     Int      @default(0)
+  baseValue     BigInt   @default(0)
   maxStack      Int      @default(1)
   maxDurability Int?
   baseStats     String?
@@ -272,7 +273,7 @@ model ModerationLog {
   action       String
   reason       String?
   duration     Int?
-  amount       Int?
+  amount       BigInt?
   channelId    String?
   messageId    String?
   createdAt    DateTime @default(now())
@@ -321,7 +322,7 @@ model Fish {
   level                 Int                       @default(1)
   experience            Int                       @default(0)
   rarity                String
-  value                 Int                       @default(0)
+  value                 BigInt                    @default(0)
   generation            Int                       @default(1)
   specialTraits         String?
   stats                 String?                   // JSON string chứa stats: strength, agility, intelligence, defense, luck
@@ -399,7 +400,7 @@ model FishMarket {
   fishId    String   @unique
   sellerId  String
   guildId   String
-  price     Int
+  price     BigInt
   listedAt  DateTime @default(now())
   expiresAt DateTime
   fish      Fish     @relation(fields: [fishId], references: [id], onDelete: Cascade)
@@ -431,9 +432,9 @@ model BreedingHistory {
 model FishPrice {
   id            String   @id @default(cuid())
   fishName      String   @unique
-  basePrice     Int
-  currentPrice  Int
-  priceChange   Int      @default(0)
+  basePrice     BigInt
+  currentPrice  BigInt
+  priceChange   BigInt   @default(0)
   changePercent Float    @default(0)
   lastUpdated   DateTime @default(now())
   priceHistory  String?
@@ -452,7 +453,7 @@ model BattleHistory {
   userPower      Int
   opponentPower  Int
   userWon        Boolean
-  reward         Int
+  reward         BigInt
   battleLog      String   // JSON string chứa log trận đấu
   battledAt      DateTime @default(now())
 
@@ -461,4 +462,19 @@ model BattleHistory {
   @@index([fishId])
   @@index([opponentId])
   @@index([battledAt])
+}
+
+model FishFood {
+  id            String      @id @default(cuid())
+  userId        String
+  guildId       String
+  foodType      String
+  quantity      Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  user          User        @relation(fields: [userId, guildId], references: [userId, guildId])
+
+  @@unique([userId, guildId, foodType])
+  @@index([userId, guildId])
+  @@index([foodType])
 }

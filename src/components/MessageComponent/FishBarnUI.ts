@@ -6,18 +6,26 @@ export class FishBarnUI {
   private userId: string;
   private guildId: string;
   private selectedFishId?: string;
+  private selectedFoodType?: string;
   private breedingMode: boolean = false;
   private selectedParent1Id?: string;
   private selectedParent2Id?: string;
+  private userFishFood: any[] = [];
 
-  constructor(inventory: any, userId: string, guildId: string, selectedFishId?: string, breedingMode: boolean = false, selectedParent1Id?: string, selectedParent2Id?: string) {
+  constructor(inventory: any, userId: string, guildId: string, selectedFishId?: string, selectedFoodType?: string, breedingMode: boolean = false, selectedParent1Id?: string, selectedParent2Id?: string) {
     this.inventory = inventory;
     this.userId = userId;
     this.guildId = guildId;
     this.selectedFishId = selectedFishId;
+    this.selectedFoodType = selectedFoodType;
     this.breedingMode = breedingMode;
     this.selectedParent1Id = selectedParent1Id;
     this.selectedParent2Id = selectedParent2Id;
+  }
+
+  async loadUserFishFood() {
+    const { FishFoodService } = await import('../../utils/fish-food');
+    this.userFishFood = await FishFoodService.getUserFishFood(this.userId, this.guildId);
   }
 
   async createEmbed(): Promise<EmbedBuilder> {
@@ -68,8 +76,8 @@ export class FishBarnUI {
         }
       }
 
-      // Hiển thị danh sách cá có thể chọn (nhóm theo thế hệ)
-      const breedableFish = this.inventory.items.filter((item: any) => item.fish.status === 'adult');
+      // Hiển thị danh sách cá có thể chọn (nhóm theo thế hệ) - loại bỏ cá level 10
+      const breedableFish = this.inventory.items.filter((item: any) => item.fish.status === 'adult' && item.fish.level < 10);
       if (breedableFish.length > 0) {
         // Nhóm cá theo thế hệ
         const fishByGeneration: { [generation: number]: any[] } = {};
@@ -87,7 +95,7 @@ export class FishBarnUI {
           const displayFish = genFish.slice(0, 3); // Tối đa 3 cá mỗi thế hệ
           
           embed.addFields({
-            name: `🏷️ Thế Hệ ${generation} (${genFish.length} cá)`,
+            name: `🏷️ Thế Hệ ${generation} (${genFish.length} cá có thể lai tạo)`,
             value: displayFish.map((item: any) => {
               const fish = item.fish;
               const stats = fish.stats || {};
@@ -118,18 +126,31 @@ export class FishBarnUI {
         const levelBonus = fish.level > 1 ? (fish.level - 1) * 0.02 : 0;
         const finalValue = Math.floor(fish.value * (1 + levelBonus));
         
-
-        
         const isInBattleInventory = await this.isFishInBattleInventory(fish.id);
         embed.addFields({
           name: `${statusEmoji} ${fish.name} (Lv.${fish.level}) - Đã chọn`,
           value: this.createFishDisplayText(fish, stats, totalPower, levelBar, finalValue, levelBonus, isInBattleInventory),
           inline: false,
         });
+
+        // Hiển thị thông tin thức ăn nếu đã chọn
+        if (this.selectedFoodType) {
+          const { FISH_FOOD_TYPES } = await import('../../utils/fish-food');
+          const foodInfo = FISH_FOOD_TYPES[this.selectedFoodType as keyof typeof FISH_FOOD_TYPES];
+          if (foodInfo) {
+            embed.addFields({
+              name: `🍽️ Thức Ăn Đã Chọn: ${foodInfo.emoji} ${foodInfo.name}`,
+              value: `**Exp Bonus:** +${foodInfo.expBonus} exp\n**Mô tả:** ${foodInfo.description}`,
+              inline: false,
+            });
+          }
+        }
       } else {
         console.log(`❌ Selected fish not found, falling back to show all fish`);
-        // Fallback: show all fish if selected fish not found
-        const displayItems = this.inventory.items.slice(0, 5);
+        // Fallback: show all fish if selected fish not found (excluding level 10 fish)
+        const displayItems = this.inventory.items
+          .filter((item: any) => item.fish.level < 10) // Lọc bỏ cá level 10
+          .slice(0, 5);
         for (const item of displayItems) {
           const fish = item.fish;
           const stats = fish.stats || {};
@@ -147,10 +168,11 @@ export class FishBarnUI {
           });
         }
       }
-      if (this.inventory.items.length > 5) {
+      const nonMaxLevelFish = this.inventory.items.filter((item: any) => item.fish.level < 10);
+      if (nonMaxLevelFish.length > 5) {
         embed.addFields({
           name: '📄 Còn lại',
-          value: `${this.inventory.items.length - 5} cá khác...`,
+          value: `${nonMaxLevelFish.length - 5} cá khác...`,
           inline: false,
         });
       }
@@ -173,8 +195,8 @@ export class FishBarnUI {
         );
       components.push(closeRow);
     } else if (this.breedingMode) {
-      // Chế độ lai tạo
-      const breedableFish = this.inventory.items.filter((item: any) => item.fish.status === 'adult');
+      // Chế độ lai tạo - loại bỏ cá level 10
+      const breedableFish = this.inventory.items.filter((item: any) => item.fish.status === 'adult' && item.fish.level < 10);
       
       if (breedableFish.length < 2) {
         // Không đủ cá để lai tạo
@@ -247,12 +269,14 @@ export class FishBarnUI {
             .setCustomId('fishbarn_feed')
             .setLabel('Cho Ăn')
             .setStyle(ButtonStyle.Primary)
-            .setEmoji('🍽️'),
+            .setEmoji('🍽️')
+            .setDisabled(!this.selectedFishId),
           new ButtonBuilder()
             .setCustomId('fishbarn_sell')
             .setLabel('Bán Cá')
             .setStyle(ButtonStyle.Danger)
-            .setEmoji('💰'),
+            .setEmoji('💰')
+            .setDisabled(!this.selectedFishId),
           new ButtonBuilder()
             .setCustomId('fishbarn_breed')
             .setLabel('Lai Tạo')
@@ -267,25 +291,64 @@ export class FishBarnUI {
             .setCustomId('fishbarn_select_fish')
             .setPlaceholder(this.selectedFishId ? 'Đổi cá khác...' : 'Chọn cá để thao tác...')
             .addOptions(
-              this.inventory.items.map((item: any, index: number) => {
-                const fish = item.fish;
-                const stats = fish.stats || {};
-                const totalPower = this.calculateTotalPower(fish);
-                // Tính giá theo level (tăng 2% mỗi level)
-                const levelBonus = fish.level > 1 ? (fish.level - 1) * 0.02 : 0;
-                const finalValue = Math.floor(fish.value * (1 + levelBonus));
-                
-                return {
-                  label: `${fish.name} (Gen.${fish.generation}, Lv.${fish.level})`,
-                  description: `Power: ${totalPower} - ${fish.status === 'adult' ? 'Trưởng thành' : 'Đang lớn'} - ${finalValue.toLocaleString()} coins`,
-                  value: fish.id,
-                  emoji: fish.status === 'adult' ? '🐟' : '🐠',
-                };
-              })
+              this.inventory.items
+                .filter((item: any) => item.fish.level < 10) // Lọc bỏ cá level 10
+                .map((item: any, index: number) => {
+                  const fish = item.fish;
+                  const stats = fish.stats || {};
+                  const totalPower = this.calculateTotalPower(fish);
+                  // Tính giá theo level (tăng 2% mỗi level)
+                  const levelBonus = fish.level > 1 ? (fish.level - 1) * 0.02 : 0;
+                  const finalValue = Math.floor(fish.value * (1 + levelBonus));
+                  
+                  return {
+                    label: `${fish.name} (Gen.${fish.generation}, Lv.${fish.level})`,
+                    description: `Power: ${totalPower} - ${fish.status === 'adult' ? 'Trưởng thành' : 'Đang lớn'} - ${finalValue.toLocaleString()} coins`,
+                    value: fish.id,
+                    emoji: fish.status === 'adult' ? '🐟' : '🐠',
+                  };
+                })
             )
         );
 
-      // Row 3: Đóng
+      // Row 3: Select menu để chọn thức ăn (chỉ hiển thị khi có cá được chọn)
+      if (this.selectedFishId) {
+        // Lọc chỉ những loại thức ăn mà user có
+        const availableFoodOptions = this.userFishFood
+          .filter(food => food.quantity > 0)
+          .map(food => ({
+            label: `${food.foodInfo.emoji} ${food.foodInfo.name} (+${food.foodInfo.expBonus} exp)`,
+            description: `Còn lại: ${food.quantity} | Giá: ${food.foodInfo.price.toLocaleString()} coins`,
+            value: food.foodType,
+            emoji: food.foodInfo.emoji,
+          }));
+
+        if (availableFoodOptions.length > 0) {
+          const foodSelectRow = new ActionRowBuilder<StringSelectMenuBuilder>()
+            .addComponents(
+              new StringSelectMenuBuilder()
+                .setCustomId('fishbarn_select_food')
+                .setPlaceholder(this.selectedFoodType ? 'Đổi thức ăn...' : 'Chọn thức ăn...')
+                .addOptions(availableFoodOptions)
+            );
+          components.push(actionRow1, selectRow, foodSelectRow);
+        } else {
+          // Nếu không có thức ăn nào, hiển thị thông báo
+          const noFoodRow = new ActionRowBuilder<ButtonBuilder>()
+            .addComponents(
+              new ButtonBuilder()
+                .setCustomId('fishbarn_no_food')
+                .setLabel('Không có thức ăn - Mua ngay!')
+                .setStyle(ButtonStyle.Secondary)
+                .setEmoji('🛒')
+            );
+          components.push(actionRow1, selectRow, noFoodRow);
+        }
+      } else {
+        components.push(actionRow1, selectRow);
+      }
+
+      // Row 4: Đóng
       const closeRow = new ActionRowBuilder<ButtonBuilder>()
         .addComponents(
           new ButtonBuilder()
@@ -295,7 +358,7 @@ export class FishBarnUI {
             .setEmoji('❌')
         );
 
-      components.push(actionRow1, selectRow, closeRow);
+      components.push(closeRow);
     }
 
     return components;

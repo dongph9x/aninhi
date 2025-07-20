@@ -1,4 +1,4 @@
-import { ButtonInteraction, StringSelectMenuInteraction, EmbedBuilder } from 'discord.js';
+import { ButtonInteraction, StringSelectMenuInteraction, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { FishBreedingService } from '../../utils/fish-breeding';
 import { FishInventoryService } from '../../utils/fish-inventory';
 import { FishBarnUI } from './FishBarnUI';
@@ -6,12 +6,54 @@ import { FishBarnUI } from './FishBarnUI';
 export class FishBarnHandler {
   // Lưu trữ cá được chọn cho mỗi user
   private static selectedFishMap = new Map<string, string>();
+  // Lưu trữ thức ăn được chọn cho mỗi user
+  private static selectedFoodMap = new Map<string, string>();
   // Lưu trữ chế độ lai tạo cho mỗi user
   private static breedingModeMap = new Map<string, {
     breedingMode: boolean;
     selectedParent1Id?: string;
     selectedParent2Id?: string;
   }>();
+
+  // Helper method để tạo UI với user fish food
+  private static async createUIWithFishFood(
+    inventory: any, 
+    userId: string, 
+    guildId: string, 
+    selectedFishId?: string, 
+    selectedFoodType?: string, 
+    breedingMode: boolean = false, 
+    selectedParent1Id?: string, 
+    selectedParent2Id?: string
+  ) {
+    // Tự động chọn cá đầu tiên có thể cho ăn nếu không có cá nào được chọn và không ở chế độ lai tạo
+    let finalSelectedFishId = selectedFishId;
+    if (!selectedFishId && !breedingMode) {
+      const feedableFish = inventory.items.filter((item: any) => item.fish.level < 10);
+      if (feedableFish.length > 0) {
+        finalSelectedFishId = feedableFish[0].fish.id;
+        if (finalSelectedFishId) {
+          this.selectedFishMap.set(userId, finalSelectedFishId);
+        }
+      }
+    }
+    
+    const ui = new FishBarnUI(
+      inventory, 
+      userId, 
+      guildId, 
+      finalSelectedFishId,
+      selectedFoodType,
+      breedingMode,
+      selectedParent1Id,
+      selectedParent2Id
+    );
+    
+    // Load user fish food
+    await ui.loadUserFishFood();
+    
+    return ui;
+  }
 
   static async handleInteraction(interaction: ButtonInteraction | StringSelectMenuInteraction) {
     const customId = interaction.customId;
@@ -47,6 +89,12 @@ export class FishBarnHandler {
           }
           break;
           
+        case 'fishbarn_select_food':
+          if (interaction.isStringSelectMenu()) {
+            await this.handleSelectFood(interaction, userId, guildId);
+          }
+          break;
+          
         case 'fishbarn_select_parent':
           if (interaction.isStringSelectMenu()) {
             await this.handleSelectParent(interaction, userId, guildId);
@@ -59,6 +107,14 @@ export class FishBarnHandler {
           
         case 'fishbarn_cancel_breed':
           await this.handleCancelBreed(interaction, userId, guildId);
+          break;
+          
+        case 'fishbarn_no_food':
+          await this.handleNoFood(interaction, userId, guildId);
+          break;
+          
+        case 'fishbarn_back_to_barn':
+          await this.handleBackToBarn(interaction, userId, guildId);
           break;
           
         default:
@@ -74,6 +130,7 @@ export class FishBarnHandler {
     // Xóa dữ liệu lưu trữ
     const userId = interaction.user.id;
     this.selectedFishMap.delete(userId);
+    this.selectedFoodMap.delete(userId);
     this.breedingModeMap.delete(userId);
     
     await interaction.update({
@@ -85,6 +142,7 @@ export class FishBarnHandler {
 
   private static async handleFeed(interaction: ButtonInteraction | StringSelectMenuInteraction, userId: string, guildId: string) {
     const selectedFishId = this.selectedFishMap.get(userId);
+    const selectedFoodType = this.selectedFoodMap.get(userId);
     
     if (!selectedFishId) {
       return interaction.reply({ 
@@ -93,11 +151,15 @@ export class FishBarnHandler {
       });
     }
 
-    // Kiểm tra quyền admin
-    const member = await interaction.guild?.members.fetch(userId);
-    const isAdmin = member?.permissions.has('Administrator') || false;
+    if (!selectedFoodType) {
+      return interaction.reply({ 
+        content: '❌ Vui lòng chọn thức ăn trước khi cho cá ăn!', 
+        ephemeral: true 
+      });
+    }
 
-    const result = await FishBreedingService.feedFish(userId, selectedFishId, isAdmin);
+    // Cho cá ăn với thức ăn
+    const result = await FishBreedingService.feedFishWithFood(userId, selectedFishId, selectedFoodType as any);
     
     if (!result.success) {
       return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });
@@ -112,6 +174,7 @@ export class FishBarnHandler {
       .setColor('#00FF00')
       .addFields(
         { name: '🐟 Cá', value: result.fish?.name || 'Unknown', inline: true },
+        { name: '🍽️ Thức Ăn', value: result.foodUsed?.name || 'Unknown', inline: true },
         { name: '📈 Kinh nghiệm', value: `+${result.experienceGained}`, inline: true },
         { name: '🎯 Level', value: `${result.fish?.level || 0}`, inline: true },
         { name: '💰 Giá trị mới', value: (result.newValue || 0).toLocaleString(), inline: true }
@@ -127,11 +190,12 @@ export class FishBarnHandler {
 
     // Cập nhật UI
     const breedingData = this.breedingModeMap.get(userId);
-    const ui = new FishBarnUI(
+    const ui = await this.createUIWithFishFood(
       updatedInventory, 
       userId, 
       guildId, 
       selectedFishId,
+      selectedFoodType,
       breedingData?.breedingMode || false,
       breedingData?.selectedParent1Id,
       breedingData?.selectedParent2Id
@@ -187,6 +251,7 @@ export class FishBarnHandler {
       userId, 
       guildId, 
       undefined,
+      undefined,
       breedingData?.breedingMode || false,
       breedingData?.selectedParent1Id,
       breedingData?.selectedParent2Id
@@ -223,8 +288,17 @@ export class FishBarnHandler {
       selectedParent2Id: undefined
     });
 
-    // Cập nhật UI
-    const ui = new FishBarnUI(inventory, userId, guildId, undefined, true);
+    // Cập nhật UI với helper function
+    const ui = await this.createUIWithFishFood(
+      inventory, 
+      userId, 
+      guildId, 
+      undefined,
+      undefined,
+      true,
+      undefined,
+      undefined
+    );
     const newEmbed = await ui.createEmbed();
     const newComponents = ui.createComponents();
 
@@ -237,26 +311,60 @@ export class FishBarnHandler {
   private static async handleSelectFish(interaction: StringSelectMenuInteraction, userId: string, guildId: string) {
     const selectedFishId = interaction.values[0];
     this.selectedFishMap.set(userId, selectedFishId);
-
-    const inventory = await FishInventoryService.getFishInventory(userId, guildId);
     
-    // Cập nhật UI
+    // Giữ lại thức ăn đã chọn trước đó
+    const selectedFoodType = this.selectedFoodMap.get(userId);
+    
+    const inventory = await FishInventoryService.getFishInventory(userId, guildId);
     const breedingData = this.breedingModeMap.get(userId);
-    const ui = new FishBarnUI(
+    
+    // Sử dụng helper function để load user fish food
+    const ui = await this.createUIWithFishFood(
       inventory, 
       userId, 
       guildId, 
       selectedFishId,
+      selectedFoodType,
       breedingData?.breedingMode || false,
       breedingData?.selectedParent1Id,
       breedingData?.selectedParent2Id
     );
-    const newEmbed = await ui.createEmbed();
-    const newComponents = ui.createComponents();
+    
+    const embed = await ui.createEmbed();
+    const components = ui.createComponents();
 
     await interaction.update({
-      embeds: [newEmbed],
-      components: newComponents,
+      embeds: [embed],
+      components: components,
+    });
+  }
+
+  private static async handleSelectFood(interaction: StringSelectMenuInteraction, userId: string, guildId: string) {
+    const selectedFoodType = interaction.values[0];
+    this.selectedFoodMap.set(userId, selectedFoodType);
+    
+    const selectedFishId = this.selectedFishMap.get(userId);
+    const inventory = await FishInventoryService.getFishInventory(userId, guildId);
+    const breedingData = this.breedingModeMap.get(userId);
+    
+    // Sử dụng helper function để load user fish food
+    const ui = await this.createUIWithFishFood(
+      inventory, 
+      userId, 
+      guildId, 
+      selectedFishId,
+      selectedFoodType,
+      breedingData?.breedingMode || false,
+      breedingData?.selectedParent1Id,
+      breedingData?.selectedParent2Id
+    );
+    
+    const embed = await ui.createEmbed();
+    const components = ui.createComponents();
+
+    await interaction.update({
+      embeds: [embed],
+      components: components,
     });
   }
 
@@ -307,11 +415,12 @@ export class FishBarnHandler {
 
     this.breedingModeMap.set(userId, breedingData);
 
-    // Cập nhật UI
-    const ui = new FishBarnUI(
+    // Cập nhật UI với helper function
+    const ui = await this.createUIWithFishFood(
       inventory, 
       userId, 
       guildId, 
+      undefined,
       undefined,
       true,
       breedingData.selectedParent1Id,
@@ -374,8 +483,20 @@ export class FishBarnHandler {
       });
     }
 
-    // Cập nhật UI
-    const ui = new FishBarnUI(updatedInventory, userId, guildId);
+    // Cập nhật UI với thức ăn đã chọn
+    const selectedFishId = this.selectedFishMap.get(userId);
+    const selectedFoodType = this.selectedFoodMap.get(userId);
+    
+    const ui = await this.createUIWithFishFood(
+      updatedInventory, 
+      userId, 
+      guildId, 
+      selectedFishId,
+      selectedFoodType,
+      false,
+      undefined,
+      undefined
+    );
     const newEmbed = await ui.createEmbed();
     const newComponents = ui.createComponents();
 
@@ -393,15 +514,105 @@ export class FishBarnHandler {
     this.breedingModeMap.delete(userId);
 
     const inventory = await FishInventoryService.getFishInventory(userId, guildId);
+    const selectedFishId = this.selectedFishMap.get(userId);
+    const selectedFoodType = this.selectedFoodMap.get(userId);
     
-    // Cập nhật UI
-    const ui = new FishBarnUI(inventory, userId, guildId, this.selectedFishMap.get(userId));
+    // Cập nhật UI với thức ăn đã chọn
+    const ui = await this.createUIWithFishFood(
+      inventory, 
+      userId, 
+      guildId, 
+      selectedFishId,
+      selectedFoodType,
+      false,
+      undefined,
+      undefined
+    );
     const newEmbed = await ui.createEmbed();
     const newComponents = ui.createComponents();
 
     await interaction.update({
       embeds: [newEmbed],
       components: newComponents,
+    });
+  }
+
+  private static async handleNoFood(interaction: ButtonInteraction | StringSelectMenuInteraction, userId: string, guildId: string) {
+    // Mở cửa hàng thức ăn
+    const { FISH_FOOD_TYPES } = await import('@/utils/fish-food');
+    
+    const embed = new EmbedBuilder()
+      .setTitle("🍽️ Cửa Hàng Thức Ăn")
+      .setDescription("Chọn loại thức ăn bạn muốn mua:")
+      .setColor("#00ff99")
+      .setTimestamp();
+
+    // Hiển thị thông tin từng loại thức ăn
+    Object.entries(FISH_FOOD_TYPES).forEach(([key, food]) => {
+      embed.addFields({
+        name: `${food.emoji} ${food.name}`,
+        value: `Giá: ${food.price.toLocaleString()}₳ | Exp: +${food.expBonus} | ${food.description}`,
+        inline: false
+      });
+    });
+
+    const row = new ActionRowBuilder<StringSelectMenuBuilder>()
+      .addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId(JSON.stringify({ n: "BuyFishFood", d: {} }))
+          .setPlaceholder("Chọn loại thức ăn...")
+          .addOptions(
+            Object.entries(FISH_FOOD_TYPES).map(([key, food]) => 
+              new StringSelectMenuOptionBuilder()
+                .setLabel(`${food.name} - ${food.price.toLocaleString()}₳`)
+                .setDescription(`Exp: +${food.expBonus} | ${food.description}`)
+                .setValue(key)
+                .setEmoji(food.emoji)
+            )
+          )
+      );
+
+    const backRow = new ActionRowBuilder<ButtonBuilder>()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId('fishbarn_back_to_barn')
+          .setLabel("⬅️ Quay Lại Rương Cá")
+          .setStyle(ButtonStyle.Secondary)
+      );
+
+    await interaction.update({ 
+      embeds: [embed], 
+      components: [row, backRow]
+    });
+  }
+
+  private static async handleBackToBarn(interaction: ButtonInteraction | StringSelectMenuInteraction, userId: string, guildId: string) {
+    // Lấy thông tin hiện tại
+    const selectedFishId = this.selectedFishMap.get(userId);
+    const selectedFoodType = this.selectedFoodMap.get(userId);
+    const breedingData = this.breedingModeMap.get(userId);
+    
+    // Lấy inventory
+    const inventory = await FishInventoryService.getFishInventory(userId, guildId);
+    
+    // Tạo UI với thông tin hiện tại
+    const ui = await this.createUIWithFishFood(
+      inventory, 
+      userId, 
+      guildId, 
+      selectedFishId,
+      selectedFoodType,
+      breedingData?.breedingMode || false,
+      breedingData?.selectedParent1Id,
+      breedingData?.selectedParent2Id
+    );
+    
+    const embed = await ui.createEmbed();
+    const components = ui.createComponents();
+
+    await interaction.update({
+      embeds: [embed],
+      components: components,
     });
   }
 } 

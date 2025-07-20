@@ -30,6 +30,9 @@ export default Bot.createMessageComponent<ComponentType.Button, { action: string
                 case "buy_bait":
                     await showBaitShop(interaction);
                     break;
+                case "buy_food":
+                    await showFoodShop(interaction);
+                    break;
                 case "manage":
                     await showManageEquipment(interaction, userId, guildId);
                     break;
@@ -62,11 +65,12 @@ async function showShop(interaction: any) {
         .addFields(
             { name: "🛒 Mua Cần Câu", value: "Mua các loại cần câu với độ bền và bonus khác nhau", inline: true },
             { name: "🪱 Mua Mồi", value: "Mua các loại mồi để tăng tỷ lệ câu được cá hiếm", inline: true },
+            { name: "🍽️ Mua Thức Ăn", value: "Mua thức ăn để cho cá ăn và tăng level", inline: true },
             { name: "⚙️ Quản Lý", value: "Xem và thay đổi cần câu, mồi hiện tại", inline: true }
         )
         .setTimestamp();
 
-    const row = new ActionRowBuilder<ButtonBuilder>()
+    const row1 = new ActionRowBuilder<ButtonBuilder>()
         .addComponents(
             new ButtonBuilder()
                 .setCustomId(JSON.stringify({ n: "FishingShop", d: { action: "buy_rod" } }))
@@ -77,6 +81,14 @@ async function showShop(interaction: any) {
                 .setLabel("🪱 Mua Mồi")
                 .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
+                .setCustomId(JSON.stringify({ n: "FishingShop", d: { action: "buy_food" } }))
+                .setLabel("🍽️ Mua Thức Ăn")
+                .setStyle(ButtonStyle.Primary)
+        );
+
+    const row2 = new ActionRowBuilder<ButtonBuilder>()
+        .addComponents(
+            new ButtonBuilder()
                 .setCustomId(JSON.stringify({ n: "FishingShop", d: { action: "manage" } }))
                 .setLabel("⚙️ Quản Lý")
                 .setStyle(ButtonStyle.Secondary)
@@ -84,7 +96,7 @@ async function showShop(interaction: any) {
 
     await interaction.reply({ 
         embeds: [embed], 
-        components: [row],
+        components: [row1, row2],
         ephemeral: true 
     });
 }
@@ -164,6 +176,55 @@ async function showBaitShop(interaction: any) {
                             .setDescription(`Bonus: +${bait.rarityBonus}%`)
                             .setValue(key)
                             .setEmoji(bait.emoji)
+                    )
+                )
+        );
+
+    const backRow = new ActionRowBuilder<ButtonBuilder>()
+        .addComponents(
+            new ButtonBuilder()
+                .setCustomId(JSON.stringify({ n: "FishingShop", d: { action: "shop" } }))
+                .setLabel("⬅️ Quay Lại")
+                .setStyle(ButtonStyle.Secondary)
+        );
+
+    await interaction.reply({ 
+        embeds: [embed], 
+        components: [row, backRow],
+        ephemeral: true 
+    });
+}
+
+async function showFoodShop(interaction: any) {
+    const { FISH_FOOD_TYPES } = await import('@/utils/fish-food');
+    
+    const embed = new EmbedBuilder()
+        .setTitle("🍽️ Cửa Hàng Thức Ăn")
+        .setDescription("Chọn loại thức ăn bạn muốn mua:")
+        .setColor("#00ff99")
+        .setTimestamp();
+
+    // Hiển thị thông tin từng loại thức ăn
+    Object.entries(FISH_FOOD_TYPES).forEach(([key, food]) => {
+        embed.addFields({
+            name: `${food.emoji} ${food.name}`,
+            value: `Giá: ${food.price.toLocaleString()}₳ | Exp: +${food.expBonus} | ${food.description}`,
+            inline: false
+        });
+    });
+
+    const row = new ActionRowBuilder<StringSelectMenuBuilder>()
+        .addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId(JSON.stringify({ n: "BuyFishFood", d: {} }))
+                .setPlaceholder("Chọn loại thức ăn...")
+                .addOptions(
+                    Object.entries(FISH_FOOD_TYPES).map(([key, food]) => 
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel(`${food.name} - ${food.price.toLocaleString()}₳`)
+                            .setDescription(`Exp: +${food.expBonus} | ${food.description}`)
+                            .setValue(key)
+                            .setEmoji(food.emoji)
                     )
                 )
         );

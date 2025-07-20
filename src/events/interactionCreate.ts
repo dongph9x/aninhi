@@ -200,6 +200,29 @@ export default Bot.createEvent({
                 return;
             }
 
+            // Kiểm tra xem có phải buy fish food modal không
+            if (interaction.customId.startsWith('buy_fish_food_modal:')) {
+                console.log("Buy fish food modal submitted");
+                
+                try {
+                    const component = client.components.modalSubmit.get('BuyFishFoodModal');
+                    if (component) {
+                        await component.run({ interaction });
+                    } else {
+                        console.error("BuyFishFoodModal component not found");
+                        if (!interaction.replied && !interaction.deferred) {
+                            interaction.reply(`${emojis.error} | Component không tồn tại!`);
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error handling Buy fish food modal:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý modal mua thức ăn!`);
+                    }
+                }
+                return;
+            }
+
             const payload: CustomIdData = JSON.parse(interaction.customId);
             const component = client.components.modalSubmit.get(payload.n);
 

@@ -23,11 +23,13 @@ export default {
       // Lấy fish inventory
       const inventory = await FishInventoryService.getFishInventory(userId, guildId);
       
-      // Tự động chọn cá đầu tiên nếu có
-      const selectedFishId = inventory.items.length > 0 ? inventory.items[0].fish.id : undefined;
+      // Tự động chọn cá đầu tiên có thể cho ăn (không phải level 10)
+      const feedableFish = inventory.items.filter((item: any) => item.fish.level < 10);
+      const selectedFishId = feedableFish.length > 0 ? feedableFish[0].fish.id : undefined;
       
       // Tạo UI
       const ui = new FishBarnUI(inventory, userId, guildId, selectedFishId);
+      await ui.loadUserFishFood(); // Load user fish food
       const embed = await ui.createEmbed();
       const components = ui.createComponents();
       
@@ -43,6 +45,12 @@ export default {
         inventory,
         selectedFishId, // Lưu selectedFishId
       });
+      
+      // Lưu selectedFishId vào FishBarnHandler để xử lý interaction
+      const { FishBarnHandler } = await import('@/components/MessageComponent/FishBarnHandler');
+      if (selectedFishId) {
+        FishBarnHandler['selectedFishMap'].set(userId, selectedFishId);
+      }
       
     } catch (error) {
       console.error('Error in fishbarn command:', error);

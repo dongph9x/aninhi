@@ -181,6 +181,94 @@ export class FishBreedingService {
   }
 
   /**
+   * Cho cá ăn với thức ăn
+   */
+  static async feedFishWithFood(userId: string, fishId: string, foodType: 'basic' | 'premium' | 'luxury' | 'legendary') {
+    const fish = await prisma.fish.findFirst({ where: { id: fishId, userId } });
+    if (!fish) return { success: false, error: 'Không tìm thấy cá!' };
+    
+    const MAX_LEVEL = 10; // Cấp tối đa là 10
+    if (fish.level >= MAX_LEVEL && fish.status === 'adult') {
+      return { success: false, error: 'Cá đã trưởng thành và đạt cấp tối đa (10)!' };
+    }
+    
+    // Kiểm tra có thức ăn không
+    const { FishFoodService } = await import('./fish-food');
+    const useFoodResult = await FishFoodService.useFishFood(userId, fish.guildId, foodType);
+    
+    if (!useFoodResult.success) {
+      return { success: false, error: useFoodResult.error };
+    }
+    
+    const expGained = useFoodResult.expBonus || 0;
+    
+    // Hàm tính exp cần cho level tiếp theo
+    function getExpForLevel(level: number) {
+      return (level + 1) * 10; // Level 1 cần 20, Level 2 cần 30, Level 3 cần 40, v.v.
+    }
+    
+    let newExp = fish.experience + expGained;
+    let newLevel = fish.level;
+    let expForNext = getExpForLevel(newLevel);
+    let becameAdult = false;
+    
+    // Lên level nếu đủ exp
+    while (newExp >= expForNext && newLevel < MAX_LEVEL) {
+      newExp -= expForNext;
+      newLevel++;
+      expForNext = getExpForLevel(newLevel);
+    }
+    
+    // Tính giá mới (tăng 2% mỗi level)
+    const valueIncrease = (newLevel - fish.level) * 0.02;
+    const newValue = Math.floor(fish.value * (1 + valueIncrease));
+    
+    // Cập nhật stats nếu lên cấp và là cá thế hệ 2+
+    let newStats = fish.stats;
+    if (newLevel > fish.level && fish.generation >= 2) {
+      const currentStats = JSON.parse(fish.stats || '{}');
+      const updatedStats = this.increaseStatsOnLevelUp(currentStats);
+      newStats = JSON.stringify(updatedStats);
+    }
+    
+    // Cập nhật trạng thái
+    let newStatus = fish.status;
+    if (newLevel >= 10) {
+      newStatus = 'adult';
+      becameAdult = true;
+    }
+    
+    const updated = await prisma.fish.update({
+      where: { id: fishId },
+      data: {
+        level: newLevel,
+        experience: newExp,
+        value: newValue,
+        status: newStatus,
+        stats: newStats,
+        updatedAt: new Date(),
+      },
+    });
+    
+    return {
+      success: true,
+      fish: {
+        ...updated,
+        name: updated.species,
+        experienceToNext: newLevel >= MAX_LEVEL ? 0 : getExpForLevel(newLevel),
+        traits: JSON.parse(updated.specialTraits || '[]'),
+        stats: JSON.parse(updated.stats || '{}'),
+        canBreed: updated.status === 'adult',
+      },
+      experienceGained: expGained,
+      leveledUp: newLevel > fish.level,
+      becameAdult,
+      newValue,
+      foodUsed: useFoodResult.foodInfo,
+    };
+  }
+
+  /**
    * Cho cá ăn theo yêu cầu mới: 
    * - Normal user: random 1-5 exp, cooldown 1 giờ
    * - Admin: luôn 100 exp, bypass cooldown

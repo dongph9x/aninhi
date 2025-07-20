@@ -34,13 +34,13 @@ export class EcommerceService {
     /**
      * Lấy số dư của người dùng
      */
-    static async getBalance(userId: string, guildId: string): Promise<number> {
+    static async getBalance(userId: string, guildId: string): Promise<bigint> {
         try {
             const user = await this.getUser(userId, guildId);
             return user.balance;
         } catch (error) {
             console.error("Error getting balance:", error);
-            return 0;
+            return 0n;
         }
     }
 
@@ -50,11 +50,14 @@ export class EcommerceService {
     static async addMoney(
         userId: string,
         guildId: string,
-        amount: number,
+        amount: number | string | bigint,
         description: string = "Added AniCoin"
     ) {
         try {
-            if (amount <= 0) {
+            // Convert amount to BigInt to handle large numbers properly
+            const bigIntAmount = BigInt(amount);
+            
+            if (bigIntAmount <= 0n) {
                 throw new Error("Số tiền phải lớn hơn 0");
             }
 
@@ -67,12 +70,12 @@ export class EcommerceService {
                     }
                 },
                 update: {
-                    balance: { increment: amount }
+                    balance: { increment: bigIntAmount }
                 },
                 create: {
                     userId,
                     guildId,
-                    balance: amount,
+                    balance: bigIntAmount,
                     dailyStreak: 0
                 }
             });
@@ -82,7 +85,7 @@ export class EcommerceService {
                 data: {
                     userId,
                     guildId,
-                    amount,
+                    amount: bigIntAmount,
                     type: "add",
                     description
                 }
@@ -101,16 +104,19 @@ export class EcommerceService {
     static async subtractMoney(
         userId: string,
         guildId: string,
-        amount: number,
+        amount: number | string | bigint,
         description: string = "Subtracted AniCoin"
     ) {
         try {
-            if (amount <= 0) {
+            // Convert amount to BigInt to handle large numbers properly
+            const bigIntAmount = BigInt(amount);
+            
+            if (bigIntAmount <= 0n) {
                 throw new Error("Số tiền phải lớn hơn 0");
             }
 
             const user = await this.getUser(userId, guildId);
-            if (user.balance < amount) {
+            if (user.balance < bigIntAmount) {
                 throw new Error("Không đủ tiền");
             }
 
@@ -122,7 +128,7 @@ export class EcommerceService {
                     }
                 },
                 data: {
-                    balance: { decrement: amount }
+                    balance: { decrement: bigIntAmount }
                 }
             });
 
@@ -131,7 +137,7 @@ export class EcommerceService {
                 data: {
                     userId,
                     guildId,
-                    amount: -amount,
+                    amount: -bigIntAmount,
                     type: "subtract",
                     description
                 }
@@ -225,8 +231,8 @@ export class EcommerceService {
             }
 
             const user = await this.getUser(userId, guildId);
-            const baseAmount = 1000;
-            const streakBonus = Math.min(user.dailyStreak * 100, 1000);
+            const baseAmount = 1000n;
+            const streakBonus = BigInt(Math.min(user.dailyStreak * 100, 1000));
             const totalAmount = baseAmount + streakBonus;
 
             // Cập nhật user và ghi lại daily claim
@@ -320,7 +326,7 @@ export class EcommerceService {
                     }
                 },
                 data: {
-                    balance: 0
+                    balance: 0n
                 }
             });
 
@@ -353,8 +359,8 @@ export class EcommerceService {
             }
 
             const user = await this.getUser(userId, guildId);
-            const baseAmount = 1000;
-            const streakBonus = Math.min(user.dailyStreak * 100, 1000);
+            const baseAmount = 1000n;
+            const streakBonus = BigInt(Math.min(user.dailyStreak * 100, 1000));
             const totalAmount = baseAmount + streakBonus;
 
             // Cập nhật user và ghi lại daily claim
@@ -444,11 +450,14 @@ export class EcommerceService {
         fromUserId: string,
         toUserId: string,
         guildId: string,
-        amount: number,
+        amount: number | string | bigint,
         description: string = "Transfer"
     ) {
         try {
-            if (amount <= 0) {
+            // Convert amount to BigInt to handle large numbers properly
+            const bigIntAmount = BigInt(amount);
+            
+            if (bigIntAmount <= 0n) {
                 return { success: false, message: "Số tiền phải lớn hơn 0" };
             }
 
@@ -460,7 +469,7 @@ export class EcommerceService {
             const fromUser = await this.getUser(fromUserId, guildId);
             const toUser = await this.getUser(toUserId, guildId);
 
-            if (fromUser.balance < amount) {
+            if (fromUser.balance < bigIntAmount) {
                 return { success: false, message: "Không đủ tiền để chuyển" };
             }
 
@@ -475,7 +484,7 @@ export class EcommerceService {
                         }
                     },
                     data: {
-                        balance: { decrement: amount }
+                        balance: { decrement: bigIntAmount }
                     }
                 });
 
@@ -488,7 +497,7 @@ export class EcommerceService {
                         }
                     },
                     data: {
-                        balance: { increment: amount }
+                        balance: { increment: bigIntAmount }
                     }
                 });
 
@@ -497,7 +506,7 @@ export class EcommerceService {
                     data: {
                         userId: fromUserId,
                         guildId,
-                        amount: -amount,
+                        amount: -bigIntAmount,
                         type: "transfer",
                         description: `${description} -> ${toUserId}`
                     }
@@ -507,7 +516,7 @@ export class EcommerceService {
                     data: {
                         userId: toUserId,
                         guildId,
-                        amount: amount,
+                        amount: bigIntAmount,
                         type: "transfer",
                         description: `${description} <- ${fromUserId}`
                     }
