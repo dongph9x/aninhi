@@ -1,0 +1,33 @@
+{
+  "allowedChannels": [
+    "123456789"
+  ],
+  "blockedChannels": [
+    "987654321"
+  ],
+  "allowedCategories": [
+    "CATEGORY123"
+  ],
+  "blockedCategories": [],
+  "useWhitelistMode": true,
+  "useBlacklistMode": true,
+  "checkCategories": true,
+  "exemptCommands": [
+    "help",
+    "ping",
+    "uptime",
+    "maintenance"
+  ],
+  "exemptAdminCommands": [
+    "maintenance",
+    "deploy",
+    "undeploy",
+    "eval",
+    "backupdb",
+    "restoredb",
+    "syncdb",
+    "dbstatus",
+    "refreshdb",
+    "listbackups"
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "allowedChannels": [
+    "CHANNEL1",
+    "CHANNEL2"
+  ],
+  "blockedChannels": [
+    "BLOCKED_CHANNEL"
+  ],
+  "allowedCategories": [
+    "CATEGORY1"
+  ],
+  "blockedCategories": [
+    "BLOCKED_CATEGORY"
+  ],
+  "useWhitelistMode": true,
+  "useBlacklistMode": true,
+  "checkCategories": true,
+  "exemptCommands": [
+    "help",
+    "ping",
+    "uptime",
+    "maintenance"
+  ],
+  "exemptAdminCommands": [
+    "maintenance",
+    "deploy",
+    "undeploy",
+    "eval",
+    "backupdb",
+    "restoredb",
+    "syncdb",
+    "dbstatus",
+    "refreshdb",
+    "listbackups"
+  ]
+}

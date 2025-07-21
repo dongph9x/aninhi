@@ -14,16 +14,22 @@ import type {
     TextCommandProps,
     TextCommandStructrue,
 } from "@/typings";
+import type { ChannelRestrictions } from "@/config";
 import { importDefault } from "@/utils/import";
 import { logger } from "@/utils/logger";
+import { ChannelRestrictionsStorage } from "@/utils/channel-restrictions-storage";
+import { MaintenanceStorage } from "@/utils/maintenance-storage";
 
 export class ExtendedClient<Ready extends boolean = boolean> extends Client<Ready> {
     cwd = process.cwd();
     production = process.env.NODE_ENV === "production";
-    maintenanceMode = false;
+    maintenanceMode = false; // Sẽ được load từ storage khi khởi tạo
 
     filter = new Filter(this);
     root = path.join(this.cwd, "src");
+
+    // Channel restrictions configuration
+    channelRestrictions?: ChannelRestrictions;
 
     menu = new Collection<string, ReadyContextMenuProps>();
 
@@ -54,10 +60,35 @@ export class ExtendedClient<Ready extends boolean = boolean> extends Client<Read
     constructor(options: ClientOptions) {
         super(options);
 
+        // Load channel restrictions và maintenance mode khi khởi tạo
+        this.loadChannelRestrictions();
+        this.loadMaintenanceMode();
+
         if (!this.production) {
             this.on("debug", message => logger.debug(message));
             this.on("error", message => logger.error(message));
             this.on("warn", message => logger.warn(message));
+        }
+    }
+
+    private loadChannelRestrictions() {
+        try {
+            this.channelRestrictions = ChannelRestrictionsStorage.load();
+            console.log('Channel restrictions loaded successfully');
+        } catch (error) {
+            console.error('Error loading channel restrictions:', error);
+            this.channelRestrictions = undefined;
+        }
+    }
+
+    private loadMaintenanceMode() {
+        try {
+            const maintenanceConfig = MaintenanceStorage.load();
+            this.maintenanceMode = maintenanceConfig.enabled;
+            console.log(`Maintenance mode loaded: ${this.maintenanceMode ? 'ENABLED' : 'DISABLED'}`);
+        } catch (error) {
+            console.error('Error loading maintenance mode:', error);
+            this.maintenanceMode = true; // Fallback to enabled
         }
     }
 

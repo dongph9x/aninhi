@@ -11,7 +11,7 @@ import {
 } from "discord.js";
 
 import type { ExtendedClient } from "@/classes";
-import { config, emojis } from "@/config";
+import { config, emojis, defaultChannelRestrictions, isChannelAllowed } from "@/config";
 import type { CommandOptions } from "@/typings";
 import type { TranslationFn } from "@/utils/locales";
 
@@ -44,6 +44,18 @@ export class Filter {
         return userCheck.includes(userId);
     }
 
+    public checkChannelRestrictions(
+        channelId: string,
+        categoryId: string | null,
+        commandName: string,
+        isAdmin: boolean = false
+    ) {
+        // Sử dụng channel restrictions từ client hoặc default
+        const restrictions = this.client.channelRestrictions || defaultChannelRestrictions;
+        
+        return isChannelAllowed(channelId, categoryId, restrictions, commandName, isAdmin);
+    }
+
     public text(
         message: OmitPartialGroupDMChannel<Message>,
         commandName: string,
@@ -58,6 +70,24 @@ export class Filter {
         }
 
         if (message.inGuild()) {
+            // Kiểm tra channel restrictions
+            const isAdmin = message.member?.permissions.has("Administrator") || false;
+            const categoryId = message.channel.isThread() 
+                ? (message.channel.parent?.parentId || null)
+                : (message.channel.parentId || null);
+            
+            const channelCheck = this.checkChannelRestrictions(
+                message.channelId,
+                categoryId,
+                commandName,
+                isAdmin
+            );
+            
+            if (!channelCheck.allowed) {
+                message.reply(`${emojis.error} | ${channelCheck.reason || t("errors.missingPermission")}`);
+                return false;
+            }
+
             if ("inGuild" in options && !options.inGuild) {
                 message.reply(`${emojis.error} | ${t("errors.directMessageOnly")}`);
                 return false;
@@ -133,6 +163,36 @@ export class Filter {
         }
 
         if (interaction.inGuild()) {
+            // Kiểm tra channel restrictions cho slash commands
+            const member = interaction.member as GuildMember;
+            const isAdmin = member?.permissions.has("Administrator") || false;
+            const categoryId = interaction.channel!.isThread() 
+                ? (interaction.channel!.parent?.parentId || null)
+                : (interaction.channel!.parentId || null);
+            
+            // Lấy command name từ interaction
+            let commandName: string;
+            if (interaction.isChatInputCommand()) {
+                commandName = interaction.commandName;
+            } else if (interaction.isContextMenuCommand()) {
+                commandName = interaction.commandName;
+            } else {
+                const customId = interaction.customId;
+                commandName = customId ? customId.split('_')[0] : 'unknown'; // Lấy phần đầu của customId
+            }
+            
+            const channelCheck = this.checkChannelRestrictions(
+                interaction.channelId,
+                categoryId,
+                commandName,
+                isAdmin
+            );
+            
+            if (!channelCheck.allowed) {
+                interaction.reply(`${emojis.error} | ${channelCheck.reason || t("errors.missingPermission")}`);
+                return false;
+            }
+
             if ("inGuild" in options && !options.inGuild) {
                 interaction.reply(`${emojis.error} | ${t("errors.directMessageOnly")}`);
                 return false;
@@ -149,7 +209,6 @@ export class Filter {
             }
 
             if (options.permissions) {
-                const member = interaction.member as GuildMember;
                 if (!member.permissions.has(options.permissions)) {
                     interaction.reply(`${emojis.error} | ${t("errors.missingPermission")}`);
                     return false;
