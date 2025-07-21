@@ -230,6 +230,43 @@ export class FishMarketService {
       await tx.fishMarket.delete({
         where: { id: listing.id }
       });
+
+      // Thêm cá vào inventory của người mua
+      const buyerInventory = await tx.fishInventory.findUnique({
+        where: { userId_guildId: { userId, guildId } }
+      });
+
+      if (buyerInventory) {
+        // Kiểm tra xem cá đã có trong inventory chưa
+        const existingItem = await tx.fishInventoryItem.findUnique({
+          where: { fishId }
+        });
+
+        if (!existingItem) {
+          await tx.fishInventoryItem.create({
+            data: {
+              fishInventoryId: buyerInventory.id,
+              fishId
+            }
+          });
+        }
+      } else {
+        // Tạo inventory mới nếu chưa có
+        const newInventory = await tx.fishInventory.create({
+          data: {
+            userId,
+            guildId,
+            capacity: 10
+          }
+        });
+
+        await tx.fishInventoryItem.create({
+          data: {
+            fishInventoryId: newInventory.id,
+            fishId
+          }
+        });
+      }
     });
 
     return {

@@ -79,11 +79,16 @@ export class FishMarketUI {
       const totalPower = this.calculateTotalPower(fish);
       const timeLeft = Math.max(0, Math.floor((new Date(listing.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60)));
       
+      // Kiểm tra xem người dùng có thể mua cá này không
+      const canBuy = listing.sellerId !== this.userId && timeLeft > 0;
+      const buyStatus = canBuy ? '🛒 Mua Nhanh' : (listing.sellerId === this.userId ? '❌ Của bạn' : '⏰ Hết hạn');
+      
       embed.addFields({
         name: `🐟 ${fish.name} (Lv.${fish.level}, Gen.${fish.generation}) - 💰${listing.price.toLocaleString()}`,
         value: `**Power:** ${totalPower} | **Rarity:** ${fish.rarity} | **Còn lại:** ${timeLeft}h\n` +
                `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}\n` +
-               `**ID:** \`${fish.id}\` | **Người bán:** <@${listing.sellerId}>`,
+               `**ID:** \`${fish.id}\` | **Người bán:** <@${listing.sellerId}>\n` +
+               `**Trạng thái:** ${buyStatus}`,
         inline: false
       });
     }
@@ -263,7 +268,31 @@ export class FishMarketUI {
           .setEmoji('🎯')
       );
 
-    // Row 2: Navigation buttons
+    // Row 2: Buy buttons cho mỗi listing (tối đa 5 listings)
+    if (this.listings.length > 0) {
+      const buyButtonsRow = new ActionRowBuilder<ButtonBuilder>();
+      
+      for (let i = 0; i < Math.min(this.listings.length, 5); i++) {
+        const listing = this.listings[i];
+        const timeLeft = Math.max(0, Math.floor((new Date(listing.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60)));
+        const canBuy = listing.sellerId !== this.userId && timeLeft > 0;
+        
+        buyButtonsRow.addComponents(
+          new ButtonBuilder()
+            .setCustomId(`market_buy_quick_${listing.fish.id}`)
+            .setLabel(`Mua ${listing.fish.name}`)
+            .setStyle(canBuy ? ButtonStyle.Primary : ButtonStyle.Secondary)
+            .setEmoji('🛒')
+            .setDisabled(!canBuy)
+        );
+      }
+      
+      components.push(actionRow1, buyButtonsRow);
+    } else {
+      components.push(actionRow1);
+    }
+
+    // Row 3: Navigation buttons
     const navRow = new ActionRowBuilder<ButtonBuilder>();
     
     if (this.currentPage > 1) {
@@ -285,10 +314,10 @@ export class FishMarketUI {
     }
 
     if (navRow.components.length > 0) {
-      components.push(actionRow1, navRow);
-    } else {
-      components.push(actionRow1);
+      components.push(navRow);
     }
+
+    // Navigation buttons đã được xử lý ở createComponents()
 
     return components;
   }
