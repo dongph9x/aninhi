@@ -173,15 +173,13 @@ export class FishBarnHandler {
     const { FishBattleService } = await import('@/utils/fish-battle');
     const isAdmin = await FishBattleService.isAdministrator(userId, guildId);
 
-    // Kiểm tra daily feed limit (trừ khi là admin)
-    if (!isAdmin) {
-      const dailyFeedCheck = await FishFeedService.checkAndResetDailyFeedCount(userId, guildId);
-      if (!dailyFeedCheck.canFeed) {
-        return interaction.reply({ 
-          content: `❌ ${dailyFeedCheck.error}`, 
-          ephemeral: true 
-        });
-      }
+    // Kiểm tra daily feed limit (admin cũng bị kiểm tra để test)
+    const dailyFeedCheck = await FishFeedService.checkAndResetDailyFeedCount(userId, guildId);
+    if (!dailyFeedCheck.canFeed) {
+      return interaction.reply({ 
+        content: `❌ ${dailyFeedCheck.error}`, 
+        ephemeral: true 
+      });
     }
     
     // Cho cá ăn với thức ăn
@@ -191,13 +189,14 @@ export class FishBarnHandler {
       return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });
     }
 
-    // Tăng daily feed count (trừ khi là admin)
-    if (!isAdmin) {
-      await FishFeedService.incrementDailyFeedCount(userId, guildId);
-    }
+    // Tăng daily feed count (admin cũng bị tăng để test)
+    await FishFeedService.incrementDailyFeedCount(userId, guildId);
 
     // Cập nhật inventory
     const updatedInventory = await FishInventoryService.getFishInventory(userId, guildId);
+    
+    // Lấy thông tin daily feed mới sau khi tăng count
+    const updatedDailyFeedInfo = await FishFeedService.checkAndResetDailyFeedCount(userId, guildId);
     
     // Tạo embed thông báo
     const embed = new EmbedBuilder()
@@ -219,7 +218,7 @@ export class FishBarnHandler {
       embed.addFields({ name: '🐟 Trưởng Thành!', value: 'Cá đã trưởng thành và có thể lai tạo!', inline: false });
     }
 
-    // Cập nhật UI
+    // Cập nhật UI (hàm createUIWithFishFood sẽ tự động lấy thông tin daily feed mới)
     const breedingData = this.breedingModeMap.get(userId);
     const ui = await this.createUIWithFishFood(
       updatedInventory, 
@@ -486,10 +485,8 @@ export class FishBarnHandler {
       return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });
     }
 
-    // Thêm cá con vào inventory
-    if (result.offspring) {
-      await FishInventoryService.addFishToInventory(userId, guildId, result.offspring.id);
-    }
+    // Cá con đã được thêm vào inventory tự động trong FishBreedingService.breedFish()
+    // Không cần thêm lại ở đây
 
     // Tắt chế độ lai tạo
     this.breedingModeMap.delete(userId);

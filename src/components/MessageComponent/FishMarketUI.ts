@@ -99,7 +99,7 @@ export class FishMarketUI {
   private createSellEmbed(embed: EmbedBuilder): EmbedBuilder {
     const eligibleFish = this.userInventory.items.filter((item: any) => {
       const fish = item.fish;
-      return fish.generation >= 2 && fish.status === 'adult' && fish.userId === this.userId;
+      return fish.generation >= 2 && fish.userId === this.userId;
     });
 
     // Lọc ra những cá đang được bán trên market
@@ -112,7 +112,7 @@ export class FishMarketUI {
       embed.setDescription("Bạn không có cá nào đủ điều kiện để bán!")
         .addFields({
           name: "📋 Điều kiện bán cá",
-          value: "• Thế hệ 2 trở lên\n• Cá trưởng thành (level 10)\n• Không trong túi đấu\n• Chưa được bán trên market\n• Thuộc về bạn"
+          value: "• Thế hệ 2 trở lên\n• Không trong túi đấu\n• Chưa được bán trên market\n• Thuộc về bạn"
         });
       
       if (eligibleFish.length > 0 && listedFishIds.length > 0) {

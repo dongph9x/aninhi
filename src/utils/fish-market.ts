@@ -95,6 +95,11 @@ export class FishMarketService {
       return { success: false, error: 'Cá không tồn tại hoặc không thuộc về bạn!' };
     }
 
+    // Kiểm tra thế hệ cá (phải từ thế hệ 2 trở lên)
+    if (fish.generation < 2) {
+      return { success: false, error: 'Chỉ cá thế hệ 2 trở lên mới được bán trên market!' };
+    }
+
     // Kiểm tra cá có đang trong battle inventory không
     const isInBattleInventory = await prisma.battleFishInventoryItem.findFirst({
       where: { fishId }

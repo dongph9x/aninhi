@@ -88,6 +88,15 @@ export class BattleFishInventoryService {
       return { success: false, error: 'Chỉ cá trưởng thành mới có thể đấu!' };
     }
 
+    // Kiểm tra cá có đang được bán trên market không
+    const isListedOnMarket = await prisma.fishMarket.findFirst({
+      where: { fishId }
+    });
+
+    if (isListedOnMarket) {
+      return { success: false, error: 'Không thể thêm cá đang được bán trên market vào túi đấu! Hãy hủy bán trước.' };
+    }
+
     // Thêm vào battle inventory
     const inventoryItem = await prisma.battleFishInventoryItem.create({
       data: {
@@ -250,13 +259,22 @@ export class BattleFishInventoryService {
     const battleInventory = await this.getBattleFishInventory(userId, guildId);
     const battleFishIds = battleInventory.items.map((item: any) => item.fish.id);
 
-    return fish.filter(fish => !battleFishIds.includes(fish.id)).map(fish => ({
-      ...fish,
-      name: fish.species,
-      experienceToNext: fish.level >= 10 ? 0 : (fish.level + 1) * 10,
-      traits: JSON.parse(fish.specialTraits || '[]'),
-      stats: JSON.parse(fish.stats || '{}'),
-      canBreed: fish.status === 'adult',
-    }));
+    // Kiểm tra xem cá nào đang được bán trên market
+    const marketListings = await prisma.fishMarket.findMany({
+      where: { fishId: { in: fish.map(f => f.id) } }
+    });
+    const marketFishIds = marketListings.map(listing => listing.fishId);
+
+    // Lọc ra cá không trong battle inventory và không trên market
+    return fish
+      .filter(fish => !battleFishIds.includes(fish.id) && !marketFishIds.includes(fish.id))
+      .map(fish => ({
+        ...fish,
+        name: fish.species,
+        experienceToNext: fish.level >= 10 ? 0 : (fish.level + 1) * 10,
+        traits: JSON.parse(fish.specialTraits || '[]'),
+        stats: JSON.parse(fish.stats || '{}'),
+        canBreed: fish.status === 'adult',
+      }));
   }
 } 

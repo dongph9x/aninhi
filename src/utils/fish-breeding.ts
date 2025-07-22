@@ -480,6 +480,10 @@ export class FishBreedingService {
     await prisma.fish.delete({ where: { id: fish1Id } });
     await prisma.fish.delete({ where: { id: fish2Id } });
     
+    // Thêm cá con vào inventory
+    const { FishInventoryService } = await import('./fish-inventory');
+    await FishInventoryService.addFishToInventory(userId, fish1.guildId, offspring.id);
+    
     // Ghi lại lịch sử lai tạo
     await prisma.breedingHistory.create({
       data: {
