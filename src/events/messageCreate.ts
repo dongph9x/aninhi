@@ -28,7 +28,7 @@ export default Bot.createEvent({
 
         // Kiểm tra chế độ bảo trì
         if (client.maintenanceMode && command.structure.name !== "maintenance") {
-            return message.reply("🔧 **Bot đang trong chế độ bảo trì**\nVui lòng chờ cho đến khi bảo trì hoàn tất.");
+            return message.reply("🔧 **Tổng tư lệnh tối cao đã tạm đóng hồ cá**\nVui lòng chờ cho đến khi có thông báo mở lại!");
         }
 
         try {

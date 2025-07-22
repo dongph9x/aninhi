@@ -136,7 +136,7 @@ export class FishBreedingService {
     const newStats = { ...currentStats };
     
     Object.keys(newStats).forEach((stat) => {
-      const increase = Math.floor(Math.random() * 3) + 1; // 1-3 điểm
+      const increase = Math.floor(Math.random() * 10) + 1; // 1-3 điểm
       newStats[stat as keyof FishStats] = Math.min(100, newStats[stat as keyof FishStats] + increase);
     });
     
