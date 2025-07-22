@@ -414,7 +414,7 @@ export class FishMarketUI {
                 const isExpired = timeLeft <= 0;
                 
                 return {
-                  label: `${fish.name} - ${listing.price.toLocaleString()} coins`,
+                  label: `${fish.name} - ${listing.price.toLocaleString()} FishCoin`,
                   description: isExpired ? 'Hết hạn' : `Còn ${timeLeft}h`,
                   value: fish.id,
                   emoji: isExpired ? '⏰' : '💰',

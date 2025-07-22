@@ -22,7 +22,7 @@ export default Bot.createMessageComponent<ComponentType.StringSelect, {}>({
                 .setDescription(
                     `**${interaction.user.username}** đã mua:\n\n` +
                     `${rodInfo.emoji} **${rodInfo.name}**\n` +
-                    `💰 **Giá:** ${rodInfo.price} AniCoin\n` +
+                    `🐟 **Giá:** ${rodInfo.price} FishCoin\n` +
                     `🛡️ **Độ bền:** ${rodInfo.durability} lần\n` +
                     `✨ **Bonus hiếm:** +${rodInfo.rarityBonus}%\n` +
                     `📝 **Mô tả:** ${rodInfo.description}\n\n` +

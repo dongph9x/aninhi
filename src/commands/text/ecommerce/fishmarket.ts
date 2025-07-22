@@ -172,7 +172,7 @@ async function showMarketListings(message: any, guildId: string, page: number = 
             const timeLeft = Math.max(0, Math.floor((new Date(listing.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60)));
             
             embed.addFields({
-                name: `🐟 ${fish.name} (Lv.${fish.level}, Gen.${fish.generation}) - 💰${listing.price.toLocaleString()}`,
+                name: `🐟 ${fish.name} (Lv.${fish.level}, Gen.${fish.generation}) - 🐟${listing.price.toLocaleString()}`,
                 value: `**Power:** ${totalPower} | **Rarity:** ${fish.rarity} | **Còn lại:** ${timeLeft}h\n` +
                        `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}\n` +
                        `**ID:** \`${fish.id}\` | **Người bán:** <@${listing.sellerId}>`,
@@ -241,7 +241,7 @@ async function sellFish(message: any, userId: string, guildId: string, args: str
                 .setColor("#51CF66")
                 .setDescription(`🐟 **${fish.name}** đã được đưa lên market`)
                 .addFields(
-                    { name: "💰 Giá bán", value: `${price.toLocaleString()} coins`, inline: true },
+                    { name: "🐟 Giá bán", value: `${price.toLocaleString()} FishCoin`, inline: true },
                     { name: "⏰ Thời gian", value: `${duration} giờ`, inline: true },
                     { name: "📊 Thông tin cá", value: `Level: ${fish.level} | Gen: ${fish.generation} | Power: ${totalPower}`, inline: true },
                     { name: "📈 Stats", value: `💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}`, inline: false },
@@ -285,7 +285,7 @@ async function buyFish(message: any, userId: string, guildId: string, args: stri
                 .setColor("#51CF66")
                 .setDescription(`🐟 **${fish.name}** đã được thêm vào inventory của bạn`)
                 .addFields(
-                    { name: "💰 Giá đã trả", value: `${result.price.toLocaleString()} coins`, inline: true },
+                    { name: "🐟 Giá đã trả", value: `${result.price.toLocaleString()} FishCoin`, inline: true },
                     { name: "📊 Thông tin cá", value: `Level: ${fish.level} | Gen: ${fish.generation} | Power: ${totalPower}`, inline: true },
                     { name: "📈 Stats", value: `💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}`, inline: false }
                 )

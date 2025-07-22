@@ -52,8 +52,8 @@ async function showQuantitySelector(interaction: any, baitType: string) {
                 .addOptions(
                     quantities.map(qty => 
                         new StringSelectMenuOptionBuilder()
-                            .setLabel(`${baitInfo.name} x${qty} - ${baitInfo.price * qty} AniCoin`)
-                            .setDescription(`${qty} cái - ${baitInfo.price * qty} AniCoin`)
+                            .setLabel(`${baitInfo.name} x${qty} - ${baitInfo.price * qty} FishCoin`)
+                            .setDescription(`${qty} cái - ${baitInfo.price * qty} FishCoin`)
                             .setValue(qty.toString())
                             .setEmoji(baitInfo.emoji)
                     )

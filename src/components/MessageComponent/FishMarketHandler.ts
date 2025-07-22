@@ -199,7 +199,7 @@ export class FishMarketHandler {
         });
         
         await interaction.followUp({ 
-          content: `✅ Đã treo bán **${result.listing.fish.name}** với giá **${price.toLocaleString()}** coins trong **${duration}h**!`, 
+          content: `✅ Đã treo bán **${result.listing.fish.name}** với giá **${price.toLocaleString()}** FishCoin trong **${duration}h**!`, 
           ephemeral: true 
         });
       } else {
@@ -399,7 +399,7 @@ export class FishMarketHandler {
       
       const priceInput = new TextInputBuilder()
         .setCustomId('market_price_input')
-        .setLabel('Giá bán (coins)')
+        .setLabel('Giá bán (FishCoin)')
         .setStyle(TextInputStyle.Short)
         .setPlaceholder(`Nhập giá bán (gợi ý: ${suggestedPrice.toLocaleString()})`)
         .setValue(suggestedPrice.toString())
@@ -525,7 +525,7 @@ export class FishMarketHandler {
           .setColor("#51CF66")
           .setDescription(`🐟 **${fish.name}** đã được thêm vào inventory của bạn`)
           .addFields(
-            { name: "💰 Giá đã trả", value: `${result.price.toLocaleString()} coins`, inline: true },
+            { name: "🐟 Giá đã trả", value: `${result.price.toLocaleString()} FishCoin`, inline: true },
             { name: "📊 Thông tin cá", value: `Level: ${fish.level} | Gen: ${fish.generation} | Power: ${totalPower}`, inline: true },
             { name: "📈 Stats", value: `💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}`, inline: false }
           )

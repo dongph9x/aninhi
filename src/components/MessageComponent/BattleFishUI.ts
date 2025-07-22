@@ -7,6 +7,7 @@ import {
     StringSelectMenuOptionBuilder
 } from "discord.js";
 import { BattleFishInventoryService } from "@/utils/battle-fish-inventory";
+import { FishBattleService } from "@/utils/fish-battle";
 
 export class BattleFishUI {
     private inventory: any;
@@ -14,13 +15,15 @@ export class BattleFishUI {
     private selectedFishId?: string;
     private userId: string;
     private guildId: string;
+    private dailyBattleInfo?: { canBattle: boolean; remainingBattles: number; error?: string };
 
-    constructor(inventory: any, eligibleFish: any[], userId: string, guildId: string, selectedFishId?: string) {
+    constructor(inventory: any, eligibleFish: any[], userId: string, guildId: string, selectedFishId?: string, dailyBattleInfo?: { canBattle: boolean; remainingBattles: number; error?: string }) {
         this.inventory = inventory;
         this.eligibleFish = eligibleFish;
         this.userId = userId;
         this.guildId = guildId;
         this.selectedFishId = selectedFishId;
+        this.dailyBattleInfo = dailyBattleInfo;
     }
 
     createEmbed(): EmbedBuilder {
@@ -29,6 +32,23 @@ export class BattleFishUI {
             .setColor('#FF6B6B')
             .setDescription('Quản lý cá đấu và tìm đối thủ!')
             .setTimestamp();
+
+        // Thông tin daily battle limit
+        if (this.dailyBattleInfo) {
+            if (this.dailyBattleInfo.canBattle) {
+                embed.addFields({
+                    name: '⏰ Giới Hạn Đấu Cá Hôm Nay',
+                    value: `✅ Còn **${this.dailyBattleInfo.remainingBattles}/20** lần đấu cá`,
+                    inline: true
+                });
+            } else {
+                embed.addFields({
+                    name: '⏰ Giới Hạn Đấu Cá Hôm Nay',
+                    value: `❌ **Đã đạt giới hạn!** (0/20)\n${this.dailyBattleInfo.error || 'Vui lòng thử lại vào ngày mai'}`,
+                    inline: true
+                });
+            }
+        }
 
         // Thông tin túi đấu
         embed.addFields({
@@ -57,7 +77,7 @@ export class BattleFishUI {
                 embed.addFields({
                     name: '🎯 Cá Được Chọn',
                     value: `**${fish.name}** (Lv.${fish.level}, Gen.${fish.generation})\n` +
-                           `💪 Power: ${power} | 💰 ${fish.value.toLocaleString()} coins\n` +
+                           `💪 Power: ${power} | 🐟 ${fish.value.toLocaleString()} FishCoin\n` +
                            `📊 Stats: 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}`,
                     inline: false
                 });
@@ -70,7 +90,7 @@ export class BattleFishUI {
                 const power = this.calculatePower(fish);
                 
                 return `**${index + 1}. ${fish.name}** (Lv.${fish.level}, Gen.${fish.generation})\n` +
-                       `💪 Power: ${power} | 💰 ${fish.value.toLocaleString()} coins\n` +
+                       `💪 Power: ${power} | 🐟 ${fish.value.toLocaleString()} FishCoin\n` +
                        `📊 Stats: 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}`;
             }).join('\n\n');
 
@@ -88,7 +108,7 @@ export class BattleFishUI {
                 const power = this.calculatePower(fish);
                 
                 return `**${index + 1}. ${fish.name}** (Lv.${fish.level}, Gen.${fish.generation})\n` +
-                       `💪 Power: ${power} | 💰 ${fish.value.toLocaleString()} coins\n` +
+                       `💪 Power: ${power} | 🐟 ${fish.value.toLocaleString()} FishCoin\n` +
                        `📊 Stats: 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}`;
             }).join('\n\n');
 
@@ -136,7 +156,7 @@ export class BattleFishUI {
                     
                     return new StringSelectMenuOptionBuilder()
                         .setLabel(`${fish.name} (Lv.${fish.level}, Gen.${fish.generation})`)
-                        .setDescription(`Power: ${power} | 💰${fish.value.toLocaleString()} | ${isSelected ? 'Đã chọn' : 'Trong túi đấu'}`)
+                        .setDescription(`Power: ${power} | 🐟${fish.value.toLocaleString()} | ${isSelected ? 'Đã chọn' : 'Trong túi đấu'}`)
                         .setValue(`battle_${fish.id}`)
                         .setEmoji(isSelected ? '🎯' : '🐟');
                 })
@@ -151,7 +171,7 @@ export class BattleFishUI {
                     
                     return new StringSelectMenuOptionBuilder()
                         .setLabel(`${fish.name} (Lv.${fish.level}, Gen.${fish.generation})`)
-                        .setDescription(`Power: ${power} | 💰${fish.value.toLocaleString()} | Có thể thêm`)
+                        .setDescription(`Power: ${power} | 🐟${fish.value.toLocaleString()} | Có thể thêm`)
                         .setValue(`eligible_${fish.id}`)
                         .setEmoji('➕');
                 })

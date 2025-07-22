@@ -134,15 +134,15 @@ async function fishWithAnimation(message: Message) {
             return await message.reply({ embeds: [errorEmbed] });
         }
 
-        // Kiểm tra số dư
+        // Kiểm tra số dư FishCoin
         const balance = await prisma.user.findUnique({
             where: { userId_guildId: { userId, guildId } }
         });
 
-        if (!balance || balance.balance < 10) {
+        if (!balance || balance.fishBalance < 10n) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle("❌ Không đủ tiền")
-                .setDescription("Bạn cần ít nhất 10 AniCoin để câu cá!")
+                .setTitle("❌ Không đủ FishCoin")
+                .setDescription("Bạn cần ít nhất 10 FishCoin để câu cá!")
                 .setColor("#ff0000")
                 .setTimestamp();
 
@@ -250,7 +250,7 @@ async function fishWithAnimation(message: Message) {
                 `**${message.author.username}** đã câu được:\n\n` +
                 `${fish.emoji} **${fish.name}**\n` +
                 `${getRarityEmoji(fish.rarity)} **${getRarityText(fish.rarity)}**\n` +
-                `💰 **Giá trị:** ${value} AniCoin${fishInventoryMessage}` +
+                `🐟 **Giá trị:** ${value} FishCoin${fishInventoryMessage}` +
                 (isAdmin && fish.rarity === 'legendary' ? '\n\n👑 **Admin đã câu được cá huyền thoại!**' : '')
             )
             .setColor(getRarityColor(fish.rarity))
@@ -283,11 +283,11 @@ async function showShop(message: Message) {
         .setDescription(
             "**Cần câu:**\n" +
             Object.entries(FISHING_RODS).map(([key, rod]: [string, typeof FISHING_RODS[string]]) =>
-                `${rod.emoji} **${rod.name}** - ${rod.price}₳ | Độ bền: ${rod.durability} | Bonus: +${rod.rarityBonus}%`
+                `${rod.emoji} **${rod.name}** - ${rod.price}🐟 | Độ bền: ${rod.durability} | Bonus: +${rod.rarityBonus}%`
             ).join("\n") +
             "\n\n**Mồi:**\n" +
             Object.entries(BAITS).map(([key, bait]: [string, typeof BAITS[string]]) =>
-                `${bait.emoji} **${bait.name}** - ${bait.price}₳ | Bonus: +${bait.rarityBonus}%`
+                `${bait.emoji} **${bait.name}** - ${bait.price}🐟 | Bonus: +${bait.rarityBonus}%`
             ).join("\n") +
             "\n\n**Mua:** `n.fishing buy <loại> <số lượng>`\n" +
             "Ví dụ: `n.fishing buy copper 1` hoặc `n.fishing buy good 5`\n" +
@@ -339,7 +339,7 @@ async function buyItem(message: Message, args: string[]) {
                 .setDescription(
                     `**${message.author.username}** đã mua:\n\n` +
                     `${rod.emoji} **${rod.name}**\n` +
-                    `💰 **Giá:** ${rod.price} AniCoin\n` +
+                    `🐟 **Giá:** ${rod.price} FishCoin\n` +
                     `🔧 **Độ bền:** ${rod.durability}\n` +
                     `📈 **Tăng tỷ lệ hiếm:** +${rod.rarityBonus}%`
                 )
@@ -355,7 +355,7 @@ async function buyItem(message: Message, args: string[]) {
                 .setDescription(
                     `**${message.author.username}** đã mua:\n\n` +
                     `${result.bait.emoji} **${result.bait.name}** x${quantity}\n` +
-                    `💰 **Tổng giá:** ${result.totalCost} AniCoin\n` +
+                    `🐟 **Tổng giá:** ${result.totalCost} FishCoin\n` +
                     `📈 **Tăng tỷ lệ hiếm:** +${result.bait.rarityBonus}%`
                 )
                 .setColor("#00ff00")
@@ -417,8 +417,8 @@ async function sellFish(message: Message, args: string[]) {
             .setDescription(
                 `**${message.author.username}** đã bán:\n\n` +
                 `🐟 **${result.fishName}** x${result.quantity}\n` +
-                `💰 **Giá hiện tại:** ${result.currentPrice} AniCoin\n` +
-                `💵 **Tổng giá:** ${result.totalValue} AniCoin`
+                `🐟 **Giá hiện tại:** ${result.currentPrice} FishCoin\n` +
+                `💵 **Tổng giá:** ${result.totalValue} FishCoin`
             )
             .setColor("#00ff00")
             .setTimestamp();
@@ -476,7 +476,7 @@ async function showInventory(message: Message) {
                 `**Cá đã bắt:**\n` +
                                  (normalFish.length > 0 
                      ? normalFish.map((f: any) => 
-                         `${FISH_LIST.find(fish => fish.name === f.fishName)?.emoji || "🐟"} **${f.fishName}** x${f.quantity} (${f.fishValue} AniCoin)`
+                         `${FISH_LIST.find(fish => fish.name === f.fishName)?.emoji || "🐟"} **${f.fishName}** x${f.quantity} (${f.fishValue} FishCoin)`
                      ).join("\n")
                      : "Chưa có cá nào"
                  )
@@ -557,8 +557,8 @@ async function showStats(message: Message) {
             .setTitle("📊 Thống Kê Câu Cá")
             .setDescription(`**${message.author.username}**\n\n` +
                 `🎣 **Tổng số lần câu:** ${fishingData.totalFish}\n` +
-                `💰 **Tổng thu nhập:** ${fishingData.totalEarnings} AniCoin\n` +
-                `🐟 **Cá lớn nhất:** ${fishingData.biggestFish || "Chưa có"} (${fishingData.biggestValue} AniCoin)\n` +
+                `🐟 **Tổng thu nhập:** ${fishingData.totalEarnings} FishCoin\n` +
+                `🐟 **Cá lớn nhất:** ${fishingData.biggestFish || "Chưa có"} (${fishingData.biggestValue} FishCoin)\n` +
                 `${getRarityEmoji(fishingData.rarestRarity)} **Cá hiếm nhất:** ${fishingData.rarestFish || "Chưa có"} (${getRarityText(fishingData.rarestRarity)})`
             )
             .setColor(config.embedColor)
@@ -601,7 +601,7 @@ async function showHelp(message: Message) {
             "• `n.fishing sell \"Cá rô phi\" 1` - Bán 1 con cá rô phi\n\n" +
             "**Lưu ý:**\n" +
             "• **Bạn cần mua cần câu và mồi trước khi câu cá!**\n" +
-            "• Mỗi lần câu tốn 10 AniCoin\n" +
+                            "• Mỗi lần câu tốn 10 FishCoin\n" +
             "• Cooldown 30 giây giữa các lần câu\n" +
             "• Animation câu cá kéo dài 3 giây\n" +
             "• Cần câu và mồi tốt hơn sẽ tăng tỷ lệ bắt cá hiếm\n" +
@@ -737,8 +737,8 @@ async function showFishPrices(message: Message, args: string[]) {
             const embed = new EmbedBuilder()
                 .setTitle(`${fishInfo?.emoji || "🐟"} Giá ${fishName}`)
                 .setDescription(
-                    `**Giá hiện tại:** ${fishPriceInfo.currentPrice} AniCoin\n` +
-                    `**Giá gốc:** ${fishPriceInfo.basePrice} AniCoin\n` +
+                                    `**Giá hiện tại:** ${fishPriceInfo.currentPrice} FishCoin\n` +
+                `**Giá gốc:** ${fishPriceInfo.basePrice} FishCoin\n` +
                     `**Thay đổi:** ${changeEmoji} ${fishPriceInfo.priceChange > 0 ? "+" : ""}${fishPriceInfo.priceChange} (${fishPriceInfo.changePercent > 0 ? "+" : ""}${fishPriceInfo.changePercent.toFixed(1)}%)\n` +
                     `**Cập nhật lúc:** ${fishPriceInfo.lastUpdated.toLocaleString("vi-VN")}`
                 )

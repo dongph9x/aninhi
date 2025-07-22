@@ -38,7 +38,9 @@ export default Bot.createCommand({
                         "Bạn đã nhận thưởng hàng ngày hôm nay rồi!\n\n" +
                             `**Thời gian còn lại:** ${cooldownText}\n` +
                             `**Chuỗi hiện tại:** ${user.dailyStreak} ngày\n` +
-                            `**Số dư hiện tại:** ${user.balance} AniCoin`,
+                            `**Số dư hiện tại:**\n` +
+                            `• AniCoin: ${user.balance} AniCoin\n` +
+                            `• FishCoin: ${user.fishBalance} FishCoin`,
                     )
                     .setColor("#ff6b6b")
                     .setFooter({
@@ -57,20 +59,26 @@ export default Bot.createCommand({
             // Tính toán reward breakdown
             const baseAmount = settings.dailyBaseAmount;
             const streakBonus = Math.min(
-                result.newStreak * settings.dailyStreakBonus,
+                (result.newStreak || 0) * settings.dailyStreakBonus,
                 settings.maxStreakBonus
             );
 
             const embed = new EmbedBuilder()
                 .setTitle("🎉 Đã Nhận Thưởng Hàng Ngày!")
                 .setDescription(
-                    `**${message.author.username}** đã nhận thưởng hàng ngày!\n\n` +
-                        "💰 **Chi Tiết Thưởng:**\n" +
+                    `**${message.author.displayName || message.author.username || 'Unknown User'}** đã nhận thưởng hàng ngày!\n\n` +
+                        "💰 **Chi Tiết Thưởng AniCoin:**\n" +
                         `• Thưởng cơ bản: **${baseAmount}** AniCoin\n` +
                         `• Thưởng chuỗi: **${streakBonus}** AniCoin\n` +
-                        `• **Tổng cộng:** **${result.amount}** AniCoin\n\n` +
-                        `🔥 **Chuỗi mới:** ${result.newStreak} ngày\n` +
-                        `💎 **Số dư mới:** ${user.balance} AniCoin`,
+                        `• **Tổng AniCoin:** **${result.aniAmount}** AniCoin\n\n` +
+                        "🐟 **Chi Tiết Thưởng FishCoin:**\n" +
+                        `• Thưởng cơ bản: **${baseAmount}** FishCoin\n` +
+                        `• Thưởng chuỗi: **${streakBonus}** FishCoin\n` +
+                        `• **Tổng FishCoin:** **${result.fishAmount}** FishCoin\n\n` +
+                        `🔥 **Chuỗi mới:** ${result.newStreak || 0} ngày\n` +
+                        `💎 **Số dư mới:**\n` +
+                        `• AniCoin: ${user.balance} AniCoin\n` +
+                        `• FishCoin: ${user.fishBalance} FishCoin`,
                 )
                 .setColor("#51cf66")
                 .setThumbnail(message.author.displayAvatarURL())
@@ -80,9 +88,9 @@ export default Bot.createCommand({
                 })
                 .setTimestamp();
 
-            if (result.newStreak >= 7) {
+            if ((result.newStreak || 0) >= 7) {
                 embed.setDescription(embed.data.description + "\n\n🔥 **🔥 Chuỗi 7+ Ngày! 🔥** 🔥");
-            } else if (result.newStreak >= 3) {
+            } else if ((result.newStreak || 0) >= 3) {
                 embed.setDescription(embed.data.description + "\n\n🔥 **Chuỗi 3+ Ngày!** 🔥");
             }
 

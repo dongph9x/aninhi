@@ -1,5 +1,5 @@
 import prisma from './prisma';
-import { ecommerceDB } from './ecommerce-db';
+import { fishCoinDB } from './fish-coin';
 
 // Định nghĩa các loại thức ăn
 export const FISH_FOOD_TYPES = {
@@ -77,12 +77,14 @@ export class FishFoodService {
       return { success: false, error: 'User không tồn tại!' };
     }
 
-    if (Number(user.balance) < totalCost) {
-      return { success: false, error: `Không đủ tiền! Cần ${totalCost.toLocaleString()} coins, hiện có ${Number(user.balance).toLocaleString()} coins` };
+    // Kiểm tra đủ FishCoin
+    const hasEnoughFishCoin = await fishCoinDB.hasEnoughFishCoin(userId, guildId, totalCost);
+    if (!hasEnoughFishCoin) {
+      return { success: false, error: `Không đủ FishCoin! Cần ${totalCost.toLocaleString()} FishCoin` };
     }
 
-    // Trừ tiền
-    await ecommerceDB.subtractMoney(userId, guildId, totalCost, 'buy_fish_food');
+    // Trừ FishCoin
+    await fishCoinDB.subtractFishCoin(userId, guildId, totalCost, `Buy fish food: ${foodInfo.name} x${quantity}`);
 
     // Thêm thức ăn vào inventory
     const existingFood = await prisma.fishFood.findUnique({

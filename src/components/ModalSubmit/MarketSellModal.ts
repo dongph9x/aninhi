@@ -76,7 +76,7 @@ export default {
                 });
                 
                 await interaction.followUp({ 
-                    content: `✅ Đã treo bán **${result.listing.fish.name}** với giá **${price.toLocaleString()}** coins trong **${duration}h**!`, 
+                    content: `✅ Đã treo bán **${result.listing.fish.name}** với giá **${price.toLocaleString()}** FishCoin trong **${duration}h**!`, 
                     ephemeral: true 
                 });
             } else {

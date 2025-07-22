@@ -157,11 +157,11 @@ async function showBaitShop(interaction: any) {
 
     // Rút gọn thông tin từng loại mồi
     Object.entries(BAITS).forEach(([key, bait]) => {
-        embed.addFields({
-            name: `${bait.emoji} ${bait.name}`,
-            value: `Giá: ${bait.price}₳ | Bonus: +${bait.rarityBonus}%`,
-            inline: true
-        });
+                    embed.addFields({
+                name: `${bait.emoji} ${bait.name}`,
+                value: `Giá: ${bait.price}🐟 | Bonus: +${bait.rarityBonus}%`,
+                inline: true
+            });
     });
 
     const row = new ActionRowBuilder<StringSelectMenuBuilder>()
@@ -172,7 +172,7 @@ async function showBaitShop(interaction: any) {
                 .addOptions(
                     Object.entries(BAITS).map(([key, bait]) => 
                         new StringSelectMenuOptionBuilder()
-                            .setLabel(`${bait.name} - ${bait.price}₳`)
+                            .setLabel(`${bait.name} - ${bait.price}🐟`)
                             .setDescription(`Bonus: +${bait.rarityBonus}%`)
                             .setValue(key)
                             .setEmoji(bait.emoji)

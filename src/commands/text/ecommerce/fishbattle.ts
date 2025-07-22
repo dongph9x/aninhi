@@ -55,9 +55,10 @@ async function showBattleUI(message: any, userId: string, guildId: string) {
         // Lấy dữ liệu
         const inventory = await BattleFishInventoryService.getBattleFishInventory(userId, guildId);
         const eligibleFish = await BattleFishInventoryService.getEligibleBattleFish(userId, guildId);
+        const dailyBattleInfo = await FishBattleService.checkAndResetDailyBattleCount(userId, guildId);
 
         // Tạo UI
-        const ui = new BattleFishUI(inventory, eligibleFish, userId, guildId);
+        const ui = new BattleFishUI(inventory, eligibleFish, userId, guildId, undefined, dailyBattleInfo);
         const embed = ui.createEmbed();
         const components = ui.createComponents();
 
@@ -91,7 +92,8 @@ async function showBattleHelp(message: any) {
             { name: '🎯 Cách sử dụng', value: '`n.fishbattle ui` - Mở giao diện đấu cá (Khuyến nghị)\n`n.fishbattle` - Tìm đối thủ ngẫu nhiên\n`n.fishbattle add <fish_id>` - Thêm cá vào túi đấu\n`n.fishbattle list` - Xem túi đấu cá\n`n.fishbattle remove <fish_id>` - Xóa cá khỏi túi đấu\n`n.fishbattle stats` - Xem thống kê đấu cá\n`n.fishbattle history` - Xem lịch sử đấu gần đây\n`n.fishbattle leaderboard` - Bảng xếp hạng đấu cá', inline: false },
             { name: '📊 Thuộc tính cá', value: '💪 Sức mạnh | 🏃 Thể lực | 🧠 Trí tuệ | 🛡️ Phòng thủ | 🍀 May mắn', inline: false },
             { name: '💰 Phần thưởng', value: 'Người thắng: 150% sức mạnh tổng\nNgười thua: 30% sức mạnh tổng', inline: false },
-            { name: '⚠️ Điều kiện cá đấu', value: '• Phải là cá thế hệ 2 trở lên\n• Phải là cá trưởng thành (level 10)\n• Túi đấu tối đa 5 cá', inline: false }
+            { name: '⚠️ Điều kiện cá đấu', value: '• Phải là cá thế hệ 2 trở lên\n• Phải là cá trưởng thành (level 10)\n• Túi đấu tối đa 5 cá', inline: false },
+            { name: '⏰ Giới hạn đấu cá', value: '• Tối đa 20 lần đấu cá mỗi ngày\n• Reset vào 00:00 ngày mai\n• Cooldown 1 phút giữa các lần đấu', inline: false }
         )
         .setTimestamp();
 
@@ -182,6 +184,22 @@ async function removeFishFromBattleInventory(message: any, userId: string, guild
 }
 
 async function findRandomBattle(message: any, userId: string, guildId: string) {
+    // Kiểm tra daily battle limit
+    const dailyLimitCheck = await FishBattleService.checkAndResetDailyBattleCount(userId, guildId);
+    if (!dailyLimitCheck.canBattle) {
+        const embed = new EmbedBuilder()
+            .setTitle('❌ Đã Đạt Giới Hạn Đấu Cá!')
+            .setColor('#FF0000')
+            .setDescription(dailyLimitCheck.error || 'Bạn đã đạt giới hạn đấu cá trong ngày!')
+            .addFields(
+                { name: '📊 Giới Hạn', value: '20 lần đấu cá mỗi ngày', inline: true },
+                { name: '🕐 Reset', value: 'Vào 00:00 ngày mai', inline: true }
+            )
+            .setTimestamp();
+
+        return message.reply({ embeds: [embed] });
+    }
+
     // Lấy battle inventory để chọn cá
     const inventory = await BattleFishInventoryService.getBattleFishInventory(userId, guildId);
     const battleFish = inventory.items;
@@ -293,7 +311,7 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
             .addFields(
                 { name: '🐟 Người thắng', value: result.winner.name, inline: true },
                 { name: '🐟 Người thua', value: result.loser.name, inline: true },
-                { name: '💰 Phần thưởng', value: `${reward.toLocaleString()} coins`, inline: true },
+                { name: '🐟 Phần thưởng', value: `${reward.toLocaleString()} FishCoin`, inline: true },
                 { name: '💪 Sức mạnh', value: `${result.winnerPower} vs ${result.loserPower}`, inline: true }
             )
             .setDescription(result.battleLog.join('\n'))

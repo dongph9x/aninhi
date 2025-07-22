@@ -1,4 +1,5 @@
 import prisma from './prisma';
+import { fishCoinDB } from './fish-coin';
 
 export class FishInventoryService {
   /**
@@ -168,20 +169,10 @@ export class FishInventoryService {
       where: { id: fishId },
     });
 
-    // Cập nhật balance
-    const user = await prisma.user.findUnique({
-      where: { userId_guildId: { userId, guildId } },
-    });
-
-    if (!user) {
-      return { success: false, error: 'User not found!' };
-    }
-
-    const newBalance = user.balance + BigInt(finalValue);
-    await prisma.user.update({
-      where: { userId_guildId: { userId, guildId } },
-      data: { balance: newBalance },
-    });
+    // Thêm FishCoin thay vì AniCoin
+    await fishCoinDB.addFishCoin(userId, guildId, finalValue, `Sold fish from inventory: ${fish.species}`);
+    
+    const newBalance = await fishCoinDB.getFishBalance(userId, guildId);
 
     return {
       success: true,

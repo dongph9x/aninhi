@@ -2,6 +2,7 @@ import { Message } from 'discord.js';
 import { ExtendedClient } from '@/classes/ExtendedClient';
 import { FishInventoryService } from '@/utils/fish-inventory';
 import { FishBarnUI } from '@/components/MessageComponent/FishBarnUI';
+import { FishFeedService } from '@/utils/fish-feed';
 
 export default {
   structure: {
@@ -27,8 +28,11 @@ export default {
       const feedableFish = inventory.items.filter((item: any) => item.fish.level < 10);
       const selectedFishId = feedableFish.length > 0 ? feedableFish[0].fish.id : undefined;
       
+      // Lấy thông tin daily feed limit
+      const dailyFeedInfo = await FishFeedService.checkAndResetDailyFeedCount(userId, guildId);
+      
       // Tạo UI
-      const ui = new FishBarnUI(inventory, userId, guildId, selectedFishId);
+      const ui = new FishBarnUI(inventory, userId, guildId, selectedFishId, undefined, false, undefined, undefined, dailyFeedInfo);
       await ui.loadUserFishFood(); // Load user fish food
       const embed = await ui.createEmbed();
       const components = ui.createComponents();

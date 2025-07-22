@@ -38,8 +38,8 @@ export default Bot.createMessageComponent<ComponentType.Button, { fishId: string
                 .setDescription(
                     `**${interaction.user.username}** đã bán:\n\n` +
                     `🐟 **${result.fishName}** x${result.quantity}\n` +
-                    `💰 **Giá hiện tại:** ${result.currentPrice} AniCoin\n` +
-                    `💵 **Tổng giá:** ${result.totalValue} AniCoin`
+                                    `🐟 **Giá hiện tại:** ${result.currentPrice} FishCoin\n` +
+                `💵 **Tổng giá:** ${result.totalValue} FishCoin`
                 )
                 .setColor("#00ff00")
                 .setTimestamp();

@@ -108,6 +108,26 @@ export default Bot.createEvent({
                 return;
             }
 
+            // Kiểm tra xem có phải bank interaction không
+            if (interaction.customId.startsWith("bank_")) {
+                console.log("Bank interaction:", interaction.customId);
+                
+                try {
+                    const { BankHandler } = await import("../components/MessageComponent/BankHandler");
+                    if (interaction.isButton()) {
+                        await BankHandler.handleButtonInteraction(interaction);
+                    } else if (interaction.isStringSelectMenu()) {
+                        await BankHandler.handleSelectMenuInteraction(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling Bank interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác ngân hàng!`);
+                    }
+                }
+                return;
+            }
+
             // Kiểm tra xem có phải fish market interaction không
             if (interaction.customId.startsWith("market_")) {
                 console.log("FishMarket interaction:", interaction.customId);
@@ -207,7 +227,8 @@ export default Bot.createEvent({
                 try {
                     const component = client.components.modalSubmit.get('BuyFishFoodModal');
                     if (component) {
-                        await component.run({ interaction });
+                        const { t, locale } = await i18n(interaction.guildId);
+                        await component.run({ client, interaction, t, locale, data: {} });
                     } else {
                         console.error("BuyFishFoodModal component not found");
                         if (!interaction.replied && !interaction.deferred) {

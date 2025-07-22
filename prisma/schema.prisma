@@ -12,7 +12,12 @@ model User {
   userId                String
   guildId               String
   balance               BigInt                  @default(0)
+  fishBalance           BigInt                  @default(0)  // FishCoin riêng cho hệ thống fish
   dailyStreak           Int                     @default(0)
+  dailyBattleCount      Int                     @default(0)  // Số lần đấu cá trong ngày
+  lastBattleReset       DateTime                @default(now()) // Thời gian reset battle count
+  dailyFeedCount        Int                     @default(0)  // Số lần cho cá ăn trong ngày
+  lastFeedReset         DateTime                @default(now()) // Thời gian reset feed count
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
   dailyClaims           DailyClaim[]
@@ -23,6 +28,7 @@ model User {
   inventory             Inventory?
   tournaments           TournamentParticipant[]
   transactions          Transaction[]
+  fishTransactions      FishTransaction[]       // Giao dịch riêng cho FishCoin
   fishFood              FishFood[]
 
   @@unique([userId, guildId])
@@ -31,6 +37,21 @@ model User {
 }
 
 model Transaction {
+  id          String   @id @default(cuid())
+  userId      String
+  guildId     String
+  amount      BigInt
+  type        String
+  description String?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId, guildId], references: [userId, guildId])
+
+  @@index([userId, guildId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model FishTransaction {
   id          String   @id @default(cuid())
   userId      String
   guildId     String

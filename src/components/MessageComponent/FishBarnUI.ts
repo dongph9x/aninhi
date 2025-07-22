@@ -1,5 +1,6 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } from 'discord.js';
 import prisma from '../../utils/prisma';
+import { FishFeedService } from '../../utils/fish-feed';
 
 export class FishBarnUI {
   private inventory: any;
@@ -11,8 +12,9 @@ export class FishBarnUI {
   private selectedParent1Id?: string;
   private selectedParent2Id?: string;
   private userFishFood: any[] = [];
+  private dailyFeedInfo?: { canFeed: boolean; remainingFeeds: number; error?: string };
 
-  constructor(inventory: any, userId: string, guildId: string, selectedFishId?: string, selectedFoodType?: string, breedingMode: boolean = false, selectedParent1Id?: string, selectedParent2Id?: string) {
+  constructor(inventory: any, userId: string, guildId: string, selectedFishId?: string, selectedFoodType?: string, breedingMode: boolean = false, selectedParent1Id?: string, selectedParent2Id?: string, dailyFeedInfo?: { canFeed: boolean; remainingFeeds: number; error?: string }) {
     this.inventory = inventory;
     this.userId = userId;
     this.guildId = guildId;
@@ -21,6 +23,7 @@ export class FishBarnUI {
     this.breedingMode = breedingMode;
     this.selectedParent1Id = selectedParent1Id;
     this.selectedParent2Id = selectedParent2Id;
+    this.dailyFeedInfo = dailyFeedInfo;
   }
 
   async loadUserFishFood() {
@@ -35,6 +38,23 @@ export class FishBarnUI {
       .setDescription(`**${this.inventory.items.length}/${this.inventory.capacity}** cá trong rương`)
       .setTimestamp();
 
+    // Thông tin daily feed limit
+    if (this.dailyFeedInfo) {
+      if (this.dailyFeedInfo.canFeed) {
+        embed.addFields({
+          name: '🍽️ Giới Hạn Cho Cá Ăn Hôm Nay',
+          value: `✅ Còn **${this.dailyFeedInfo.remainingFeeds}/20** lần cho cá ăn`,
+          inline: true
+        });
+      } else {
+        embed.addFields({
+          name: '🍽️ Giới Hạn Cho Cá Ăn Hôm Nay',
+          value: `❌ **Đã đạt giới hạn!** (0/20)\n${this.dailyFeedInfo.error || 'Vui lòng thử lại vào ngày mai'}`,
+          inline: true
+        });
+      }
+    }
+
     if (this.inventory.items.length === 0) {
       embed.addFields({
         name: '📭 Rương trống',
@@ -43,9 +63,12 @@ export class FishBarnUI {
       });
     } else if (this.breedingMode) {
       // Hiển thị chế độ lai tạo
+      const { FishBreedingService } = await import('../../utils/fish-breeding');
+      const breedingCost = FishBreedingService.getBreedingCost();
+      
       embed.setTitle('❤️ Chế Độ Lai Tạo')
         .setColor('#FF69B4')
-        .setDescription('Chọn 2 cá trưởng thành để lai tạo');
+        .setDescription(`Chọn 2 cá trưởng thành để lai tạo\n💸 Chi phí lai tạo: ${breedingCost.toLocaleString()} FishCoin`);
 
       // Hiển thị cá bố mẹ đã chọn
       if (this.selectedParent1Id) {
@@ -308,7 +331,7 @@ export class FishBarnUI {
                   
                   return {
                     label: `${fish.species} (Gen.${fish.generation}, Lv.${fish.level})`,
-                    description: `Power: ${totalPower} - ${fish.status === 'adult' ? 'Trưởng thành' : 'Đang lớn'} - ${finalValue.toLocaleString()} coins`,
+                    description: `Power: ${totalPower} - ${fish.status === 'adult' ? 'Trưởng thành' : 'Đang lớn'} - ${finalValue.toLocaleString()} FishCoin`,
                     value: fish.id,
                     emoji: fish.status === 'adult' ? '🐟' : '🐠',
                   };
@@ -329,7 +352,7 @@ export class FishBarnUI {
           .slice(0, 25) // Giới hạn tối đa 25 options
           .map(food => ({
             label: `${food.foodInfo.emoji} ${food.foodInfo.name} (+${food.foodInfo.expBonus} exp)`,
-            description: `Còn lại: ${food.quantity} | Giá: ${food.foodInfo.price.toLocaleString()} coins`,
+            description: `Còn lại: ${food.quantity} | Giá: ${food.foodInfo.price.toLocaleString()} FishCoin`,
             value: food.foodType,
             emoji: food.foodInfo.emoji,
           }));
@@ -416,9 +439,9 @@ export class FishBarnUI {
     }
     
     if (finalValue !== undefined) {
-      text += `**Giá trị:** ${finalValue.toLocaleString()} coins${levelBonus && levelBonus > 0 ? ` (+${Math.round(levelBonus * 100)}%)` : ''}\n`;
+              text += `**Giá trị:** ${finalValue.toLocaleString()} FishCoin${levelBonus && levelBonus > 0 ? ` (+${Math.round(levelBonus * 100)}%)` : ''}\n`;
     } else {
-      text += `**Giá trị:** ${Number(fish.value).toLocaleString()} coins\n`;
+              text += `**Giá trị:** ${Number(fish.value).toLocaleString()} FishCoin\n`;
     }
     
     if (levelBar) {

@@ -29,8 +29,8 @@ export default Bot.createMessageComponent<ComponentType.StringSelect, { baitType
                 .setDescription(
                     `**${interaction.user.username}** đã mua:\n\n` +
                     `${baitInfo.emoji} **${baitInfo.name}** x${quantity}\n` +
-                    `💰 **Giá mỗi cái:** ${baitInfo.price} AniCoin\n` +
-                    `💵 **Tổng giá:** ${result.totalCost} AniCoin\n` +
+                    `🐟 **Giá mỗi cái:** ${baitInfo.price} FishCoin\n` +
+                    `💵 **Tổng giá:** ${result.totalCost} FishCoin\n` +
                     `✨ **Bonus hiếm:** +${baitInfo.rarityBonus}%\n` +
                     `📝 **Mô tả:** ${baitInfo.description}\n\n` +
                     `✅ **Đã tự động đặt làm mồi hiện tại!**`

@@ -363,7 +363,7 @@ export class BattleFishHandler {
 
             embed.addFields({
                 name: `${result} Trận ${index + 1} (${date})`,
-                value: `🐟 ${userFishName} vs ${opponentFishName} | 💰 ${reward} coins | 💪 ${battle.userPower} vs ${battle.opponentPower}`,
+                value: `🐟 ${userFishName} vs ${opponentFishName} | 🐟 ${reward} FishCoin | 💪 ${battle.userPower} vs ${battle.opponentPower}`,
                 inline: false
             });
         });
@@ -401,7 +401,7 @@ export class BattleFishHandler {
 
             embed.addFields({
                 name: `${medal} <@${user.userId}>`,
-                value: `🏆 ${user.wins}W/${user.totalBattles}L (${winRate}%) | 💰 ${totalEarnings.toLocaleString()} coins`,
+                value: `🏆 ${user.wins}W/${user.totalBattles}L (${winRate}%) | 🐟 ${totalEarnings.toLocaleString()} FishCoin`,
                 inline: false
             });
         });
@@ -499,7 +499,7 @@ export class BattleFishHandler {
             .addFields(
                 { name: '🐟 Người thắng', value: result.winner.name, inline: true },
                 { name: '🐟 Người thua', value: result.loser.name, inline: true },
-                { name: '💰 Phần thưởng', value: `${reward.toLocaleString()} coins`, inline: true },
+                { name: '🐟 Phần thưởng', value: `${reward.toLocaleString()} FishCoin`, inline: true },
                 { name: '💪 Sức mạnh', value: `${result.winnerPower} vs ${result.loserPower}`, inline: true }
             )
             .setDescription(result.battleLog.join('\n'))

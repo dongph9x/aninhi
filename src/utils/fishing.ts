@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { fishCoinDB } from "./fish-coin";
 
 const prisma = new PrismaClient();
 
@@ -202,7 +203,7 @@ export class FishPriceService {
                 return 0;
             }
 
-            return fishPrice.currentPrice;
+            return Number(fishPrice.currentPrice);
         } catch (error) {
             console.error("❌ Lỗi lấy giá cá:", error);
             return 0;
@@ -436,20 +437,14 @@ export class FishingService {
                 throw new Error(cooldownCheck.message || `Bạn cần đợi ${Math.ceil(cooldownCheck.remainingTime / 1000)} giây nữa để câu cá!`);
             }
 
-            // Kiểm tra số dư
-            const balance = await prisma.user.findUnique({
-                where: { userId_guildId: { userId, guildId } }
-            });
-
-            if (!balance || Number(balance.balance) < FISHING_COST) {
-                throw new Error(`Bạn cần ít nhất ${FISHING_COST} AniCoin để câu cá!`);
+            // Kiểm tra số dư FishCoin
+            const hasEnoughFishCoin = await fishCoinDB.hasEnoughFishCoin(userId, guildId, FISHING_COST);
+            if (!hasEnoughFishCoin) {
+                throw new Error(`Bạn cần ít nhất ${FISHING_COST} FishCoin để câu cá!`);
             }
 
-            // Trừ tiền câu cá
-            await prisma.user.update({
-                where: { userId_guildId: { userId, guildId } },
-                data: { balance: { decrement: FISHING_COST } }
-            });
+            // Trừ FishCoin câu cá
+            await fishCoinDB.subtractFishCoin(userId, guildId, FISHING_COST, 'Fishing cost');
 
             // Chọn cá ngẫu nhiên (Admin luôn câu được cá huyền thoại)
             const fish = isAdmin ? this.getAdminFish() : this.getRandomFish(fishingData);
@@ -552,8 +547,7 @@ export class FishingService {
 
             return {
                 fish,
-                value: fishValue,
-                newBalance: Number(balance.balance) - FISHING_COST + fishValue
+                value: fishValue
             };
         } catch (error) {
             console.error("Error fishing:", error);
@@ -571,12 +565,10 @@ export class FishingService {
                 throw new Error("Loại cần câu không hợp lệ!");
             }
 
-            const user = await prisma.user.findUnique({
-                where: { userId_guildId: { userId, guildId } }
-            });
-
-            if (!user || Number(user.balance) < rod.price) {
-                throw new Error(`Không đủ tiền! Cần ${rod.price} AniCoin`);
+            // Kiểm tra đủ FishCoin
+            const hasEnoughFishCoin = await fishCoinDB.hasEnoughFishCoin(userId, guildId, rod.price);
+            if (!hasEnoughFishCoin) {
+                throw new Error(`Không đủ FishCoin! Cần ${rod.price} FishCoin`);
             }
 
             const fishingData = await this.getFishingData(userId, guildId);
@@ -584,38 +576,34 @@ export class FishingService {
             // Kiểm tra đã có cần câu này chưa
             const existingRod = fishingData.rods.find((r: { rodType: string; durability: number; id: string }) => r.rodType === rodType);
             
-            // Trừ tiền và thêm/cộng dồn cần câu
-            await prisma.$transaction(async (tx: any) => {
-                await tx.user.update({
-                    where: { userId_guildId: { userId, guildId } },
-                    data: { balance: { decrement: rod.price } }
+            // Trừ FishCoin trước
+            await fishCoinDB.subtractFishCoin(userId, guildId, rod.price, `Buy fishing rod: ${rod.name}`);
+
+            // Thêm/cộng dồn cần câu
+            if (existingRod) {
+                // Nếu đã có cần câu này, cộng dồn độ bền
+                await prisma.fishingRod.update({
+                    where: { id: existingRod.id },
+                    data: { durability: { increment: rod.durability } }
+                });
+            } else {
+                // Nếu chưa có, tạo cần câu mới
+                await prisma.fishingRod.create({
+                    data: {
+                        fishingDataId: fishingData.id,
+                        rodType,
+                        durability: rod.durability
+                    }
                 });
 
-                if (existingRod) {
-                    // Nếu đã có cần câu này, cộng dồn độ bền
-                    await tx.fishingRod.update({
-                        where: { id: existingRod.id },
-                        data: { durability: { increment: rod.durability } }
+                // Tự động set làm cần câu hiện tại nếu chưa có cần câu nào
+                if (!fishingData.currentRod || fishingData.currentRod === "") {
+                    await prisma.fishingData.update({
+                        where: { id: fishingData.id },
+                        data: { currentRod: rodType }
                     });
-                } else {
-                    // Nếu chưa có, tạo cần câu mới
-                    await tx.fishingRod.create({
-                        data: {
-                            fishingDataId: fishingData.id,
-                            rodType,
-                            durability: rod.durability
-                        }
-                    });
-
-                    // Tự động set làm cần câu hiện tại nếu chưa có cần câu nào
-                    if (!fishingData.currentRod || fishingData.currentRod === "") {
-                        await tx.fishingData.update({
-                            where: { id: fishingData.id },
-                            data: { currentRod: rodType }
-                        });
-                    }
                 }
-            });
+            }
 
             return rod;
         } catch (error) {
@@ -635,48 +623,43 @@ export class FishingService {
             }
 
             const totalCost = bait.price * quantity;
-            const user = await prisma.user.findUnique({
-                where: { userId_guildId: { userId, guildId } }
-            });
-
-            if (!user || Number(user.balance) < totalCost) {
-                throw new Error(`Không đủ tiền! Cần ${totalCost} AniCoin`);
+            
+            // Kiểm tra đủ FishCoin
+            const hasEnoughFishCoin = await fishCoinDB.hasEnoughFishCoin(userId, guildId, totalCost);
+            if (!hasEnoughFishCoin) {
+                throw new Error(`Không đủ FishCoin! Cần ${totalCost} FishCoin`);
             }
 
             const fishingData = await this.getFishingData(userId, guildId);
 
-            // Trừ tiền và thêm mồi
-            await prisma.$transaction(async (tx: any) => {
-                await tx.user.update({
-                    where: { userId_guildId: { userId, guildId } },
-                    data: { balance: { decrement: totalCost } }
-                });
+            // Trừ FishCoin trước
+            await fishCoinDB.subtractFishCoin(userId, guildId, totalCost, `Buy fishing bait: ${bait.name} x${quantity}`);
 
-                await tx.fishingBait.upsert({
-                    where: {
-                        fishingDataId_baitType: {
-                            fishingDataId: fishingData.id,
-                            baitType
-                        }
-                    },
-                    update: {
-                        quantity: { increment: quantity }
-                    },
-                    create: {
+            // Thêm mồi
+            await prisma.fishingBait.upsert({
+                where: {
+                    fishingDataId_baitType: {
                         fishingDataId: fishingData.id,
-                        baitType,
-                        quantity
+                        baitType
                     }
-                });
-
-                // Tự động set làm mồi hiện tại nếu chưa có mồi nào
-                if (!fishingData.currentBait || fishingData.currentBait === "") {
-                    await tx.fishingData.update({
-                        where: { id: fishingData.id },
-                        data: { currentBait: baitType }
-                    });
+                },
+                update: {
+                    quantity: { increment: quantity }
+                },
+                create: {
+                    fishingDataId: fishingData.id,
+                    baitType,
+                    quantity
                 }
             });
+
+            // Tự động set làm mồi hiện tại nếu chưa có mồi nào
+            if (!fishingData.currentBait || fishingData.currentBait === "") {
+                await prisma.fishingData.update({
+                    where: { id: fishingData.id },
+                    data: { currentBait: baitType }
+                });
+            }
 
             return { bait, quantity, totalCost };
         } catch (error) {
@@ -761,24 +744,19 @@ export class FishingService {
             const currentPrice = await FishPriceService.getCurrentPrice(fishName);
             const totalValue = currentPrice * quantity;
 
-            // Cộng tiền và trừ cá
-            await prisma.$transaction(async (tx: any) => {
-                await tx.user.update({
-                    where: { userId_guildId: { userId, guildId } },
-                    data: { balance: { increment: BigInt(totalValue) } }
-                });
+            // Cộng FishCoin và trừ cá
+            await fishCoinDB.addFishCoin(userId, guildId, totalValue, `Sold fish: ${fishName} x${quantity}`);
 
-                if (caughtFish.quantity === quantity) {
-                    await tx.caughtFish.delete({
-                        where: { id: caughtFish.id }
-                    });
-                } else {
-                    await tx.caughtFish.update({
-                        where: { id: caughtFish.id },
-                        data: { quantity: { decrement: quantity } }
-                    });
-                }
-            });
+            if (caughtFish.quantity === quantity) {
+                await prisma.caughtFish.delete({
+                    where: { id: caughtFish.id }
+                });
+            } else {
+                await prisma.caughtFish.update({
+                    where: { id: caughtFish.id },
+                    data: { quantity: { decrement: quantity } }
+                });
+            }
 
             return { fishName, quantity, totalValue, currentPrice };
         } catch (error) {

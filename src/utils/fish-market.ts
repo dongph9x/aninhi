@@ -1,4 +1,5 @@
 import prisma from './prisma';
+import { fishCoinDB } from './fish-coin';
 
 export class FishMarketService {
   /**
@@ -197,16 +198,28 @@ export class FishMarketService {
       return { success: false, error: 'Bạn không thể mua cá của chính mình!' };
     }
 
-    // Kiểm tra số dư
+    // Kiểm tra số dư FishCoin
     const buyer = await prisma.user.findUnique({
       where: { userId_guildId: { userId, guildId } }
     });
 
-    if (!buyer || buyer.balance < listing.price) {
-      return { success: false, error: 'Không đủ tiền để mua cá này!' };
+    if (!buyer) {
+      return { success: false, error: 'Người dùng không tồn tại!' };
     }
 
-    // Thực hiện giao dịch
+    // Kiểm tra đủ FishCoin
+    const hasEnoughFishCoin = await fishCoinDB.hasEnoughFishCoin(userId, guildId, listing.price);
+    if (!hasEnoughFishCoin) {
+      return { success: false, error: `Không đủ FishCoin! Cần ${listing.price} FishCoin` };
+    }
+
+    // Trừ FishCoin người mua
+    await fishCoinDB.subtractFishCoin(userId, guildId, listing.price, `Buy fish from market: ${listing.fish.species}`);
+
+    // Cộng FishCoin người bán
+    await fishCoinDB.addFishCoin(listing.sellerId, guildId, listing.price, `Sold fish in market: ${listing.fish.species}`);
+
+    // Thực hiện giao dịch database
     await prisma.$transaction(async (tx) => {
       // Chuyển cá cho người mua
       await tx.fish.update({
@@ -214,21 +227,14 @@ export class FishMarketService {
         data: { userId, guildId }
       });
 
-      // Trừ tiền người mua
-      await tx.user.update({
-        where: { userId_guildId: { userId, guildId } },
-        data: { balance: { decrement: listing.price } }
-      });
-
-      // Cộng tiền người bán
-      await tx.user.update({
-        where: { userId_guildId: { userId: listing.sellerId, guildId } },
-        data: { balance: { increment: listing.price } }
-      });
-
       // Xóa listing
       await tx.fishMarket.delete({
         where: { id: listing.id }
+      });
+
+      // Xóa cá khỏi inventory của seller (nếu có)
+      await tx.fishInventoryItem.deleteMany({
+        where: { fishId }
       });
 
       // Thêm cá vào inventory của người mua
@@ -237,19 +243,12 @@ export class FishMarketService {
       });
 
       if (buyerInventory) {
-        // Kiểm tra xem cá đã có trong inventory chưa
-        const existingItem = await tx.fishInventoryItem.findUnique({
-          where: { fishId }
+        await tx.fishInventoryItem.create({
+          data: {
+            fishInventoryId: buyerInventory.id,
+            fishId
+          }
         });
-
-        if (!existingItem) {
-          await tx.fishInventoryItem.create({
-            data: {
-              fishInventoryId: buyerInventory.id,
-              fishId
-            }
-          });
-        }
       } else {
         // Tạo inventory mới nếu chưa có
         const newInventory = await tx.fishInventory.create({

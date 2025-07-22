@@ -1,4 +1,5 @@
 import prisma from './prisma';
+import { fishCoinDB } from './fish-coin';
 
 // Định nghĩa các thuộc tính di truyền cho đấu cá
 export interface FishStats {
@@ -16,6 +17,8 @@ export interface FishBreedingPair {
 }
 
 export class FishBreedingService {
+  private static readonly BREEDING_COST = 100000; // Chi phí lai tạo: 100,000 FishCoin
+
   /**
    * Lấy bộ sưu tập cá huyền thoại của user
    */
@@ -406,7 +409,7 @@ export class FishBreedingService {
   /**
    * Lai tạo cá với chọn bố mẹ thủ công
    */
-  static async breedFish(userId: string, fish1Id: string, fish2Id: string) {
+  static async breedFish(userId: string, fish1Id: string, fish2Id: string, isAdmin: boolean = false) {
     const fish1 = await prisma.fish.findFirst({ where: { id: fish1Id, userId } });
     const fish2 = await prisma.fish.findFirst({ where: { id: fish2Id, userId } });
     
@@ -415,6 +418,17 @@ export class FishBreedingService {
     if (fish1.status !== 'adult' || fish2.status !== 'adult') return { success: false, error: 'Chỉ cá trưởng thành mới được lai tạo!' };
     if (fish1Id === fish2Id) return { success: false, error: 'Không thể lai tạo cá với chính nó!' };
     if (fish1.generation !== fish2.generation) return { success: false, error: 'Chỉ cá cùng thế hệ mới được lai tạo với nhau!' };
+
+    // Kiểm tra chi phí lai tạo (trừ khi là admin)
+    if (!isAdmin) {
+      const hasEnoughFishCoin = await fishCoinDB.hasEnoughFishCoin(userId, fish1.guildId, this.BREEDING_COST);
+      if (!hasEnoughFishCoin) {
+        return { 
+          success: false, 
+          error: `Không đủ FishCoin để lai tạo! Cần ${this.BREEDING_COST.toLocaleString()} FishCoin` 
+        };
+      }
+    }
     
     // Lấy stats của bố mẹ
     const parent1Stats: FishStats = JSON.parse(fish1.stats || '{}');
@@ -452,6 +466,16 @@ export class FishBreedingService {
       }
     });
     
+    // Trừ FishCoin (trừ khi là admin)
+    if (!isAdmin) {
+      await fishCoinDB.subtractFishCoin(
+        userId, 
+        fish1.guildId, 
+        this.BREEDING_COST, 
+        `Breeding cost: ${fish1.species} + ${fish2.species} = ${offspringSpecies}`
+      );
+    }
+
     // Xóa cá bố mẹ sau khi lai tạo thành công
     await prisma.fish.delete({ where: { id: fish1Id } });
     await prisma.fish.delete({ where: { id: fish2Id } });
@@ -465,7 +489,7 @@ export class FishBreedingService {
         parent2Id: fish2Id,
         offspringId: offspring.id,
         success: true,
-        notes: `Lai tạo thành công: ${fish1.species} + ${fish2.species} = ${offspringSpecies}`
+        notes: `Lai tạo thành công: ${fish1.species} + ${fish2.species} = ${offspringSpecies} (Chi phí: ${this.BREEDING_COST.toLocaleString()} FishCoin)`
       }
     });
     
@@ -617,14 +641,13 @@ export class FishBreedingService {
       return { success: false, error: 'User not found!' };
     }
     
-    // Delete fish and update balance
+    // Delete fish and add FishCoin
     await prisma.fish.delete({ where: { id: fishId } });
     
-    const newBalance = user.balance + fish.value;
-    await prisma.user.update({
-      where: { userId_guildId: { userId, guildId: fish.guildId } },
-      data: { balance: newBalance }
-    });
+    // Thêm FishCoin thay vì AniCoin
+    await fishCoinDB.addFishCoin(userId, fish.guildId, fish.value, `Sold fish: ${fish.species}`);
+    
+    const newBalance = await fishCoinDB.getFishBalance(userId, fish.guildId);
     
     return {
       success: true,
@@ -678,30 +701,23 @@ export class FishBreedingService {
       return { success: false, error: 'You cannot buy your own fish!' };
     }
     
-    // Check if user has enough money
-    const user = await prisma.user.findUnique({
-      where: { userId_guildId: { userId, guildId: marketItem.guildId } }
-    });
-    
-    if (!user || user.balance < marketItem.price) {
-      return { success: false, error: 'Not enough money!' };
+    // Check if user has enough FishCoin
+    const hasEnoughFishCoin = await fishCoinDB.hasEnoughFishCoin(userId, marketItem.guildId, marketItem.price);
+    if (!hasEnoughFishCoin) {
+      return { success: false, error: `Not enough FishCoin! Need ${marketItem.price} FishCoin` };
     }
     
-    // Transfer fish and money
+    // Transfer fish and FishCoin
     await prisma.fish.update({
       where: { id: fishId },
       data: { userId, guildId: marketItem.guildId }
     });
     
-    await prisma.user.update({
-      where: { userId_guildId: { userId, guildId: marketItem.guildId } },
-      data: { balance: { decrement: marketItem.price } }
-    });
+    // Trừ FishCoin người mua
+    await fishCoinDB.subtractFishCoin(userId, marketItem.guildId, marketItem.price, `Buy fish from market: ${marketItem.fish.species}`);
     
-    await prisma.user.update({
-      where: { userId_guildId: { userId: marketItem.sellerId, guildId: marketItem.guildId } },
-      data: { balance: { increment: marketItem.price } }
-    });
+    // Cộng FishCoin người bán
+    await fishCoinDB.addFishCoin(marketItem.sellerId, marketItem.guildId, marketItem.price, `Sold fish in market: ${marketItem.fish.species}`);
     
     // Remove from market
     await prisma.fishMarket.delete({
@@ -720,5 +736,12 @@ export class FishBreedingService {
       },
       price: marketItem.price
     };
+  }
+
+  /**
+   * Lấy chi phí lai tạo
+   */
+  static getBreedingCost(): number {
+    return this.BREEDING_COST;
   }
 } 

@@ -1,6 +1,7 @@
 import prisma from './prisma';
 import { FishBreedingService } from './fish-breeding';
 import { BattleFishInventoryService } from './battle-fish-inventory';
+import { fishCoinDB } from './fish-coin';
 import type { FishStats } from './fish-breeding';
 
 export interface BattleResult {
@@ -27,6 +28,7 @@ export class FishBattleService {
   // Lưu trữ thời gian cooldown của mỗi user
   private static battleCooldowns = new Map<string, number>();
   private static readonly BATTLE_COOLDOWN = 60000; // 60 giây (1 phút)
+  private static readonly DAILY_BATTLE_LIMIT = 20; // Giới hạn 20 lần đấu cá mỗi ngày
 
   /**
    * Kiểm tra cooldown battle
@@ -57,6 +59,75 @@ export class FishBattleService {
   static updateBattleCooldown(userId: string, guildId: string) {
     const key = `${userId}_${guildId}`;
     this.battleCooldowns.set(key, Date.now());
+  }
+
+  /**
+   * Kiểm tra và reset daily battle count nếu cần
+   */
+  static async checkAndResetDailyBattleCount(userId: string, guildId: string): Promise<{ canBattle: boolean; remainingBattles: number; error?: string }> {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { userId_guildId: { userId, guildId } }
+      });
+
+      if (!user) {
+        return { canBattle: false, remainingBattles: 0, error: 'Không tìm thấy người dùng' };
+      }
+
+      const now = new Date();
+      const lastReset = new Date(user.lastBattleReset);
+      
+      // Kiểm tra xem có phải ngày mới không (so sánh ngày)
+      const isNewDay = now.getDate() !== lastReset.getDate() || 
+                      now.getMonth() !== lastReset.getMonth() || 
+                      now.getFullYear() !== lastReset.getFullYear();
+
+      if (isNewDay) {
+        // Reset daily battle count cho ngày mới
+        await prisma.user.update({
+          where: { userId_guildId: { userId, guildId } },
+          data: {
+            dailyBattleCount: 0,
+            lastBattleReset: now
+          }
+        });
+        
+        return { canBattle: true, remainingBattles: this.DAILY_BATTLE_LIMIT };
+      }
+
+      // Kiểm tra xem có vượt quá giới hạn không
+      if (user.dailyBattleCount >= this.DAILY_BATTLE_LIMIT) {
+        return { 
+          canBattle: false, 
+          remainingBattles: 0, 
+          error: `Bạn đã đạt giới hạn ${this.DAILY_BATTLE_LIMIT} lần đấu cá trong ngày! Vui lòng thử lại vào ngày mai.` 
+        };
+      }
+
+      const remainingBattles = this.DAILY_BATTLE_LIMIT - user.dailyBattleCount;
+      return { canBattle: true, remainingBattles };
+    } catch (error) {
+      console.error('Error checking daily battle count:', error);
+      return { canBattle: false, remainingBattles: 0, error: 'Đã xảy ra lỗi khi kiểm tra giới hạn đấu cá' };
+    }
+  }
+
+  /**
+   * Tăng daily battle count
+   */
+  static async incrementDailyBattleCount(userId: string, guildId: string): Promise<void> {
+    try {
+      await prisma.user.update({
+        where: { userId_guildId: { userId, guildId } },
+        data: {
+          dailyBattleCount: {
+            increment: 1
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error incrementing daily battle count:', error);
+    }
   }
 
   /**
@@ -140,17 +211,27 @@ export class FishBattleService {
       console.log(`  - fishId: ${fishId}`);
       console.log(`  - opponentId: ${opponentId}`);
 
-      // Kiểm tra cooldown (trừ khi là Administrator)
+      // Kiểm tra cooldown và daily battle limit (trừ khi là Administrator)
       const isAdmin = await this.isAdministrator(userId, guildId);
       console.log(`  - isAdmin: ${isAdmin}`);
       
       if (!isAdmin) {
+        // Kiểm tra cooldown
         const cooldownCheck = this.checkBattleCooldown(userId, guildId);
         if (!cooldownCheck.canBattle) {
           const remainingSeconds = Math.ceil((cooldownCheck.remainingTime || 0) / 1000);
           return { 
             success: false, 
             error: `⏰ Bạn cần chờ ${remainingSeconds} giây nữa mới có thể đấu!` 
+          };
+        }
+
+        // Kiểm tra daily battle limit
+        const dailyLimitCheck = await this.checkAndResetDailyBattleCount(userId, guildId);
+        if (!dailyLimitCheck.canBattle) {
+          return { 
+            success: false, 
+            error: dailyLimitCheck.error || 'Đã đạt giới hạn đấu cá trong ngày!' 
           };
         }
       }
@@ -524,20 +605,14 @@ export class FishBattleService {
       battleLog.push(`💥 Bonus critical: +20% phần thưởng!`);
     }
     
-    battleLog.push(`💰 Phần thưởng người thắng: ${winnerReward.toLocaleString()} coins`);
-    battleLog.push(`💰 Phần thưởng người thua: ${loserReward.toLocaleString()} coins`);
+    battleLog.push(`🐟 Phần thưởng người thắng: ${winnerReward.toLocaleString()} FishCoin`);
+    battleLog.push(`🐟 Phần thưởng người thua: ${loserReward.toLocaleString()} FishCoin`);
 
-    // Cập nhật balance
+    // Cập nhật FishCoin balance
     if (isUserWinner) {
-      await prisma.user.update({
-        where: { userId_guildId: { userId, guildId } },
-        data: { balance: { increment: winnerReward } }
-      });
+      await fishCoinDB.addFishCoin(userId, guildId, winnerReward, `Battle victory reward: ${winner.species} vs ${loser.species}`);
     } else {
-      await prisma.user.update({
-        where: { userId_guildId: { userId, guildId } },
-        data: { balance: { increment: loserReward } }
-      });
+      await fishCoinDB.addFishCoin(userId, guildId, loserReward, `Battle defeat reward: ${loser.species} vs ${winner.species}`);
     }
 
     // Ghi lại lịch sử đấu
@@ -556,9 +631,10 @@ export class FishBattleService {
       }
     });
 
-    // Cập nhật cooldown (trừ khi là Administrator)
+    // Cập nhật cooldown và daily battle count (trừ khi là Administrator)
     if (!isAdmin) {
       this.updateBattleCooldown(userId, guildId);
+      await this.incrementDailyBattleCount(userId, guildId);
     }
 
     return {
@@ -598,7 +674,7 @@ export class FishBattleService {
     const wins = battles.filter(b => b.userWon).length;
     const losses = totalBattles - wins;
     const winRate = totalBattles > 0 ? (wins / totalBattles) * 100 : 0;
-    const totalEarnings = battles.reduce((sum, b) => sum + b.reward, 0);
+    const totalEarnings = battles.reduce((sum, b) => sum + Number(b.reward), 0);
 
     return {
       totalBattles,

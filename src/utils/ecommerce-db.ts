@@ -318,26 +318,32 @@ export class EcommerceService {
      */
     static async resetBalance(userId: string, guildId: string) {
         try {
-            const user = await prisma.user.update({
+            const user = await prisma.user.upsert({
                 where: {
                     userId_guildId: {
                         userId,
                         guildId
                     }
                 },
-                data: {
-                    balance: 0n
+                update: {
+                    balance: 0n,
+                    fishBalance: 0n,
+                    dailyStreak: 0
+                },
+                create: {
+                    userId,
+                    guildId,
+                    balance: 0n,
+                    fishBalance: 0n,
+                    dailyStreak: 0
                 }
             });
 
-            // Ghi lại giao dịch
-            await prisma.transaction.create({
-                data: {
+            // Xóa tất cả daily claims cũ
+            await prisma.dailyClaim.deleteMany({
+                where: {
                     userId,
-                    guildId,
-                    amount: -user.balance,
-                    type: "reset",
-                    description: "Balance reset"
+                    guildId
                 }
             });
 
@@ -361,7 +367,10 @@ export class EcommerceService {
             const user = await this.getUser(userId, guildId);
             const baseAmount = 1000n;
             const streakBonus = BigInt(Math.min(user.dailyStreak * 100, 1000));
-            const totalAmount = baseAmount + streakBonus;
+            const totalAniAmount = baseAmount + streakBonus;
+            
+            // Thêm FishCoin với số lượng tương tự
+            const totalFishAmount = totalAniAmount;
 
             // Cập nhật user và ghi lại daily claim
             const result = await prisma.$transaction(async (tx: any) => {
@@ -373,7 +382,8 @@ export class EcommerceService {
                         }
                     },
                     data: {
-                        balance: { increment: totalAmount },
+                        balance: { increment: totalAniAmount },
+                        fishBalance: { increment: totalFishAmount },
                         dailyStreak: { increment: 1 }
                     }
                 });
@@ -385,13 +395,25 @@ export class EcommerceService {
                     }
                 });
 
+                // Ghi lại transaction AniCoin
                 await tx.transaction.create({
                     data: {
                         userId,
                         guildId,
-                        amount: totalAmount,
+                        amount: totalAniAmount,
                         type: "daily",
                         description: `Daily reward (streak: ${user.dailyStreak + 1})`
+                    }
+                });
+
+                // Ghi lại transaction FishCoin
+                await tx.fishTransaction.create({
+                    data: {
+                        userId,
+                        guildId,
+                        amount: totalFishAmount,
+                        type: "daily",
+                        description: `Daily reward FishCoin (streak: ${user.dailyStreak + 1})`
                     }
                 });
 
@@ -400,7 +422,8 @@ export class EcommerceService {
 
             return {
                 success: true,
-                amount: totalAmount,
+                aniAmount: totalAniAmount,
+                fishAmount: totalFishAmount,
                 newStreak: user.dailyStreak + 1
             };
         } catch (error) {

@@ -2,6 +2,7 @@ import { ButtonInteraction, StringSelectMenuInteraction, EmbedBuilder, ActionRow
 import { FishBreedingService } from '../../utils/fish-breeding';
 import { FishInventoryService } from '../../utils/fish-inventory';
 import { FishBarnUI } from './FishBarnUI';
+import { FishFeedService } from '../../utils/fish-feed';
 
 export class FishBarnHandler {
   // Lưu trữ cá được chọn cho mỗi user
@@ -37,6 +38,9 @@ export class FishBarnHandler {
         }
       }
     }
+
+    // Lấy thông tin daily feed limit
+    const dailyFeedInfo = await FishFeedService.checkAndResetDailyFeedCount(userId, guildId);
     
     const ui = new FishBarnUI(
       inventory, 
@@ -46,7 +50,8 @@ export class FishBarnHandler {
       selectedFoodType,
       breedingMode,
       selectedParent1Id,
-      selectedParent2Id
+      selectedParent2Id,
+      dailyFeedInfo
     );
     
     // Load user fish food
@@ -167,12 +172,28 @@ export class FishBarnHandler {
     // Kiểm tra quyền admin
     const { FishBattleService } = await import('@/utils/fish-battle');
     const isAdmin = await FishBattleService.isAdministrator(userId, guildId);
+
+    // Kiểm tra daily feed limit (trừ khi là admin)
+    if (!isAdmin) {
+      const dailyFeedCheck = await FishFeedService.checkAndResetDailyFeedCount(userId, guildId);
+      if (!dailyFeedCheck.canFeed) {
+        return interaction.reply({ 
+          content: `❌ ${dailyFeedCheck.error}`, 
+          ephemeral: true 
+        });
+      }
+    }
     
     // Cho cá ăn với thức ăn
     const result = await FishBreedingService.feedFishWithFood(userId, selectedFishId, selectedFoodType as any, isAdmin);
     
     if (!result.success) {
       return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });
+    }
+
+    // Tăng daily feed count (trừ khi là admin)
+    if (!isAdmin) {
+      await FishFeedService.incrementDailyFeedCount(userId, guildId);
     }
 
     // Cập nhật inventory
@@ -250,7 +271,7 @@ export class FishBarnHandler {
       .setColor('#FFD700')
       .addFields(
         { name: '🐟 Cá đã bán', value: result.fish?.name || 'Unknown', inline: true },
-        { name: '💰 Số tiền nhận', value: (result.coinsEarned || 0).toLocaleString(), inline: true },
+        { name: '🐟 Số tiền nhận', value: (result.coinsEarned || 0).toLocaleString(), inline: true },
         { name: '💳 Số dư mới', value: (result.newBalance || 0).toLocaleString(), inline: true }
       );
 
@@ -455,7 +476,11 @@ export class FishBarnHandler {
       });
     }
 
-    const result = await FishBreedingService.breedFish(userId, breedingData.selectedParent1Id, breedingData.selectedParent2Id);
+    // Kiểm tra quyền admin
+    const { FishBattleService } = await import('@/utils/fish-battle');
+    const isAdmin = await FishBattleService.isAdministrator(userId, guildId);
+
+    const result = await FishBreedingService.breedFish(userId, breedingData.selectedParent1Id, breedingData.selectedParent2Id, isAdmin);
     
     if (!result.success) {
       return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });
@@ -473,6 +498,7 @@ export class FishBarnHandler {
     const updatedInventory = await FishInventoryService.getFishInventory(userId, guildId);
     
     // Tạo embed thông báo
+    const breedingCost = FishBreedingService.getBreedingCost();
     const embed = new EmbedBuilder()
       .setTitle('❤️ Lai Tạo Thành Công!')
       .setColor('#FF69B4')
@@ -484,6 +510,21 @@ export class FishBarnHandler {
         { name: '🏷️ Thế hệ', value: (result.offspring?.generation || 0).toString(), inline: true },
         { name: '💪 Tổng sức mạnh', value: result.offspring ? FishBreedingService.calculateTotalPower(result.offspring).toString() : '0', inline: true }
       );
+
+    // Hiển thị chi phí lai tạo
+    if (!isAdmin) {
+      embed.addFields({
+        name: '💸 Chi Phí Lai Tạo',
+        value: `${breedingCost.toLocaleString()} FishCoin`,
+        inline: true
+      });
+    } else {
+      embed.addFields({
+        name: '👑 Admin Privilege',
+        value: 'Miễn phí lai tạo',
+        inline: true
+      });
+    }
 
     if (result.offspring?.stats) {
       embed.addFields({
