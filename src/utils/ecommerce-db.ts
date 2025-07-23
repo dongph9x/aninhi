@@ -231,8 +231,9 @@ export class EcommerceService {
             }
 
             const user = await this.getUser(userId, guildId);
-            const baseAmount = 1000n;
-            const streakBonus = BigInt(Math.min(user.dailyStreak * 100, 1000));
+            const baseAmount = 2000n;
+            const newStreak = user.dailyStreak + 1;
+            const streakBonus = BigInt(Math.min(newStreak * 100, 1000));
             const totalAmount = baseAmount + streakBonus;
 
             // Cập nhật user và ghi lại daily claim
@@ -365,8 +366,9 @@ export class EcommerceService {
             }
 
             const user = await this.getUser(userId, guildId);
-            const baseAmount = 1000n;
-            const streakBonus = BigInt(Math.min(user.dailyStreak * 100, 1000));
+            const baseAmount = 2000n;
+            const newStreak = user.dailyStreak + 1;
+            const streakBonus = BigInt(Math.min(newStreak * 100, 1000));
             const totalAniAmount = baseAmount + streakBonus;
             
             // Thêm FishCoin với số lượng tương tự
@@ -459,7 +461,7 @@ export class EcommerceService {
      */
     static async getSettings() {
         return {
-            dailyBaseAmount: 1000,
+            dailyBaseAmount: 2000,
             dailyStreakBonus: 100,
             maxStreakBonus: 1000,
             dailyCooldownHours: 24

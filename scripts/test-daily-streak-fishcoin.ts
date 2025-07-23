@@ -52,7 +52,7 @@ async function testDailyStreakWithFishCoin() {
             console.log(`   Current FishCoin: ${user.fishBalance}`);
 
             // Calculate expected rewards
-            const baseAmount = 1000;
+            const baseAmount = 2000;
             const streakBonus = Math.min(user.dailyStreak * 100, 1000);
             const expectedAni = baseAmount + streakBonus;
             const expectedFish = expectedAni;

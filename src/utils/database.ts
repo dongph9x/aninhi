@@ -59,7 +59,7 @@ export class DatabaseService {
   // Khởi tạo cài đặt mặc định
   private async initializeDefaultSettings(): Promise<void> {
     const defaultSettings = [
-      { key: 'dailyBaseAmount', value: '1000', description: 'Số tiền cơ bản mỗi ngày' },
+      { key: 'dailyBaseAmount', value: '2000', description: 'Số tiền cơ bản mỗi ngày' },
       { key: 'dailyStreakBonus', value: '100', description: 'Tiền thưởng streak mỗi ngày' },
       { key: 'maxStreakBonus', value: '1000', description: 'Tiền thưởng streak tối đa' },
       { key: 'dailyCooldownHours', value: '24', description: 'Thời gian chờ daily (giờ)' },

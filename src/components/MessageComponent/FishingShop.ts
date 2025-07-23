@@ -112,7 +112,7 @@ async function showRodShop(interaction: any) {
     Object.entries(FISHING_RODS).forEach(([key, rod]) => {
         embed.addFields({
             name: `${rod.emoji} ${rod.name}`,
-            value: `Giá: ${rod.price}₳ | Độ bền: ${rod.durability} | Bonus: +${rod.rarityBonus}%`,
+            value: `Giá: ${rod.price}🐟 | Độ bền: ${rod.durability} | Bonus: +${rod.rarityBonus}%`,
             inline: true
         });
     });
@@ -125,7 +125,7 @@ async function showRodShop(interaction: any) {
                 .addOptions(
                     Object.entries(FISHING_RODS).map(([key, rod]) => 
                         new StringSelectMenuOptionBuilder()
-                            .setLabel(`${rod.name} - ${rod.price}₳`)
+                            .setLabel(`${rod.name} - ${rod.price}🐟`)
                             .setDescription(`Độ bền: ${rod.durability} | Bonus: +${rod.rarityBonus}%`)
                             .setValue(key)
                             .setEmoji(rod.emoji)
@@ -208,7 +208,7 @@ async function showFoodShop(interaction: any) {
     Object.entries(FISH_FOOD_TYPES).forEach(([key, food]) => {
         embed.addFields({
             name: `${food.emoji} ${food.name}`,
-            value: `Giá: ${food.price.toLocaleString()}₳ | Exp: +${food.expBonus} | ${food.description}`,
+            value: `Giá: ${food.price.toLocaleString()}🐟 | Exp: +${food.expBonus} | ${food.description}`,
             inline: false
         });
     });
@@ -221,7 +221,7 @@ async function showFoodShop(interaction: any) {
                 .addOptions(
                     Object.entries(FISH_FOOD_TYPES).map(([key, food]) => 
                         new StringSelectMenuOptionBuilder()
-                            .setLabel(`${food.name} - ${food.price.toLocaleString()}₳`)
+                            .setLabel(`${food.name} - ${food.price.toLocaleString()}🐟`)
                             .setDescription(`Exp: +${food.expBonus} | ${food.description}`)
                             .setValue(key)
                             .setEmoji(food.emoji)

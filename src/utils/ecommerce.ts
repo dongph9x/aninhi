@@ -74,7 +74,7 @@ class EcommerceManager {
                 transactions: [],
                 dailyClaims: {},
                 settings: {
-                    dailyBaseAmount: 1000,
+                    dailyBaseAmount: 2000,
                     dailyStreakBonus: 100,
                     maxStreakBonus: 1000,
                     dailyCooldownHours: 24,
@@ -94,7 +94,7 @@ class EcommerceManager {
                 transactions: [],
                 dailyClaims: {},
                 settings: {
-                    dailyBaseAmount: 1000,
+                    dailyBaseAmount: 2000,
                     dailyStreakBonus: 100,
                     maxStreakBonus: 1000,
                     dailyCooldownHours: 24,
