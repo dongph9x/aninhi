@@ -162,22 +162,10 @@ async function fishWithAnimation(message: Message) {
             baitName = BAITS[fishingData.currentBait]?.name || "Không xác định";
         }
 
-        // Bắt đầu animation câu cá
-        const fishingEmbed = new EmbedBuilder()
-            .setTitle("🎣 Đang Câu Cá...")
-            .setDescription(
-                `**${message.author.username}** đang câu cá...\n\n` +
-                `🎣 **Cần câu:** ${rodName}\n` +
-                `🪱 **Mồi:** ${baitName}\n\n` +
-                `⏳ Đang chờ cá cắn câu...`
-            )
-            .setColor("#0099ff")
-            .setThumbnail(message.author.displayAvatarURL())
-            .setTimestamp();
-
-        const fishingMsg = await message.reply({ embeds: [fishingEmbed] });
-
-        // Animation 3 giây với các bước khác nhau
+        // Tối ưu: Load GIF một lần và tái sử dụng
+        const fishingGifUrl = "https://cdn.discordapp.com/attachments/1396335030216822875/1397399341475430411/fish-shark.gif?ex=6881950d&is=6880438d&hm=60523d4d9a24ab5f45a42e6fd1c8dddf28680e015cadf0e5fce617e12599f552&";
+        
+        // Animation 3 giây với các bước khác nhau (chỉ text thay đổi, GIF giữ nguyên)
         const animationSteps = [
             "🎣 Đang thả mồi...",
             "🌊 Đang chờ cá cắn câu...",
@@ -185,27 +173,41 @@ async function fishWithAnimation(message: Message) {
             "🎣 Đang kéo cá lên..."
         ];
 
-        for (let i = 0; i < animationSteps.length; i++) {
+        // Bắt đầu animation câu cá với GIF ngay từ đầu
+        const fishingEmbed = new EmbedBuilder()
+            .setTitle("🎣 Đang Câu Cá...")
+            .setDescription(
+                `**${message.author.username}** đang câu cá...\n\n` +
+                `🎣 **Cần câu:** ${rodName}\n` +
+                `🪱 **Mồi:** ${baitName}\n\n` +
+                `⏳ ${animationSteps[0]}`
+            )
+            .setColor("#0099ff")
+            .setThumbnail(message.author.displayAvatarURL())
+            .setImage(fishingGifUrl) // GIF xuất hiện ngay từ đầu
+            .setTimestamp();
+
+        const fishingMsg = await message.reply({ embeds: [fishingEmbed] });
+
+        // Cập nhật các bước tiếp theo (chỉ thay đổi description, không động đến image để tránh nháy GIF)
+        for (let i = 1; i < animationSteps.length; i++) {
             await new Promise(resolve => setTimeout(resolve, 750)); // 750ms mỗi bước = 3 giây tổng
             
-            const updatedEmbed = new EmbedBuilder()
-                .setTitle("🎣 Đang Câu Cá...")
+            // Tạo embed mới từ embed hiện tại, chỉ thay đổi description
+            const updatedEmbed = EmbedBuilder.from(fishingMsg.embeds[0])
                 .setDescription(
                     `**${message.author.username}** đang câu cá...\n\n` +
                     `🎣 **Cần câu:** ${rodName}\n` +
                     `🪱 **Mồi:** ${baitName}\n\n` +
                     `⏳ ${animationSteps[i]}`
-                )
-                .setColor("#0099ff")
-                .setThumbnail(message.author.displayAvatarURL())
-                .setTimestamp();
-
+                );
+            
             await fishingMsg.edit({ embeds: [updatedEmbed] });
         }
 
         // Thực hiện câu cá
         const result = await FishingService.fish(userId, guildId, isAdmin);
-        const { fish, value, newBalance } = result;
+        const { fish, value } = result;
 
         // Tự động thêm cá huyền thoại vào fish inventory
         let fishInventoryMessage = '';
