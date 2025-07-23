@@ -42,6 +42,10 @@ export class FishBarnHandler {
     // Lấy thông tin daily feed limit
     const dailyFeedInfo = await FishFeedService.checkAndResetDailyFeedCount(userId, guildId);
     
+    // Kiểm tra quyền admin
+    const { FishBattleService } = await import('@/utils/fish-battle');
+    const isAdmin = await FishBattleService.isAdministrator(userId, guildId);
+    
     const ui = new FishBarnUI(
       inventory, 
       userId, 
@@ -51,7 +55,8 @@ export class FishBarnHandler {
       breedingMode,
       selectedParent1Id,
       selectedParent2Id,
-      dailyFeedInfo
+      dailyFeedInfo,
+      isAdmin
     );
     
     // Load user fish food
@@ -173,7 +178,7 @@ export class FishBarnHandler {
     const { FishBattleService } = await import('@/utils/fish-battle');
     const isAdmin = await FishBattleService.isAdministrator(userId, guildId, interaction.client);
 
-    // Kiểm tra daily feed limit (admin cũng bị kiểm tra để test)
+    // Kiểm tra daily feed limit
     const dailyFeedCheck = await FishFeedService.checkAndResetDailyFeedCount(userId, guildId);
     if (!dailyFeedCheck.canFeed) {
       return interaction.reply({ 
@@ -189,7 +194,7 @@ export class FishBarnHandler {
       return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });
     }
 
-    // Tăng daily feed count (admin cũng bị tăng để test)
+    // Tăng daily feed count
     await FishFeedService.incrementDailyFeedCount(userId, guildId);
 
     // Cập nhật inventory
@@ -276,6 +281,14 @@ export class FishBarnHandler {
 
     // Cập nhật UI
     const breedingData = this.breedingModeMap.get(userId);
+    
+    // Lấy thông tin daily feed limit
+    const dailyFeedInfo = await FishFeedService.checkAndResetDailyFeedCount(userId, guildId);
+    
+    // Kiểm tra quyền admin
+    const { FishBattleService } = await import('@/utils/fish-battle');
+    const isAdmin = await FishBattleService.isAdministrator(userId, guildId);
+    
     const ui = new FishBarnUI(
       updatedInventory, 
       userId, 
@@ -284,7 +297,9 @@ export class FishBarnHandler {
       undefined,
       breedingData?.breedingMode || false,
       breedingData?.selectedParent1Id,
-      breedingData?.selectedParent2Id
+      breedingData?.selectedParent2Id,
+      dailyFeedInfo,
+      isAdmin
     );
     const newEmbed = await ui.createEmbed();
     const newComponents = ui.createComponents();

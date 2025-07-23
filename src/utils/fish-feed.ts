@@ -37,7 +37,17 @@ export class FishFeedService {
         return { canFeed: true, remainingFeeds: this.DAILY_FEED_LIMIT };
       }
 
-      // Kiểm tra xem có vượt quá giới hạn không
+      // Kiểm tra quyền admin
+      const { FishBattleService } = await import('./fish-battle');
+      const isAdmin = await FishBattleService.isAdministrator(userId, guildId);
+      
+      // Admin luôn có thể cho cá ăn, không bị giới hạn
+      if (isAdmin) {
+        const remainingFeeds = Math.max(0, this.DAILY_FEED_LIMIT - user.dailyFeedCount);
+        return { canFeed: true, remainingFeeds };
+      }
+
+      // Kiểm tra xem có vượt quá giới hạn không (chỉ cho user thường)
       if (user.dailyFeedCount >= this.DAILY_FEED_LIMIT) {
         return { 
           canFeed: false, 

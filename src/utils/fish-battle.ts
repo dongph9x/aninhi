@@ -95,7 +95,16 @@ export class FishBattleService {
         return { canBattle: true, remainingBattles: this.DAILY_BATTLE_LIMIT };
       }
 
-      // Kiểm tra xem có vượt quá giới hạn không
+      // Kiểm tra quyền admin
+      const isAdmin = await this.isAdministrator(userId, guildId);
+      
+      // Admin luôn có thể đấu, không bị giới hạn
+      if (isAdmin) {
+        const remainingBattles = Math.max(0, this.DAILY_BATTLE_LIMIT - user.dailyBattleCount);
+        return { canBattle: true, remainingBattles };
+      }
+
+      // Kiểm tra xem có vượt quá giới hạn không (chỉ cho user thường)
       if (user.dailyBattleCount >= this.DAILY_BATTLE_LIMIT) {
         return { 
           canBattle: false, 
@@ -655,11 +664,9 @@ export class FishBattleService {
       }
     });
 
-    // Cập nhật cooldown và daily battle count (trừ khi là Administrator)
-    if (!isAdmin) {
-      this.updateBattleCooldown(userId, guildId);
-      await this.incrementDailyBattleCount(userId, guildId);
-    }
+    // Cập nhật cooldown và daily battle count
+    this.updateBattleCooldown(userId, guildId);
+    await this.incrementDailyBattleCount(userId, guildId);
 
     return {
       winner: {

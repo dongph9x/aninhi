@@ -13,8 +13,9 @@ export class FishBarnUI {
   private selectedParent2Id?: string;
   private userFishFood: any[] = [];
   private dailyFeedInfo?: { canFeed: boolean; remainingFeeds: number; error?: string };
+  private isAdmin?: boolean;
 
-  constructor(inventory: any, userId: string, guildId: string, selectedFishId?: string, selectedFoodType?: string, breedingMode: boolean = false, selectedParent1Id?: string, selectedParent2Id?: string, dailyFeedInfo?: { canFeed: boolean; remainingFeeds: number; error?: string }) {
+  constructor(inventory: any, userId: string, guildId: string, selectedFishId?: string, selectedFoodType?: string, breedingMode: boolean = false, selectedParent1Id?: string, selectedParent2Id?: string, dailyFeedInfo?: { canFeed: boolean; remainingFeeds: number; error?: string }, isAdmin?: boolean) {
     this.inventory = inventory;
     this.userId = userId;
     this.guildId = guildId;
@@ -24,6 +25,7 @@ export class FishBarnUI {
     this.selectedParent1Id = selectedParent1Id;
     this.selectedParent2Id = selectedParent2Id;
     this.dailyFeedInfo = dailyFeedInfo;
+    this.isAdmin = isAdmin;
   }
 
   async loadUserFishFood() {
@@ -40,7 +42,14 @@ export class FishBarnUI {
 
     // Thông tin daily feed limit
     if (this.dailyFeedInfo) {
-      if (this.dailyFeedInfo.canFeed) {
+      if (this.isAdmin) {
+        // Admin hiển thị thông tin đặc biệt
+        embed.addFields({
+          name: '🍽️ Giới Hạn Cho Cá Ăn Hôm Nay (👑 Admin)',
+          value: `✅ Còn **${this.dailyFeedInfo.remainingFeeds}/20** lần cho cá ăn\n👑 **Không bị giới hạn - có thể cho cá ăn vô hạn**`,
+          inline: true
+        });
+      } else if (this.dailyFeedInfo.canFeed) {
         embed.addFields({
           name: '🍽️ Giới Hạn Cho Cá Ăn Hôm Nay',
           value: `✅ Còn **${this.dailyFeedInfo.remainingFeeds}/20** lần cho cá ăn`,

@@ -267,6 +267,12 @@ export class BattleFishHandler {
         messageData.currentOpponent = opponentResult.opponent;
         messageData.currentUserFish = selectedFish;
 
+        // Lấy thông tin daily battle limit
+        const dailyLimitCheck = await FishBattleService.checkAndResetDailyBattleCount(
+            messageData.userId, 
+            messageData.guildId
+        );
+
         // Tạo embed thông tin trước khi đấu
         const stats = selectedFish.stats || {};
         const opponentStats = opponentResult.opponent?.stats || {};
@@ -281,7 +287,8 @@ export class BattleFishHandler {
                 { name: '🐟 Đối thủ', value: `${opponentResult.opponent.name} (Lv.${opponentResult.opponent.level})`, inline: true },
                 { name: '💪 Sức mạnh', value: `${userPower} vs ${opponentPower}`, inline: true },
                 { name: '📊 Stats của bạn', value: `💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}`, inline: false },
-                { name: '📊 Stats đối thủ', value: `💪${opponentStats.strength || 0} 🏃${opponentStats.agility || 0} 🧠${opponentStats.intelligence || 0} 🛡️${opponentStats.defense || 0} 🍀${opponentStats.luck || 0}`, inline: false }
+                { name: '📊 Stats đối thủ', value: `💪${opponentStats.strength || 0} 🏃${opponentStats.agility || 0} 🧠${opponentStats.intelligence || 0} 🛡️${opponentStats.defense || 0} 🍀${opponentStats.luck || 0}`, inline: false },
+                { name: '⏰ Giới Hạn Đấu Cá Hôm Nay', value: `✅ Còn **${dailyLimitCheck.remainingBattles}/20** lần đấu cá`, inline: true }
             )
             .setDescription('React với ⚔️ để bắt đầu đấu!')
             .setTimestamp();
@@ -492,6 +499,15 @@ export class BattleFishHandler {
         const isUserWinner = result.winner.id === selectedFish.id;
         const reward = isUserWinner ? result.rewards.winner : result.rewards.loser;
 
+        // Lấy thông tin daily battle limit mới sau khi đấu
+        const updatedDailyLimitCheck = await FishBattleService.checkAndResetDailyBattleCount(
+            messageData.userId, 
+            messageData.guildId
+        );
+
+        // Kiểm tra quyền admin
+        const isAdmin = await FishBattleService.isAdministrator(messageData.userId, messageData.guildId);
+
         // Hiển thị kết quả
         const battleEmbed = new EmbedBuilder()
             .setTitle(isUserWinner ? '🏆 Chiến Thắng!' : '💀 Thất Bại!')
@@ -500,7 +516,14 @@ export class BattleFishHandler {
                 { name: '🐟 Người thắng', value: result.winner.name, inline: true },
                 { name: '🐟 Người thua', value: result.loser.name, inline: true },
                 { name: '🐟 Phần thưởng', value: `${reward.toLocaleString()} FishCoin`, inline: true },
-                { name: '💪 Sức mạnh', value: `${result.winnerPower} vs ${result.loserPower}`, inline: true }
+                { name: '💪 Sức mạnh', value: `${result.winnerPower} vs ${result.loserPower}`, inline: true },
+                { 
+                    name: isAdmin ? '⏰ Giới Hạn Đấu Cá Hôm Nay (👑 Admin)' : '⏰ Giới Hạn Đấu Cá Hôm Nay', 
+                    value: isAdmin 
+                        ? `✅ Còn **${updatedDailyLimitCheck.remainingBattles}/20** lần đấu cá\n👑 **Không bị giới hạn - có thể đấu vô hạn**`
+                        : `✅ Còn **${updatedDailyLimitCheck.remainingBattles}/20** lần đấu cá`, 
+                    inline: true 
+                }
             )
             .setDescription(result.battleLog.join('\n'))
             .setTimestamp();
@@ -534,15 +557,32 @@ export class BattleFishHandler {
             messageData.userId, 
             messageData.guildId
         );
+        
+        // Cập nhật daily battle info
+        messageData.dailyBattleInfo = await FishBattleService.checkAndResetDailyBattleCount(
+            messageData.userId, 
+            messageData.guildId
+        );
     }
 
     private static async refreshUI(interaction: ButtonInteraction | StringSelectMenuInteraction, messageData: any) {
+        // Sử dụng daily battle info từ messageData nếu có, nếu không thì lấy mới
+        const dailyBattleInfo = messageData.dailyBattleInfo || await FishBattleService.checkAndResetDailyBattleCount(
+            messageData.userId, 
+            messageData.guildId
+        );
+        
+        // Kiểm tra quyền admin
+        const isAdmin = await FishBattleService.isAdministrator(messageData.userId, messageData.guildId);
+        
         const ui = new BattleFishUI(
             messageData.inventory,
             messageData.eligibleFish,
             messageData.userId,
             messageData.guildId,
-            messageData.selectedFishId
+            messageData.selectedFishId,
+            dailyBattleInfo,
+            isAdmin
         );
 
         const embed = ui.createEmbed();

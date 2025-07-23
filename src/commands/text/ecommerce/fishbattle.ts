@@ -57,8 +57,11 @@ async function showBattleUI(message: any, userId: string, guildId: string) {
         const eligibleFish = await BattleFishInventoryService.getEligibleBattleFish(userId, guildId);
         const dailyBattleInfo = await FishBattleService.checkAndResetDailyBattleCount(userId, guildId);
 
+        // Kiểm tra quyền admin
+        const isAdmin = await FishBattleService.isAdministrator(userId, guildId);
+        
         // Tạo UI
-        const ui = new BattleFishUI(inventory, eligibleFish, userId, guildId, undefined, dailyBattleInfo);
+        const ui = new BattleFishUI(inventory, eligibleFish, userId, guildId, undefined, dailyBattleInfo, isAdmin);
         const embed = ui.createEmbed();
         const components = ui.createComponents();
 
@@ -74,7 +77,8 @@ async function showBattleUI(message: any, userId: string, guildId: string) {
             guildId,
             inventory,
             eligibleFish,
-            selectedFishId: undefined
+            selectedFishId: undefined,
+            dailyBattleInfo
         });
 
     } catch (error) {
@@ -108,7 +112,7 @@ async function addFishToBattleInventory(message: any, userId: string, guildId: s
     const fishId = args[0];
     const result = await BattleFishInventoryService.addFishToBattleInventory(userId, guildId, fishId);
 
-    if (result.success) {
+    if (result.success && result.inventoryItem) {
         const embed = new EmbedBuilder()
             .setTitle('✅ Đã thêm cá vào túi đấu!')
             .setColor('#00FF00')
@@ -124,7 +128,7 @@ async function addFishToBattleInventory(message: any, userId: string, guildId: s
         const embed = new EmbedBuilder()
             .setTitle('❌ Không thể thêm cá!')
             .setColor('#FF0000')
-            .setDescription(result.error)
+            .setDescription(result.error || 'Không thể thêm cá vào túi đấu')
             .setTimestamp();
 
         return message.reply({ embeds: [embed] });
@@ -230,11 +234,22 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
         return message.reply({ embeds: [embed] });
     }
 
+    // Kiểm tra opponent có tồn tại không
+    if (!opponentResult.opponent) {
+        const embed = new EmbedBuilder()
+            .setTitle('❌ Lỗi tìm đối thủ!')
+            .setColor('#FF0000')
+            .setDescription('Không thể tìm thấy thông tin đối thủ!')
+            .setTimestamp();
+
+        return message.reply({ embeds: [embed] });
+    }
+
     // Hiển thị thông tin trước khi đấu
     const stats = selectedFish.stats || {};
-    const opponentStats = opponentResult.opponent?.stats || {};
+    const opponentStats = opponentResult.opponent.stats || {};
     const userPower = FishBreedingService.calculateTotalPowerWithLevel(selectedFish);
-    const opponentPower = FishBreedingService.calculateTotalPowerWithLevel(opponentResult.opponent || {});
+    const opponentPower = FishBreedingService.calculateTotalPowerWithLevel(opponentResult.opponent);
 
     const embed = new EmbedBuilder()
         .setTitle('⚔️ Tìm Thấy Đối Thủ!')
@@ -244,7 +259,8 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
             { name: '🐟 Đối thủ', value: `${opponentResult.opponent.name} (Lv.${opponentResult.opponent.level})`, inline: true },
             { name: '💪 Sức mạnh', value: `${userPower} vs ${opponentPower}`, inline: true },
             { name: '📊 Stats của bạn', value: `💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}`, inline: false },
-            { name: '📊 Stats đối thủ', value: `💪${opponentStats.strength || 0} 🏃${opponentStats.agility || 0} 🧠${opponentStats.intelligence || 0} 🛡️${opponentStats.defense || 0} 🍀${opponentStats.luck || 0}`, inline: false }
+            { name: '📊 Stats đối thủ', value: `💪${opponentStats.strength || 0} 🏃${opponentStats.agility || 0} 🧠${opponentStats.intelligence || 0} 🛡️${opponentStats.defense || 0} 🍀${opponentStats.luck || 0}`, inline: false },
+            { name: '⏰ Giới Hạn Đấu Cá Hôm Nay', value: `✅ Còn **${dailyLimitCheck.remainingBattles}/20** lần đấu cá`, inline: true }
         )
         .setDescription('React với ⚔️ để bắt đầu đấu!')
         .setTimestamp();
@@ -258,7 +274,7 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
     const filter = (reaction: any, user: any) => reaction.emoji.name === '⚔️' && user.id === userId;
     const collector = battleMessage.createReactionCollector({ filter, time: 30000, max: 1 });
 
-    collector.on('collect', async () => {
+    collector.on('collect', async (collected: any) => {
         // Bắt đầu animation
         const animationFrames = [
             '⚔️ **Bắt đầu chiến đấu!** ⚔️',
@@ -305,6 +321,12 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
         const isUserWinner = result.winner.id === selectedFish.id;
         const reward = isUserWinner ? result.rewards.winner : result.rewards.loser;
 
+        // Lấy thông tin daily battle limit mới sau khi đấu
+        const updatedDailyLimitCheck = await FishBattleService.checkAndResetDailyBattleCount(userId, guildId);
+        
+        // Kiểm tra quyền admin
+        const isAdmin = await FishBattleService.isAdministrator(userId, guildId);
+        
         const battleEmbed = new EmbedBuilder()
             .setTitle(isUserWinner ? '🏆 Chiến Thắng!' : '💀 Thất Bại!')
             .setColor(isUserWinner ? '#00FF00' : '#FF0000')
@@ -312,7 +334,14 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
                 { name: '🐟 Người thắng', value: result.winner.name, inline: true },
                 { name: '🐟 Người thua', value: result.loser.name, inline: true },
                 { name: '🐟 Phần thưởng', value: `${reward.toLocaleString()} FishCoin`, inline: true },
-                { name: '💪 Sức mạnh', value: `${result.winnerPower} vs ${result.loserPower}`, inline: true }
+                { name: '💪 Sức mạnh', value: `${result.winnerPower} vs ${result.loserPower}`, inline: true },
+                { 
+                    name: isAdmin ? '⏰ Giới Hạn Đấu Cá Hôm Nay (👑 Admin)' : '⏰ Giới Hạn Đấu Cá Hôm Nay', 
+                    value: isAdmin 
+                        ? `✅ Còn **${updatedDailyLimitCheck.remainingBattles}/20** lần đấu cá\n👑 **Không bị giới hạn - có thể đấu vô hạn**`
+                        : `✅ Còn **${updatedDailyLimitCheck.remainingBattles}/20** lần đấu cá`, 
+                    inline: true 
+                }
             )
             .setDescription(result.battleLog.join('\n'))
             .setTimestamp();

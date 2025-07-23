@@ -16,14 +16,16 @@ export class BattleFishUI {
     private userId: string;
     private guildId: string;
     private dailyBattleInfo?: { canBattle: boolean; remainingBattles: number; error?: string };
+    private isAdmin?: boolean;
 
-    constructor(inventory: any, eligibleFish: any[], userId: string, guildId: string, selectedFishId?: string, dailyBattleInfo?: { canBattle: boolean; remainingBattles: number; error?: string }) {
+    constructor(inventory: any, eligibleFish: any[], userId: string, guildId: string, selectedFishId?: string, dailyBattleInfo?: { canBattle: boolean; remainingBattles: number; error?: string }, isAdmin?: boolean) {
         this.inventory = inventory;
         this.eligibleFish = eligibleFish;
         this.userId = userId;
         this.guildId = guildId;
         this.selectedFishId = selectedFishId;
         this.dailyBattleInfo = dailyBattleInfo;
+        this.isAdmin = isAdmin;
     }
 
     createEmbed(): EmbedBuilder {
@@ -35,7 +37,14 @@ export class BattleFishUI {
 
         // Thông tin daily battle limit
         if (this.dailyBattleInfo) {
-            if (this.dailyBattleInfo.canBattle) {
+            if (this.isAdmin) {
+                // Admin hiển thị thông tin đặc biệt
+                embed.addFields({
+                    name: '⏰ Giới Hạn Đấu Cá Hôm Nay (👑 Admin)',
+                    value: `✅ Còn **${this.dailyBattleInfo.remainingBattles}/20** lần đấu cá\n👑 **Không bị giới hạn - có thể đấu vô hạn**`,
+                    inline: true
+                });
+            } else if (this.dailyBattleInfo.canBattle) {
                 embed.addFields({
                     name: '⏰ Giới Hạn Đấu Cá Hôm Nay',
                     value: `✅ Còn **${this.dailyBattleInfo.remainingBattles}/20** lần đấu cá`,
