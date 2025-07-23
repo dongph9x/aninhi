@@ -274,8 +274,10 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
     const filter = (reaction: any, user: any) => reaction.emoji.name === '⚔️' && user.id === userId;
     const collector = battleMessage.createReactionCollector({ filter, time: 30000, max: 1 });
 
-    collector.on('collect', async (collected: any) => {
-        // Bắt đầu animation
+    collector.on('collect', async (collected: any, user: any) => {
+        // Bắt đầu animation với GIF
+        const battleGifUrl = "https://cdn.discordapp.com/attachments/1396335030216822875/1397424104411234376/3c5b414026eb64ebb267b6f388091c37.gif?ex=6881ac1d&is=68805a9d&hm=5cc5c154f6c0ca09a149c213ef2649e8e14a88e3882f74ef05ca35055694fa36&";
+        
         const animationFrames = [
             '⚔️ **Bắt đầu chiến đấu!** ⚔️',
             '🐟 **${selectedFish.name}** vs **${opponentResult.opponent.name}** 🐟',
@@ -288,11 +290,12 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
             .setTitle('⚔️ Chiến Đấu Đang Diễn Ra...')
             .setColor('#FF6B6B')
             .setDescription(animationFrames[0])
+            .setImage(battleGifUrl) // Thêm GIF animation
             .setTimestamp();
 
         await battleMessage.edit({ embeds: [animationEmbed] });
 
-        // Chạy animation trong 3 giây
+        // Chạy animation trong 3 giây với GIF
         for (let i = 1; i < animationFrames.length; i++) {
             await new Promise(resolve => setTimeout(resolve, 600)); // 600ms mỗi frame
             
@@ -300,8 +303,11 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
                 .replace('${selectedFish.name}', selectedFish.name)
                 .replace('${opponentResult.opponent.name}', opponentResult.opponent.name);
             
-            animationEmbed.setDescription(currentFrame);
-            await battleMessage.edit({ embeds: [animationEmbed] });
+            // Sử dụng EmbedBuilder.from để tránh nháy GIF
+            const updatedEmbed = EmbedBuilder.from(battleMessage.embeds[0])
+                .setDescription(currentFrame);
+            
+            await battleMessage.edit({ embeds: [updatedEmbed] });
         }
 
         // Thực hiện battle
