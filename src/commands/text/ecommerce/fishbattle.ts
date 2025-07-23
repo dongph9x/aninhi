@@ -276,18 +276,18 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
 
     collector.on('collect', async (collected: any, user: any) => {
         // Bắt đầu animation với GIF
-        const battleGifUrl = "https://cdn.discordapp.com/attachments/1396335030216822875/1397424104411234376/3c5b414026eb64ebb267b6f388091c37.gif?ex=6881ac1d&is=68805a9d&hm=5cc5c154f6c0ca09a149c213ef2649e8e14a88e3882f74ef05ca35055694fa36&";
+        const battleGifUrl = "https://cdn.discordapp.com/attachments/1362234245392765201/1397459618434650203/youtube_video_0r2OSVD2A8_8.gif?ex=6881cd30&is=68807bb0&hm=835f0a83c15c79348d507e57bfa33a2b78220ea02cab55ec46fa29231a8f607a&";
         
         const animationFrames = [
             '⚔️ **Bắt đầu chiến đấu!** ⚔️',
-            '🐟 **${selectedFish.name}** vs **${opponentResult.opponent.name}** 🐟',
+            '🔯 **Nhận buff/debuff** 🔯',
             '💥 **Đang đấu...** 💥',
             '⚡ **Chiến đấu gay cấn!** ⚡',
             '🔥 **Kết quả sắp có!** 🔥'
         ];
 
         const animationEmbed = new EmbedBuilder()
-            .setTitle('⚔️ Chiến Đấu Đang Diễn Ra...')
+            .setTitle('⚔️ Đang Chiến Đấu...')
             .setColor('#FF6B6B')
             .setDescription(animationFrames[0])
             .setImage(battleGifUrl) // Thêm GIF animation

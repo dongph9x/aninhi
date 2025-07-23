@@ -448,14 +448,14 @@ export class BattleFishHandler {
         // Animation frames
         const animationFrames = [
             '⚔️ **Bắt đầu chiến đấu!** ⚔️',
-            '🐟 **${selectedFish.name}** vs **${opponent.name}** 🐟',
+            '🔯 **Nhận buff/debuff** 🔯',
             '💥 **Đang đấu...** 💥',
             '⚡ **Chiến đấu gay cấn!** ⚡',
             '🔥 **Kết quả sắp có!** 🔥'
         ];
 
         const animationEmbed = new EmbedBuilder()
-            .setTitle('⚔️ Chiến Đấu Đang Diễn Ra...')
+            .setTitle('⚔️ Đang Chiến Đấu...')
             .setColor('#FF6B6B')
             .setDescription(animationFrames[0])
             .setTimestamp();
