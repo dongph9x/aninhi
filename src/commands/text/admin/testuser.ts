@@ -16,7 +16,7 @@ export default Bot.createCommand({
 
         // Kiểm tra quyền admin
         const { FishBattleService } = await import('@/utils/fish-battle');
-        const isAdmin = await FishBattleService.isAdministrator(userId, guildId);
+        const isAdmin = await FishBattleService.isAdministrator(userId, guildId, message.client);
         
         if (!isAdmin) {
             const errorEmbed = new EmbedBuilder()

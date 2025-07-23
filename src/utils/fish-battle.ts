@@ -133,13 +133,14 @@ export class FishBattleService {
   /**
    * Kiểm tra quyền Administrator
    */
-  static async isAdministrator(userId: string, guildId: string): Promise<boolean> {
+  static async isAdministrator(userId: string, guildId: string, client?: any): Promise<boolean> {
     try {
       // Danh sách Administrator IDs (có thể mở rộng sau)
       const adminUserIds: string[] = [
         '389957152153796608', // Admin user - có quyền sử dụng lệnh admin
         // Thêm ID của các Administrator khác vào đây
         // Ví dụ: '123456789012345678'
+        // Thêm User ID của user bạn muốn cấp quyền admin ở đây
       ];
       
       // Kiểm tra xem user có trong danh sách admin không
@@ -147,8 +148,31 @@ export class FishBattleService {
         return true;
       }
       
-      // Có thể thêm logic kiểm tra role Discord ở đây trong tương lai
-      // Hiện tại return false nếu không phải admin
+      // Kiểm tra quyền Discord Administrator nếu có client
+      if (client) {
+        try {
+          // Lấy guild và member
+          const guild = await client.guilds.fetch(guildId);
+          if (!guild) return false;
+          
+          const member = await guild.members.fetch(userId);
+          if (!member) return false;
+          
+          // Kiểm tra quyền Administrator
+          if (member.permissions.has('Administrator')) {
+            return true;
+          }
+          
+          // Kiểm tra quyền ManageGuild (Server Manager)
+          if (member.permissions.has('ManageGuild')) {
+            return true;
+          }
+          
+        } catch (discordError) {
+          console.log('Discord permission check failed, falling back to ID list:', discordError);
+        }
+      }
+      
       return false;
     } catch (error) {
       return false;

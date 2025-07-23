@@ -171,7 +171,7 @@ export class FishBarnHandler {
 
     // Kiểm tra quyền admin
     const { FishBattleService } = await import('@/utils/fish-battle');
-    const isAdmin = await FishBattleService.isAdministrator(userId, guildId);
+    const isAdmin = await FishBattleService.isAdministrator(userId, guildId, interaction.client);
 
     // Kiểm tra daily feed limit (admin cũng bị kiểm tra để test)
     const dailyFeedCheck = await FishFeedService.checkAndResetDailyFeedCount(userId, guildId);
@@ -477,7 +477,7 @@ export class FishBarnHandler {
 
     // Kiểm tra quyền admin
     const { FishBattleService } = await import('@/utils/fish-battle');
-    const isAdmin = await FishBattleService.isAdministrator(userId, guildId);
+    const isAdmin = await FishBattleService.isAdministrator(userId, guildId, interaction.client);
 
     const result = await FishBreedingService.breedFish(userId, breedingData.selectedParent1Id, breedingData.selectedParent2Id, isAdmin);
     
