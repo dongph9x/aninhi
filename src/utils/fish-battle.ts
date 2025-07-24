@@ -95,16 +95,7 @@ export class FishBattleService {
         return { canBattle: true, remainingBattles: this.DAILY_BATTLE_LIMIT };
       }
 
-      // Kiểm tra quyền admin
-      const isAdmin = await this.isAdministrator(userId, guildId);
-      
-      // Admin luôn có thể đấu, không bị giới hạn
-      if (isAdmin) {
-        const remainingBattles = Math.max(0, this.DAILY_BATTLE_LIMIT - user.dailyBattleCount);
-        return { canBattle: true, remainingBattles };
-      }
-
-      // Kiểm tra xem có vượt quá giới hạn không (chỉ cho user thường)
+      // Kiểm tra xem có vượt quá giới hạn không (áp dụng cho tất cả người dùng)
       if (user.dailyBattleCount >= this.DAILY_BATTLE_LIMIT) {
         return { 
           canBattle: false, 
@@ -244,29 +235,23 @@ export class FishBattleService {
       console.log(`  - fishId: ${fishId}`);
       console.log(`  - opponentId: ${opponentId}`);
 
-      // Kiểm tra cooldown và daily battle limit (trừ khi là Administrator)
-      const isAdmin = await this.isAdministrator(userId, guildId);
-      console.log(`  - isAdmin: ${isAdmin}`);
-      
-      if (!isAdmin) {
-        // Kiểm tra cooldown
-        const cooldownCheck = this.checkBattleCooldown(userId, guildId);
-        if (!cooldownCheck.canBattle) {
-          const remainingSeconds = Math.ceil((cooldownCheck.remainingTime || 0) / 1000);
-          return { 
-            success: false, 
-            error: `⏰ Bạn cần chờ ${remainingSeconds} giây nữa mới có thể đấu!` 
-          };
-        }
+      // Kiểm tra cooldown và daily battle limit (áp dụng cho tất cả người dùng)
+      const cooldownCheck = this.checkBattleCooldown(userId, guildId);
+      if (!cooldownCheck.canBattle) {
+        const remainingSeconds = Math.ceil((cooldownCheck.remainingTime || 0) / 1000);
+        return { 
+          success: false, 
+          error: `⏰ Bạn cần chờ ${remainingSeconds} giây nữa mới có thể đấu!` 
+        };
+      }
 
-        // Kiểm tra daily battle limit
-        const dailyLimitCheck = await this.checkAndResetDailyBattleCount(userId, guildId);
-        if (!dailyLimitCheck.canBattle) {
-          return { 
-            success: false, 
-            error: dailyLimitCheck.error || 'Đã đạt giới hạn đấu cá trong ngày!' 
-          };
-        }
+      // Kiểm tra daily battle limit
+      const dailyLimitCheck = await this.checkAndResetDailyBattleCount(userId, guildId);
+      if (!dailyLimitCheck.canBattle) {
+        return { 
+          success: false, 
+          error: dailyLimitCheck.error || 'Đã đạt giới hạn đấu cá trong ngày!' 
+        };
       }
 
       const userFish = await prisma.fish.findFirst({

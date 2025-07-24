@@ -186,7 +186,7 @@ export class FishBreedingService {
   /**
    * Cho cá ăn với thức ăn
    */
-  static async feedFishWithFood(userId: string, fishId: string, foodType: 'basic' | 'premium' | 'luxury' | 'legendary', isAdmin: boolean = false) {
+  static async feedFishWithFood(userId: string, fishId: string, foodType: 'basic' | 'premium' | 'luxury' | 'legendary') {
     const fish = await prisma.fish.findFirst({ where: { id: fishId, userId } });
     if (!fish) return { success: false, error: 'Không tìm thấy cá!' };
     
@@ -195,25 +195,16 @@ export class FishBreedingService {
       return { success: false, error: 'Cá đã trưởng thành và đạt cấp tối đa (10)!' };
     }
     
-    let expGained = 0;
-    let foodUsed = null;
+    // Kiểm tra có thức ăn không
+    const { FishFoodService } = await import('./fish-food');
+    const useFoodResult = await FishFoodService.useFishFood(userId, fish.guildId, foodType);
     
-    // Admin không cần thức ăn và luôn nhận 100 exp
-    if (isAdmin) {
-      expGained = 100;
-      foodUsed = { name: 'Admin Feed', type: 'admin' };
-    } else {
-      // Kiểm tra có thức ăn không
-      const { FishFoodService } = await import('./fish-food');
-      const useFoodResult = await FishFoodService.useFishFood(userId, fish.guildId, foodType);
-      
-      if (!useFoodResult.success) {
-        return { success: false, error: useFoodResult.error };
-      }
-      
-      expGained = useFoodResult.expBonus || 0;
-      foodUsed = useFoodResult.foodInfo;
+    if (!useFoodResult.success) {
+      return { success: false, error: useFoodResult.error };
     }
+    
+    const expGained = useFoodResult.expBonus || 0;
+    const foodUsed = useFoodResult.foodInfo;
     
     // Hàm tính exp cần cho level tiếp theo
     function getExpForLevel(level: number) {

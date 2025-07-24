@@ -56,12 +56,9 @@ async function showBattleUI(message: any, userId: string, guildId: string) {
         const inventory = await BattleFishInventoryService.getBattleFishInventory(userId, guildId);
         const eligibleFish = await BattleFishInventoryService.getEligibleBattleFish(userId, guildId);
         const dailyBattleInfo = await FishBattleService.checkAndResetDailyBattleCount(userId, guildId);
-
-        // Kiểm tra quyền admin
-        const isAdmin = await FishBattleService.isAdministrator(userId, guildId);
         
         // Tạo UI
-        const ui = new BattleFishUI(inventory, eligibleFish, userId, guildId, undefined, dailyBattleInfo, isAdmin);
+        const ui = new BattleFishUI(inventory, eligibleFish, userId, guildId, undefined, dailyBattleInfo);
         const embed = ui.createEmbed();
         const components = ui.createComponents();
 

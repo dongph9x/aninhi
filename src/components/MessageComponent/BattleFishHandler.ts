@@ -572,17 +572,13 @@ export class BattleFishHandler {
             messageData.guildId
         );
         
-        // Kiểm tra quyền admin
-        const isAdmin = await FishBattleService.isAdministrator(messageData.userId, messageData.guildId);
-        
         const ui = new BattleFishUI(
             messageData.inventory,
             messageData.eligibleFish,
             messageData.userId,
             messageData.guildId,
             messageData.selectedFishId,
-            dailyBattleInfo,
-            isAdmin
+            dailyBattleInfo
         );
 
         const embed = ui.createEmbed();

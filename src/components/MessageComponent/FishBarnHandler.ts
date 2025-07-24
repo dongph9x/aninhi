@@ -42,10 +42,6 @@ export class FishBarnHandler {
     // Lấy thông tin daily feed limit
     const dailyFeedInfo = await FishFeedService.checkAndResetDailyFeedCount(userId, guildId);
     
-    // Kiểm tra quyền admin
-    const { FishBattleService } = await import('@/utils/fish-battle');
-    const isAdmin = await FishBattleService.isAdministrator(userId, guildId);
-    
     const ui = new FishBarnUI(
       inventory, 
       userId, 
@@ -55,8 +51,7 @@ export class FishBarnHandler {
       breedingMode,
       selectedParent1Id,
       selectedParent2Id,
-      dailyFeedInfo,
-      isAdmin
+      dailyFeedInfo
     );
     
     // Load user fish food
@@ -174,10 +169,6 @@ export class FishBarnHandler {
       });
     }
 
-    // Kiểm tra quyền admin
-    const { FishBattleService } = await import('@/utils/fish-battle');
-    const isAdmin = await FishBattleService.isAdministrator(userId, guildId, interaction.client);
-
     // Kiểm tra daily feed limit
     const dailyFeedCheck = await FishFeedService.checkAndResetDailyFeedCount(userId, guildId);
     if (!dailyFeedCheck.canFeed) {
@@ -188,7 +179,7 @@ export class FishBarnHandler {
     }
     
     // Cho cá ăn với thức ăn
-    const result = await FishBreedingService.feedFishWithFood(userId, selectedFishId, selectedFoodType as any, isAdmin);
+    const result = await FishBreedingService.feedFishWithFood(userId, selectedFishId, selectedFoodType as any);
     
     if (!result.success) {
       return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });

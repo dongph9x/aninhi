@@ -32,11 +32,7 @@ export default {
       const dailyFeedInfo = await FishFeedService.checkAndResetDailyFeedCount(userId, guildId);
       
       // Tạo UI
-      // Kiểm tra quyền admin
-    const { FishBattleService } = await import('@/utils/fish-battle');
-    const isAdmin = await FishBattleService.isAdministrator(userId, guildId, message.client);
-    
-    const ui = new FishBarnUI(inventory, userId, guildId, selectedFishId, undefined, false, undefined, undefined, dailyFeedInfo, isAdmin);
+      const ui = new FishBarnUI(inventory, userId, guildId, selectedFishId, undefined, false, undefined, undefined, dailyFeedInfo);
       await ui.loadUserFishFood(); // Load user fish food
       const embed = await ui.createEmbed();
       const components = ui.createComponents();

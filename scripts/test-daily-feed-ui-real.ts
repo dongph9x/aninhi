@@ -75,7 +75,7 @@ async function testDailyFeedUIReal() {
             }
             
             // Feed fish (simulating UI feed button)
-            const feedResult = await FishBreedingService.feedFishWithFood(testUserId, fish.id, 'basic', isAdmin);
+            const feedResult = await FishBreedingService.feedFishWithFood(testUserId, fish.id, 'basic');
             console.log(`   Feed result: ${feedResult.success ? 'Success' : 'Failed'}`);
             
             if (!feedResult.success) {
