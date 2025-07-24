@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Script kiểm tra user có cá gen 2 trên VPS
+# Script kiểm tra user có cá gen 2 và cá gen 1 level > 5 trên VPS
 # Container ID: c8203bcf3da3
 
-echo "🔍 Kiểm Tra User Có Cá Gen 2 (VPS Docker)"
+echo "🔍 Kiểm Tra User Có Cá Gen 2 & Gen 1 Level > 5 (VPS Docker)"
 echo ""
 
 CONTAINER_ID="c8203bcf3da3"
@@ -28,7 +28,7 @@ const prisma = new PrismaClient();
 
 async function checkGen2Fish() {
   try {
-    console.log('🔍 Kiểm Tra User Có Cá Gen 2 (VPS Database)');
+    console.log('🔍 Kiểm Tra User Có Cá Gen 2 & Gen 1 Level > 5 (VPS Database)');
     console.log('');
 
     // Kết nối database
@@ -83,6 +83,38 @@ async function checkGen2Fish() {
       });
     }
 
+    // Tìm cá gen 1 level > 5
+    console.log('');
+    console.log('🔍 Tìm Cá Gen 1 Level > 5:');
+    const gen1HighLevelFish = await prisma.fish.findMany({
+      where: { 
+        generation: 1,
+        level: { gt: 5 }
+      },
+      select: {
+        id: true, userId: true, guildId: true, species: true,
+        level: true, rarity: true, value: true, status: true
+      },
+      orderBy: [{ level: 'desc' }, { userId: 'asc' }]
+    });
+
+    if (gen1HighLevelFish.length === 0) {
+      console.log('   ✅ Không có cá gen 1 level > 5 nào');
+    } else {
+      console.log(\`   📊 Tìm thấy \${gen1HighLevelFish.length} con cá gen 1 level > 5:\`);
+      gen1HighLevelFish.forEach((fish, index) => {
+        console.log(\`\n   🐟 Cá \${index + 1}:\`);
+        console.log(\`      ID: \${fish.id}\`);
+        console.log(\`      User: \${fish.userId}\`);
+        console.log(\`      Guild: \${fish.guildId}\`);
+        console.log(\`      Species: \${fish.species}\`);
+        console.log(\`      Level: \${fish.level}\`);
+        console.log(\`      Rarity: \${fish.rarity}\`);
+        console.log(\`      Value: \${fish.value.toString()} coins\`);
+        console.log(\`      Status: \${fish.status}\`);
+      });
+    }
+
     // Tìm cá gen 3+
     console.log('');
     console.log('🔍 Tìm Cá Gen 3+:');
@@ -111,6 +143,18 @@ async function checkGen2Fish() {
         console.log(\`      Status: \${fish.status}\`);
       });
     }
+
+    // Thống kê tổng hợp
+    console.log('');
+    console.log('📊 Thống Kê Tổng Hợp:');
+    const totalGen2 = gen2Fish.length;
+    const totalGen1HighLevel = gen1HighLevelFish.length;
+    const totalGen3Plus = gen3PlusFish.length;
+    
+    console.log(\`   🐟 Cá Gen 2: \${totalGen2} con\`);
+    console.log(\`   🐟 Cá Gen 1 Level > 5: \${totalGen1HighLevel} con\`);
+    console.log(\`   🐟 Cá Gen 3+: \${totalGen3Plus} con\`);
+    console.log(\`   📋 Tổng cộng: \${totalGen2 + totalGen1HighLevel + totalGen3Plus} con cá cần chú ý\`);
 
     // Kiểm tra breeding history
     console.log('');

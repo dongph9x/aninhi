@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Script xóa cá gen 2+ trên VPS
+# Script xóa cá gen 2+ và gen 1 level > 5 trên VPS
 # Container ID: c8203bcf3da3
 
-echo "🗑️ Xóa Cá Gen 2+ (VPS Docker)"
+echo "🗑️ Xóa Cá Gen 2+ & Gen 1 Level > 5 (VPS Docker)"
 echo ""
 
 CONTAINER_ID="c8203bcf3da3"
@@ -21,9 +21,9 @@ echo "   ✅ Container $CONTAINER_ID đang chạy"
 # Xác nhận xóa
 echo ""
 echo "2️⃣ Xác Nhận Xóa:"
-echo "   ⚠️  Bạn sắp xóa TẤT CẢ cá gen 2 trở lên!"
+echo "   ⚠️  Bạn sắp xóa TẤT CẢ cá gen 2+ và gen 1 level > 5!"
 echo "   ⚠️  Hành động này KHÔNG THỂ HOÀN TÁC!"
-echo "   ⚠️  Tất cả dữ liệu cá gen 2+ sẽ bị mất vĩnh viễn!"
+echo "   ⚠️  Tất cả dữ liệu cá gen 2+ và gen 1 level > 5 sẽ bị mất vĩnh viễn!"
 echo ""
 read -p "   Bạn có chắc chắn muốn tiếp tục? (y/N): " confirm
 
@@ -42,7 +42,7 @@ const prisma = new PrismaClient();
 
 async function deleteGen2PlusFish() {
   try {
-    console.log('🗑️ Xóa Cá Gen 2+ (VPS Database)');
+    console.log('🗑️ Xóa Cá Gen 2+ & Gen 1 Level > 5 (VPS Database)');
     console.log('');
 
     // Kết nối database
@@ -61,34 +61,48 @@ async function deleteGen2PlusFish() {
       console.log(\`   Gen \${group.generation}: \${group._count.id} con cá\`);
     });
 
-    // Tìm cá gen 2+
+    // Tìm cá gen 2+ và gen 1 level > 5
     console.log('');
-    console.log('🔍 Tìm Cá Gen 2+:');
-    const gen2PlusFish = await prisma.fish.findMany({
-      where: { generation: { gte: 2 } },
+    console.log('🔍 Tìm Cá Gen 2+ & Gen 1 Level > 5:');
+    const fishToDelete = await prisma.fish.findMany({
+      where: { 
+        OR: [
+          { generation: { gte: 2 } },
+          { 
+            AND: [
+              { generation: 1 },
+              { level: { gt: 5 } }
+            ]
+          }
+        ]
+      },
       select: {
         id: true, userId: true, guildId: true, species: true,
         generation: true, level: true, rarity: true, value: true
       },
-      orderBy: [{ generation: 'desc' }, { createdAt: 'desc' }]
+      orderBy: [{ generation: 'desc' }, { level: 'desc' }]
     });
 
-    if (gen2PlusFish.length === 0) {
-      console.log('   ✅ Không có cá gen 2+ nào để xóa');
+    if (fishToDelete.length === 0) {
+      console.log('   ✅ Không có cá gen 2+ hoặc gen 1 level > 5 nào để xóa');
       return;
     }
 
-    console.log(\`   📊 Tìm thấy \${gen2PlusFish.length} con cá gen 2+:\`);
+    console.log(\`   📊 Tìm thấy \${fishToDelete.length} con cá để xóa:\`);
     
-    // Nhóm theo generation
-    const fishByGen = gen2PlusFish.reduce((acc, fish) => {
-      if (!acc[fish.generation]) acc[fish.generation] = [];
-      acc[fish.generation].push(fish);
+    // Nhóm theo generation và level
+    const fishByCategory = fishToDelete.reduce((acc, fish) => {
+      let category = \`Gen \${fish.generation}\`;
+      if (fish.generation === 1 && fish.level > 5) {
+        category = \`Gen 1 Level > 5\`;
+      }
+      if (!acc[category]) acc[category] = [];
+      acc[category].push(fish);
       return acc;
     }, {});
 
-    Object.entries(fishByGen).forEach(([gen, fishes]) => {
-      console.log(\`\n   Gen \${gen} (\${fishes.length} con):\`);
+    Object.entries(fishByCategory).forEach(([category, fishes]) => {
+      console.log(\`\n   \${category} (\${fishes.length} con):\`);
       fishes.slice(0, 3).forEach((fish, index) => {
         console.log(\`     \${index + 1}. \${fish.species} - Level \${fish.level} - \${fish.rarity} - \${fish.value.toString()} coins\`);
       });
@@ -104,12 +118,12 @@ async function deleteGen2PlusFish() {
     let deletedCount = 0;
     let errorCount = 0;
     
-    for (const fish of gen2PlusFish) {
+    for (const fish of fishToDelete) {
       try {
         await prisma.fish.delete({ where: { id: fish.id } });
         deletedCount++;
         if (deletedCount % 10 === 0) {
-          console.log(\`   ✅ Đã xóa \${deletedCount}/\${gen2PlusFish.length} con cá\`);
+          console.log(\`   ✅ Đã xóa \${deletedCount}/\${fishToDelete.length} con cá\`);
         }
       } catch (error) {
         errorCount++;
@@ -136,12 +150,12 @@ async function deleteGen2PlusFish() {
     console.log('📋 Tóm Tắt Kết Quả:');
     console.log(\`   ✅ Đã xóa thành công: \${deletedCount} con cá\`);
     console.log(\`   ❌ Lỗi khi xóa: \${errorCount} con cá\`);
-    console.log(\`   📊 Tổng cộng: \${gen2PlusFish.length} con cá gen 2+\`);
+    console.log(\`   📊 Tổng cộng: \${fishToDelete.length} con cá (gen 2+ & gen 1 level > 5)\`);
     
-    if (deletedCount === gen2PlusFish.length) {
+    if (deletedCount === fishToDelete.length) {
       console.log('   🎉 Xóa thành công 100%!');
     } else {
-      console.log(\`   ⚠️  Xóa thành công \${Math.round((deletedCount / gen2PlusFish.length) * 100)}%\`);
+      console.log(\`   ⚠️  Xóa thành công \${Math.round((deletedCount / fishToDelete.length) * 100)}%\`);
     }
 
   } catch (error) {
@@ -155,4 +169,4 @@ deleteGen2PlusFish();
 "
 
 echo ""
-echo "✅ Hoàn thành xóa cá gen 2+!" 
+echo "✅ Hoàn thành xóa cá gen 2+ & gen 1 level > 5!" 
