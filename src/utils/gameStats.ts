@@ -388,4 +388,20 @@ export class GameStatsService {
             console.error("Error deleting user game stats:", error);
         }
     }
+
+    /**
+     * Xóa tất cả GameStats của server
+     */
+    static async deleteAllGameStats(guildId: string): Promise<number> {
+        try {
+            const result = await prisma.gameStats.deleteMany({
+                where: { guildId }
+            });
+            
+            return result.count;
+        } catch (error) {
+            console.error("Error deleting all game stats:", error);
+            return 0;
+        }
+    }
 } 
