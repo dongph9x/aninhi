@@ -374,13 +374,34 @@ export class FishingService {
 
             // Admin bypass tất cả yêu cầu về cần câu và mồi
             if (!isAdmin) {
-                // Kiểm tra có cần câu không
+                // Kiểm tra có cần câu không - tự động trang bị cần tốt nhất nếu chưa có
                 if (!fishingData.currentRod || fishingData.currentRod === "") {
-                    return {
-                        canFish: false,
-                        remainingTime: 0,
-                        message: "Bạn cần mua cần câu trước khi câu cá! Dùng `n.fishing shop` để xem cửa hàng."
-                    };
+                    // Tự động trang bị cần tốt nhất còn độ bền
+                    const availableRods = fishingData.rods.filter((r: { rodType: string; durability: number; id: string }) => r.durability > 0);
+                    if (availableRods.length > 0) {
+                        // Ưu tiên theo thứ tự: diamond > gold > silver > copper > basic
+                        const rodPriority = ['diamond', 'gold', 'silver', 'copper', 'basic'];
+                        let bestRod = availableRods[0];
+                        for (const priorityRod of rodPriority) {
+                            const foundRod = availableRods.find((r: { rodType: string; durability: number; id: string }) => r.rodType === priorityRod);
+                            if (foundRod) {
+                                bestRod = foundRod;
+                                break;
+                            }
+                        }
+                        // Tự động trang bị cần tốt nhất
+                        await prisma.fishingData.update({
+                            where: { id: fishingData.id },
+                            data: { currentRod: bestRod.rodType }
+                        });
+                        fishingData.currentRod = bestRod.rodType;
+                    } else {
+                        return {
+                            canFish: false,
+                            remainingTime: 0,
+                            message: "Bạn cần mua cần câu trước khi câu cá! Dùng `n.fishing shop` để xem cửa hàng."
+                        };
+                    }
                 }
 
                 // Kiểm tra có mồi không - tự động trang bị mồi tốt nhất nếu chưa có
@@ -418,14 +439,37 @@ export class FishingService {
                     }
                 }
 
-                // Kiểm tra cần câu có độ bền không
+                // Kiểm tra cần câu có độ bền không - tự động chuyển sang cần khác nếu hết độ bền
                 const currentRod = fishingData.rods.find((r: { rodType: string; durability: number; id: string }) => r.rodType === fishingData.currentRod);
                 if (!currentRod || currentRod.durability <= 0) {
-                    return {
-                        canFish: false,
-                        remainingTime: 0,
-                        message: "Cần câu của bạn đã hết độ bền! Hãy mua cần câu mới."
-                    };
+                    // Tự động chuyển sang cần khác còn độ bền
+                    const availableRods = fishingData.rods.filter((r: { rodType: string; durability: number; id: string }) => r.rodType !== fishingData.currentRod && r.durability > 0);
+                    if (availableRods.length > 0) {
+                        // Ưu tiên theo thứ tự: diamond > gold > silver > copper > basic
+                        const rodPriority = ['diamond', 'gold', 'silver', 'copper', 'basic'];
+                        let nextRod = availableRods[0];
+                        for (const priorityRod of rodPriority) {
+                            const foundRod = availableRods.find((r: { rodType: string; durability: number; id: string }) => r.rodType === priorityRod);
+                            if (foundRod) {
+                                nextRod = foundRod;
+                                break;
+                            }
+                        }
+                        // Tự động chuyển sang cần khác
+                        await prisma.fishingData.update({
+                            where: { id: fishingData.id },
+                            data: { currentRod: nextRod.rodType }
+                        });
+                        fishingData.currentRod = nextRod.rodType;
+                        // Bypass cooldown khi auto-switch rod
+                        return { canFish: true, remainingTime: 0 };
+                    } else {
+                        return {
+                            canFish: false,
+                            remainingTime: 0,
+                            message: "Cần câu của bạn đã hết độ bền! Hãy mua cần câu mới."
+                        };
+                    }
                 }
 
                 // Kiểm tra có mồi không - tự động chuyển sang mồi khác nếu mồi hiện tại hết

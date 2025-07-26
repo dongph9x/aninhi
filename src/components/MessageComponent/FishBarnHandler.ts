@@ -118,6 +118,10 @@ export class FishBarnHandler {
           await this.handleNoFood(interaction, userId, guildId);
           break;
           
+        case 'fishbarn_cancel_sell':
+          await this.handleCancelSell(interaction, userId, guildId);
+          break;
+          
         case 'fishbarn_buy_fish_food':
           if (interaction.isStringSelectMenu()) {
             await this.handleBuyFishFood(interaction, userId, guildId);
@@ -129,6 +133,12 @@ export class FishBarnHandler {
           break;
           
         default:
+          // Kiểm tra xem có phải confirm sell không
+          if (customId.startsWith('fishbarn_confirm_sell_')) {
+            const fishId = customId.replace('fishbarn_confirm_sell_', '');
+            await this.handleConfirmSell(interaction, userId, guildId, fishId);
+            return true;
+          }
           await interaction.reply({ content: '❌ Lỗi: Không nhận diện được action!', ephemeral: true });
       }
     } catch (error) {
@@ -248,60 +258,59 @@ export class FishBarnHandler {
       });
     }
 
-    const result = await FishInventoryService.sellFishFromInventory(userId, guildId, selectedFishId);
+    // Lấy thông tin cá để hiển thị trong popup xác nhận
+    const inventory = await FishInventoryService.getFishInventory(userId, guildId);
+    const selectedFish = inventory.items.find((item: any) => item.fish.id === selectedFishId)?.fish;
     
-    if (!result.success) {
-      return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });
+    if (!selectedFish) {
+      return interaction.reply({ 
+        content: '❌ Không tìm thấy thông tin cá!', 
+        ephemeral: true 
+      });
     }
 
-    // Xóa cá khỏi selected
-    this.selectedFishMap.delete(userId);
+    // Tính giá bán
+    const levelBonus = selectedFish.level > 1 ? (selectedFish.level - 1) * 0.02 : 0;
+    const finalValue = Math.floor(Number(selectedFish.value) * (1 + levelBonus));
 
-    // Cập nhật inventory
-    const updatedInventory = await FishInventoryService.getFishInventory(userId, guildId);
-    
-    // Tạo embed thông báo
-    const embed = new EmbedBuilder()
-      .setTitle('💰 Bán Cá Thành Công!')
-      .setColor('#FFD700')
+    // Tạo embed xác nhận bán
+    const confirmEmbed = new EmbedBuilder()
+      .setTitle('⚠️ Xác Nhận Bán Cá')
+      .setColor('#FFA500')
+      .setDescription('Bạn có chắc chắn muốn bán con cá này không?')
       .addFields(
-        { name: '🐟 Cá đã bán', value: result.fish?.name || 'Unknown', inline: true },
-        { name: '🐟 Số tiền nhận', value: (result.coinsEarned || 0).toLocaleString(), inline: true },
-        { name: '💳 Số dư mới', value: (result.newBalance || 0).toLocaleString(), inline: true }
+        { name: '🐟 Tên cá', value: selectedFish.species, inline: true },
+        { name: '📊 Level', value: selectedFish.level.toString(), inline: true },
+        { name: '🏷️ Thế hệ', value: `Gen.${selectedFish.generation}`, inline: true },
+        { name: '💰 Giá bán', value: `${finalValue.toLocaleString()} FishCoin`, inline: true },
+        { name: '⭐ Độ hiếm', value: selectedFish.rarity, inline: true },
+        { name: '📈 Trạng thái', value: selectedFish.status, inline: true }
+      )
+      .setFooter({ text: 'Hành động này không thể hoàn tác!' })
+      .setTimestamp();
+
+    // Tạo buttons xác nhận
+    const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = await import('discord.js');
+    
+    const confirmRow = new ActionRowBuilder<ButtonBuilder>()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId(`fishbarn_confirm_sell_${selectedFishId}`)
+          .setLabel('✅ Xác Nhận Bán')
+          .setStyle(ButtonStyle.Danger)
+          .setEmoji('💰'),
+        new ButtonBuilder()
+          .setCustomId('fishbarn_cancel_sell')
+          .setLabel('❌ Hủy Bỏ')
+          .setStyle(ButtonStyle.Secondary)
+          .setEmoji('🚫')
       );
 
-    // Cập nhật UI
-    const breedingData = this.breedingModeMap.get(userId);
-    
-    // Lấy thông tin daily feed limit
-    const dailyFeedInfo = await FishFeedService.checkAndResetDailyFeedCount(userId, guildId);
-    
-    // Kiểm tra quyền admin
-    const { FishBattleService } = await import('@/utils/fish-battle');
-    const isAdmin = await FishBattleService.isAdministrator(userId, guildId);
-    
-    const ui = new FishBarnUI(
-      updatedInventory, 
-      userId, 
-      guildId, 
-      undefined,
-      undefined,
-      breedingData?.breedingMode || false,
-      breedingData?.selectedParent1Id,
-      breedingData?.selectedParent2Id,
-      dailyFeedInfo,
-      isAdmin
-    );
-    const newEmbed = await ui.createEmbed();
-    const newComponents = ui.createComponents();
-
-    await interaction.update({
-      embeds: [newEmbed],
-      components: newComponents,
+    await interaction.reply({
+      embeds: [confirmEmbed],
+      components: [confirmRow],
+      ephemeral: true
     });
-
-    // Gửi thông báo thành công
-    await interaction.followUp({ embeds: [embed], ephemeral: true });
   }
 
   private static async handleBreed(interaction: ButtonInteraction | StringSelectMenuInteraction, userId: string, guildId: string) {
@@ -667,6 +676,75 @@ export class FishBarnHandler {
       );
     
     await interaction.followUp({ embeds: [embed], ephemeral: true });
+  }
+
+  private static async handleConfirmSell(interaction: ButtonInteraction | StringSelectMenuInteraction, userId: string, guildId: string, fishId: string) {
+    // Thực hiện bán cá
+    const result = await FishInventoryService.sellFishFromInventory(userId, guildId, fishId);
+    
+    if (!result.success) {
+      return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });
+    }
+
+    // Xóa cá khỏi selected
+    this.selectedFishMap.delete(userId);
+
+    // Cập nhật inventory
+    const updatedInventory = await FishInventoryService.getFishInventory(userId, guildId);
+    
+    // Tạo embed thông báo thành công
+    const successEmbed = new EmbedBuilder()
+      .setTitle('💰 Bán Cá Thành Công!')
+      .setColor('#00FF00')
+      .addFields(
+        { name: '🐟 Cá đã bán', value: result.fish?.species || 'Unknown', inline: true },
+        { name: '🐟 Số tiền nhận', value: (result.coinsEarned || 0).toLocaleString(), inline: true },
+        { name: '💳 Số dư mới', value: (result.newBalance || 0).toLocaleString(), inline: true }
+      )
+      .setTimestamp();
+
+    // Cập nhật UI
+    const breedingData = this.breedingModeMap.get(userId);
+    
+    // Lấy thông tin daily feed limit
+    const dailyFeedInfo = await FishFeedService.checkAndResetDailyFeedCount(userId, guildId);
+    
+    // Kiểm tra quyền admin
+    const { FishBattleService } = await import('@/utils/fish-battle');
+    const isAdmin = await FishBattleService.isAdministrator(userId, guildId);
+    
+    const ui = new FishBarnUI(
+      updatedInventory, 
+      userId, 
+      guildId, 
+      undefined,
+      undefined,
+      breedingData?.breedingMode || false,
+      breedingData?.selectedParent1Id,
+      breedingData?.selectedParent2Id,
+      dailyFeedInfo,
+      isAdmin
+    );
+    const newEmbed = await ui.createEmbed();
+    const newComponents = ui.createComponents();
+
+    // Cập nhật UI chính
+    await interaction.update({
+      embeds: [newEmbed],
+      components: newComponents,
+    });
+
+    // Gửi thông báo thành công
+    await interaction.followUp({ embeds: [successEmbed], ephemeral: true });
+  }
+
+  private static async handleCancelSell(interaction: ButtonInteraction | StringSelectMenuInteraction, userId: string, guildId: string) {
+    // Chỉ đóng popup xác nhận
+    await interaction.update({
+      content: '❌ Đã hủy bỏ việc bán cá!',
+      embeds: [],
+      components: [],
+    });
   }
 
   private static async handleBackToBarn(interaction: ButtonInteraction | StringSelectMenuInteraction, userId: string, guildId: string) {

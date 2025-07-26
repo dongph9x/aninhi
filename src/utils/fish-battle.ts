@@ -748,29 +748,58 @@ export class FishBattleService {
    * Lấy bảng xếp hạng đấu cá
    */
   static async getBattleLeaderboard(guildId: string, limit: number = 10) {
-    const leaderboard = await prisma.$queryRaw`
+    // Lấy tất cả users trong guild (không giới hạn số lượng)
+    const allUsers = await prisma.user.findMany({
+      where: { guildId }
+    });
+
+    // Lấy dữ liệu đấu cá cho tất cả users
+    const battleData = await prisma.$queryRaw`
       SELECT 
         u.userId,
-        u.balance,
         COUNT(b.id) as totalBattles,
         SUM(CASE WHEN b.userWon THEN 1 ELSE 0 END) as wins,
         SUM(b.reward) as totalEarnings
       FROM User u
       LEFT JOIN BattleHistory b ON u.userId = b.userId AND u.guildId = b.guildId
       WHERE u.guildId = ${guildId}
-      GROUP BY u.userId, u.balance
-      HAVING totalBattles > 0
-      ORDER BY wins DESC, totalEarnings DESC
-      LIMIT ${limit}
+      GROUP BY u.userId
     `;
 
-    // Chuyển đổi BigInt thành Number để tránh lỗi
-    return (leaderboard as any[]).map(user => ({
-      ...user,
-      balance: typeof user.balance === 'bigint' ? Number(user.balance) : user.balance,
-      totalBattles: typeof user.totalBattles === 'bigint' ? Number(user.totalBattles) : user.totalBattles,
-      wins: typeof user.wins === 'bigint' ? Number(user.wins) : user.wins,
-      totalEarnings: typeof user.totalEarnings === 'bigint' ? Number(user.totalEarnings) : user.totalEarnings
-    }));
+    // Tạo map để truy cập nhanh battle data
+    const battleMap = new Map();
+    (battleData as any[]).forEach(user => {
+      battleMap.set(user.userId, {
+        totalBattles: typeof user.totalBattles === 'bigint' ? Number(user.totalBattles) : Number(user.totalBattles || 0),
+        wins: typeof user.wins === 'bigint' ? Number(user.wins) : Number(user.wins || 0),
+        totalEarnings: typeof user.totalEarnings === 'bigint' ? Number(user.totalEarnings) : Number(user.totalEarnings || 0)
+      });
+    });
+
+    // Tạo leaderboard với tất cả users, kể cả chưa có dữ liệu đấu cá
+    const leaderboard = allUsers.map(user => {
+      const battleInfo = battleMap.get(user.userId) || {
+        totalBattles: 0,
+        wins: 0,
+        totalEarnings: 0
+      };
+
+      return {
+        userId: user.userId,
+        balance: typeof user.balance === 'bigint' ? Number(user.balance) : user.balance,
+        totalBattles: battleInfo.totalBattles,
+        wins: battleInfo.wins,
+        totalEarnings: battleInfo.totalEarnings
+      };
+    });
+
+    // Sắp xếp theo wins DESC, totalEarnings DESC, balance DESC
+    leaderboard.sort((a, b) => {
+      if (a.wins !== b.wins) return b.wins - a.wins;
+      if (a.totalEarnings !== b.totalEarnings) return b.totalEarnings - a.totalEarnings;
+      return b.balance - a.balance;
+    });
+
+    return leaderboard.slice(0, limit);
   }
 } 

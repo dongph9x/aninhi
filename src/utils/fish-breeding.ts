@@ -607,6 +607,16 @@ export class FishBreedingService {
   }
 
   /**
+   * Check if fish is in battle inventory
+   */
+  static async checkFishInBattleInventory(fishId: string) {
+    const isInBattleInventory = await prisma.battleFishInventoryItem.findFirst({
+      where: { fishId },
+    });
+    return !!isInBattleInventory;
+  }
+
+  /**
    * Sell fish
    */
   static async sellFish(userId: string, fishId: string) {

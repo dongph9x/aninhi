@@ -163,6 +163,8 @@ async function fishWithAnimation(message: Message) {
         let rodName = "Không có";
         let baitName = "Không có";
         
+        // Lưu thông tin cần câu ban đầu để so sánh sau này
+        const originalRodName = fishingData.currentRod ? FISHING_RODS[fishingData.currentRod]?.name || 'Unknown' : 'None';
         // Lưu thông tin mồi ban đầu để so sánh sau này
         const originalBaitName = fishingData.currentBait ? BAITS[fishingData.currentBait]?.name || 'Unknown' : 'None';
         
@@ -209,7 +211,7 @@ async function fishWithAnimation(message: Message) {
             .setTimestamp();
 
         // Tạo embed cho Admin GIF (hiển thị nhỏ gọn - 100x50px equivalent)
-        let adminEmbed = null;
+        let adminEmbed: EmbedBuilder | undefined = undefined;
         if (isAdmin) {
             adminEmbed = new EmbedBuilder()
                 .setThumbnail(adminGifUrl) // GIF đặc biệt cho Admin (nhỏ gọn)
@@ -218,30 +220,30 @@ async function fishWithAnimation(message: Message) {
         }
 
         // Tạo embed cho Top 1 Fisher GIF (hiển thị nhỏ gọn)
-        let topFisherEmbed = null;
-        if (isTopFisher && !isAdmin && !isTopLose) { // Chỉ hiển thị nếu là top fisher và không phải admin/top lose
+        let topFisherEmbed: EmbedBuilder | undefined = undefined;
+        if (isTopFisher && !isAdmin && !isTopLose) {
             topFisherEmbed = new EmbedBuilder()
-                .setThumbnail(topFisherGifUrl) // GIF đặc biệt cho Top 1 Fisher (nhỏ gọn)
-                .setColor("#ff6b35") // Màu cam cho Top 1 Fisher
-                .setTitle("🏆 Top 1 Câu Cá"); // Tiêu đề nhỏ cho Top 1 Fisher
+                .setThumbnail(topFisherGifUrl)
+                .setColor("#ff6b35")
+                .setTitle("🏆 Top 1 Câu Cá");
         }
 
         // Tạo embed cho Top 1 Lose GIF (hiển thị nhỏ gọn)
-        let topLoseEmbed = null;
-        if (isTopLose && !isAdmin) { // Chỉ hiển thị nếu là top lose và không phải admin (ưu tiên hơn top fisher)
+        let topLoseEmbed: EmbedBuilder | undefined = undefined;
+        if (isTopLose && !isAdmin) {
             topLoseEmbed = new EmbedBuilder()
-                .setThumbnail(topLoseGifUrl) // GIF đặc biệt cho Top 1 Lose (nhỏ gọn)
-                .setColor("#ff4757") // Màu đỏ cho Top 1 Lose
-                .setTitle("💸 Top 1 Thua Lỗ"); // Tiêu đề nhỏ cho Top 1 Lose
+                .setThumbnail(topLoseGifUrl)
+                .setColor("#ff4757")
+                .setTitle("💸 Top 1 Thua Lỗ");
         }
 
         // Gửi embed(s) dựa trên vai trò
-        let embeds = [fishingEmbed];
-        if (isAdmin) {
+        let embeds: EmbedBuilder[] = [fishingEmbed];
+        if (isAdmin && adminEmbed) {
             embeds = [adminEmbed, fishingEmbed];
-        } else if (isTopLose) {
+        } else if (isTopLose && topLoseEmbed) {
             embeds = [topLoseEmbed, fishingEmbed];
-        } else if (isTopFisher) {
+        } else if (isTopFisher && topFisherEmbed) {
             embeds = [topFisherEmbed, fishingEmbed];
         }
         const fishingMsg = await message.reply({ embeds });
@@ -250,7 +252,7 @@ async function fishWithAnimation(message: Message) {
         for (let i = 1; i < animationSteps.length; i++) {
             await new Promise(resolve => setTimeout(resolve, 750)); // 750ms mỗi bước = 3 giây tổng
             
-            if (isAdmin) {
+            if (isAdmin && adminEmbed) {
                 // Admin: Cập nhật cả hai embed
                 const updatedFishingEmbed = EmbedBuilder.from(fishingMsg.embeds[1]) // Embed thứ 2 là fishing embed
                     .setDescription(
@@ -262,7 +264,7 @@ async function fishWithAnimation(message: Message) {
                 
                 const updatedEmbeds = [adminEmbed, updatedFishingEmbed];
                 await fishingMsg.edit({ embeds: updatedEmbeds });
-            } else if (isTopLose) {
+            } else if (isTopLose && topLoseEmbed) {
                 // Top 1 Lose: Cập nhật cả hai embed
                 const updatedFishingEmbed = EmbedBuilder.from(fishingMsg.embeds[1]) // Embed thứ 2 là fishing embed
                     .setDescription(
@@ -274,7 +276,7 @@ async function fishWithAnimation(message: Message) {
                 
                 const updatedEmbeds = [topLoseEmbed, updatedFishingEmbed];
                 await fishingMsg.edit({ embeds: updatedEmbeds });
-            } else if (isTopFisher) {
+            } else if (isTopFisher && topFisherEmbed) {
                 // Top 1 Fisher: Cập nhật cả hai embed
                 const updatedFishingEmbed = EmbedBuilder.from(fishingMsg.embeds[1]) // Embed thứ 2 là fishing embed
                     .setDescription(
@@ -338,6 +340,37 @@ async function fishWithAnimation(message: Message) {
             console.error('Error checking auto-equip bait:', error);
         }
 
+        // Kiểm tra auto-switch rod sau khi câu cá
+        let autoSwitchRodMessage = '';
+        try {
+            const fishingData = await FishingService.getFishingData(userId, guildId);
+            const currentRod = fishingData.rods.find((r: any) => r.rodType === fishingData.currentRod);
+            if (!currentRod || currentRod.durability <= 0) {
+                // Tìm cần mới được chọn
+                const newRod = fishingData.rods.find((r: any) => r.rodType === fishingData.currentRod);
+                if (newRod) {
+                    const rodData = FISHING_RODS[newRod.rodType];
+                    autoSwitchRodMessage = `\n\n🔄 **Tự động chuyển sang cần câu:** ${rodData.emoji} ${rodData.name} (Độ bền: ${newRod.durability})`;
+                }
+            }
+        } catch (error) {
+            console.error('Error checking auto-switch rod:', error);
+        }
+
+        // Kiểm tra auto-equip rod (trang bị cần tự động)
+        let autoEquipRodMessage = '';
+        try {
+            if (originalRodName !== rodName) {
+                const rodData = FISHING_RODS[fishingData.currentRod];
+                const currentRod = fishingData.rods.find((r: any) => r.rodType === fishingData.currentRod);
+                if (rodData && currentRod) {
+                    autoEquipRodMessage = `\n\n⚡ **Tự động trang bị cần câu:** ${rodData.emoji} ${rodData.name} (Độ bền: ${currentRod.durability})`;
+                }
+            }
+        } catch (error) {
+            console.error('Error checking auto-equip rod:', error);
+        }
+
         // Tự động thêm cá huyền thoại vào fish inventory
         let fishInventoryMessage = '';
         if (fish.rarity === 'legendary') {
@@ -381,7 +414,7 @@ async function fishWithAnimation(message: Message) {
                 `**${message.author.username}** đã câu được:\n\n` +
                 `${fish.emoji} **${fish.name}**\n` +
                 `${getRarityEmoji(fish.rarity)} **${getRarityText(fish.rarity)}**\n` +
-                `🐟 **Giá trị:** ${value} FishCoin${fishInventoryMessage}${autoSwitchMessage}${autoEquipMessage}` +
+                `🐟 **Giá trị:** ${value} FishCoin${fishInventoryMessage}${autoSwitchMessage}${autoEquipMessage}${autoSwitchRodMessage}${autoEquipRodMessage}` +
                 (isAdmin && fish.rarity === 'legendary' ? '\n\n👑 **Admin đã câu được cá huyền thoại!**' : '')
             )
             .setColor(getRarityColor(fish.rarity))
@@ -389,20 +422,16 @@ async function fishWithAnimation(message: Message) {
             .setTimestamp();
 
         // Gửi kết quả dựa trên vai trò
-        if (isAdmin) {
-            // Admin: Giữ lại Admin GIF và thêm kết quả
+        if (isAdmin && adminEmbed) {
             const finalEmbeds = [adminEmbed, successEmbed];
             await fishingMsg.edit({ embeds: finalEmbeds });
-        } else if (isTopLose) {
-            // Top 1 Lose: Giữ lại Top Lose GIF và thêm kết quả
+        } else if (isTopLose && topLoseEmbed) {
             const finalEmbeds = [topLoseEmbed, successEmbed];
             await fishingMsg.edit({ embeds: finalEmbeds });
-        } else if (isTopFisher) {
-            // Top 1 Fisher: Giữ lại Top Fisher GIF và thêm kết quả
+        } else if (isTopFisher && topFisherEmbed) {
             const finalEmbeds = [topFisherEmbed, successEmbed];
             await fishingMsg.edit({ embeds: finalEmbeds });
         } else {
-            // Normal user: Chỉ gửi kết quả
             await fishingMsg.edit({ embeds: [successEmbed] });
         }
     } catch (error: any) {

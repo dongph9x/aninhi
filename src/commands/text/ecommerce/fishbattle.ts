@@ -420,31 +420,76 @@ async function showBattleHistory(message: any, userId: string, guildId: string) 
 async function showBattleLeaderboard(message: any, guildId: string) {
     const leaderboard = await FishBattleService.getBattleLeaderboard(guildId, 10);
 
-    if (leaderboard.length === 0) {
-        const embed = new EmbedBuilder()
-            .setTitle('🏆 Bảng Xếp Hạng Đấu Cá')
-            .setColor('#FFA500')
-            .setDescription('Chưa có dữ liệu đấu cá nào!')
-            .setTimestamp();
-
-        return message.reply({ embeds: [embed] });
-    }
-
+    // Tạo embed chính cho leaderboard
     const embed = new EmbedBuilder()
         .setTitle('🏆 Bảng Xếp Hạng Đấu Cá')
         .setColor('#FFD700')
         .setTimestamp();
 
-    leaderboard.forEach((user: any, index) => {
-        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
-        const winRate = user.totalBattles > 0 ? Math.round((user.wins / user.totalBattles) * 100) : 0;
+        // Tạo embed riêng cho top 1 với GIF ở chính giữa
+    let top1Embed: EmbedBuilder | undefined;
+    let hasRealTop1 = false;
 
-        embed.addFields({
-            name: `${medal} <@${user.userId}>`,
-            value: `🏆 ${user.wins}W/${user.totalBattles}L (${winRate}%) | 💰 ${user.totalEarnings.toLocaleString()} coins`,
-            inline: false
-        });
-    });
+    // Luôn hiển thị top 10, kể cả khi không có dữ liệu đấu cá
+    for (let i = 0; i < 10; i++) {
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+        
+        if (i < leaderboard.length) {
+            const user = leaderboard[i];
+            const winRate = user.totalBattles > 0 ? Math.round((user.wins / user.totalBattles) * 100) : 0;
+            
+            // Kiểm tra nếu user có dữ liệu đấu cá thực tế hoặc không phải user test
+            const hasRealBattleData = user.totalBattles > 0 || user.totalEarnings > 0;
+            const isTestUser = user.userId.includes('test-') || user.userId.includes('test_') || user.userId.includes('real-battle-user');
+            
+            if (hasRealBattleData && !isTestUser) {
+                // Hiển thị user thực tế có dữ liệu đấu cá
+                if (i === 0) {
+                    // Top 1: Tạo embed riêng với GIF ở trên cùng và căn giữa
+                    hasRealTop1 = true;
+                    top1Embed = new EmbedBuilder()
+                        .setColor('#FFD700')
+                        .setThumbnail('https://media.discordapp.net/attachments/1396335030216822875/1398569225718861854/113_144.gif?ex=6885d697&is=68848517&hm=e4170005d400feac541c4b903b2fa4d329a734c157da76a12b9dbc13e840145f&=&width=260&height=104')
+                        .setDescription(`**<@${user.userId}>**\n🏆 ${user.wins}W/${user.totalBattles}L (${winRate}%) | 🐟 ${user.totalEarnings.toLocaleString()} FishCoin`);
+                } else {
+                    // Các vị trí khác: Hiển thị emoji bình thường
+                    embed.addFields({
+                        name: `${medal} <@${user.userId}>`,
+                        value: `🏆 ${user.wins}W/${user.totalBattles}L (${winRate}%) | 🐟 ${user.totalEarnings.toLocaleString()} FishCoin`,
+                        inline: false
+                    });
+                }
+            } else {
+                // Ẩn user test hoặc user không có dữ liệu đấu cá
+                embed.addFields({
+                    name: `${medal} Trống`,
+                    value: `🏆 0W/0L (0%) | 🐟 0 FishCoin`,
+                    inline: false
+                });
+            }
+        } else {
+            // Hiển thị tên trống cho các vị trí còn lại
+            embed.addFields({
+                name: `${medal} Trống`,
+                value: `🏆 0W/0L (0%) | 🐟 0 FishCoin`,
+                inline: false
+            });
+        }
+    }
 
-    message.reply({ embeds: [embed] });
+    // Nếu không có top 1 thực tế, tạo embed với "Admin"
+    if (!hasRealTop1) {
+        top1Embed = new EmbedBuilder()
+            .setColor('#FFD700')
+            .setDescription(`**Admin**\n🏆 0W/0L (0%) | 🐟 0 FishCoin`);
+    }
+
+    // Gửi embeds
+    const embeds = [];
+    if (top1Embed) {
+        embeds.push(top1Embed);
+    }
+    embeds.push(embed);
+    
+    message.reply({ embeds });
 } 
