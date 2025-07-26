@@ -4,7 +4,7 @@ import { Bot } from "@/classes";
 import { EcommerceService } from "@/utils/ecommerce-db";
 import { GameStatsService } from "@/utils/gameStats";
 
-const maxBet = 300000;
+const maxBet = 100000;
 const slots = ["🍆", "❤️", "🍒", "🪙", "😊", "😄"];
 const moving = "🎰";
 

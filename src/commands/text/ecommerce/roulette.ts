@@ -5,7 +5,7 @@ import { config } from "@/config";
 import { EcommerceService } from "@/utils/ecommerce-db";
 import { GameStatsService } from "@/utils/gameStats";
 
-const maxBet = 300000;
+const maxBet = 100000;
 const minBet = 10;
 
 // Các loại cược và tỷ lệ thắng

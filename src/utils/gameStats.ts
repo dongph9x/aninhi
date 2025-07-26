@@ -224,6 +224,61 @@ export class GameStatsService {
     }
 
     /**
+     * Lấy thông tin người có số lần thua nhiều nhất (top 1 lose)
+     */
+    static async getTopLoseUser(guildId: string) {
+        try {
+            const topLoseUser = await prisma.gameStats.groupBy({
+                by: ['userId'],
+                where: {
+                    guildId,
+                    totalLost: { gt: 0 }
+                },
+                _sum: {
+                    totalLost: true,
+                    totalBet: true,
+                    gamesPlayed: true,
+                    gamesWon: true,
+                    biggestLoss: true
+                },
+                orderBy: {
+                    _sum: {
+                        totalLost: 'desc'
+                    }
+                },
+                take: 1
+            });
+
+            if (topLoseUser.length === 0) {
+                return null;
+            }
+
+            const entry = topLoseUser[0];
+            const user = await prisma.user.findUnique({
+                where: {
+                    userId_guildId: {
+                        userId: entry.userId,
+                        guildId
+                    }
+                }
+            });
+
+            return {
+                userId: entry.userId,
+                totalLost: entry._sum.totalLost || 0n,
+                totalBet: entry._sum.totalBet || 0n,
+                gamesPlayed: entry._sum.gamesPlayed || 0,
+                gamesWon: entry._sum.gamesWon || 0,
+                biggestLoss: entry._sum.biggestLoss || 0n,
+                user: user
+            };
+        } catch (error) {
+            console.error("Error getting top lose user:", error);
+            return null;
+        }
+    }
+
+    /**
      * Lấy tổng thống kê game của server
      */
     static async getServerGameStats(guildId: string) {

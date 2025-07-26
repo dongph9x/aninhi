@@ -1,7 +1,7 @@
 import { FISH_LIST, FISHING_RODS, BAITS } from '../src/utils/fishing';
 
 function calculateLegendaryFishRate() {
-  console.log('🎣 Tính Toán Tỷ Lệ Cá Huyền Thoại\n');
+  console.log('🎣 Tính Toán Tỷ Lệ Cá Huyền Thoại (Chỉ Cần Kim Cương + Mồi Thần)\n');
 
   // 1. Tỷ lệ cơ bản (không có cần câu và mồi)
   console.log('1️⃣ Tỷ Lệ Cơ Bản (Không Có Cần Câu Và Mồi):');
@@ -14,6 +14,7 @@ function calculateLegendaryFishRate() {
   console.log(`   Tổng tỷ lệ tất cả cá: ${totalChance}%`);
   console.log(`   Tổng tỷ lệ cá huyền thoại: ${legendaryChance}%`);
   console.log(`   Tỷ lệ ra cá huyền thoại: ${legendaryRate.toFixed(2)}%`);
+  console.log(`   ⚠️  Lưu ý: Chỉ có thể câu được cá huyền thoại với cần câu kim cương + mồi thần!`);
   console.log();
   
   // 2. Chi tiết từng loại cá huyền thoại
@@ -30,6 +31,9 @@ function calculateLegendaryFishRate() {
   Object.entries(FISHING_RODS).forEach(([rodType, rod]) => {
     console.log(`\n   🎣 ${rod.name} (${rod.rarityBonus}% bonus):`);
     
+    // Kiểm tra có thể câu được cá huyền thoại không
+    const canCatchLegendary = rodType === "diamond";
+    
     // Tính tỷ lệ mới với bonus từ cần câu
     const adjustedFish = FISH_LIST.map(fish => {
       let adjustedChance = fish.chance;
@@ -38,8 +42,10 @@ function calculateLegendaryFishRate() {
         adjustedChance += rod.rarityBonus * 0.5;
       } else if (fish.rarity === "epic") {
         adjustedChance += rod.rarityBonus * 0.3;
-      } else if (fish.rarity === "legendary") {
+      } else if (fish.rarity === "legendary" && canCatchLegendary) {
         adjustedChance += rod.rarityBonus * 0.1;
+      } else if (fish.rarity === "legendary" && !canCatchLegendary) {
+        adjustedChance = 0; // Không thể câu được cá huyền thoại
       }
       
       return { ...fish, adjustedChance };
@@ -53,7 +59,11 @@ function calculateLegendaryFishRate() {
     
     console.log(`     Tổng tỷ lệ: ${newTotalChance.toFixed(1)}%`);
     console.log(`     Tỷ lệ cá huyền thoại: ${newLegendaryRate.toFixed(2)}%`);
-    console.log(`     Tăng: +${(newLegendaryRate - legendaryRate).toFixed(2)}%`);
+    if (canCatchLegendary) {
+      console.log(`     Tăng: +${(newLegendaryRate - legendaryRate).toFixed(2)}%`);
+    } else {
+      console.log(`     ❌ Không thể câu được cá huyền thoại`);
+    }
   });
 
   // 4. Tỷ lệ với các loại mồi khác nhau
@@ -61,6 +71,9 @@ function calculateLegendaryFishRate() {
   
   Object.entries(BAITS).forEach(([baitType, bait]) => {
     console.log(`\n   ${bait.emoji} ${bait.name} (${bait.rarityBonus}% bonus):`);
+    
+    // Kiểm tra có thể câu được cá huyền thoại không
+    const canCatchLegendary = baitType === "divine";
     
     // Tính tỷ lệ mới với bonus từ mồi
     const adjustedFish = FISH_LIST.map(fish => {
@@ -70,8 +83,10 @@ function calculateLegendaryFishRate() {
         adjustedChance += bait.rarityBonus * 0.5;
       } else if (fish.rarity === "epic") {
         adjustedChance += bait.rarityBonus * 0.3;
-      } else if (fish.rarity === "legendary") {
+      } else if (fish.rarity === "legendary" && canCatchLegendary) {
         adjustedChance += bait.rarityBonus * 0.1;
+      } else if (fish.rarity === "legendary" && !canCatchLegendary) {
+        adjustedChance = 0; // Không thể câu được cá huyền thoại
       }
       
       return { ...fish, adjustedChance };
@@ -85,25 +100,30 @@ function calculateLegendaryFishRate() {
     
     console.log(`     Tổng tỷ lệ: ${newTotalChance.toFixed(1)}%`);
     console.log(`     Tỷ lệ cá huyền thoại: ${newLegendaryRate.toFixed(2)}%`);
-    console.log(`     Tăng: +${(newLegendaryRate - legendaryRate).toFixed(2)}%`);
+    if (canCatchLegendary) {
+      console.log(`     Tăng: +${(newLegendaryRate - legendaryRate).toFixed(2)}%`);
+    } else {
+      console.log(`     ❌ Không thể câu được cá huyền thoại`);
+    }
   });
 
   // 5. Tỷ lệ tối đa (cần câu kim cương + mồi thần)
   console.log('\n5️⃣ Tỷ Lệ Tối Đa (Cần Câu Kim Cương + Mồi Thần):');
+  console.log('   ⭐ Đây là cách DUY NHẤT để câu được cá huyền thoại!');
   
-  const maxRodBonus = FISHING_RODS.diamond.rarityBonus; // 10%
-  const maxBaitBonus = BAITS.divine.rarityBonus; // 10%
-  const totalBonus = maxRodBonus + maxBaitBonus; // 20%
+  const maxRodBonus = FISHING_RODS.diamond.rarityBonus; // 5%
+  const maxBaitBonus = BAITS.divine.rarityBonus; // 5%
+  const totalBonus = maxRodBonus + maxBaitBonus; // 10%
   
   const maxAdjustedFish = FISH_LIST.map(fish => {
     let adjustedChance = fish.chance;
     
     if (fish.rarity === "rare") {
-      adjustedChance += totalBonus * 0.5; // +10%
+      adjustedChance += totalBonus * 0.5; // +5%
     } else if (fish.rarity === "epic") {
-      adjustedChance += totalBonus * 0.3; // +6%
+      adjustedChance += totalBonus * 0.3; // +3%
     } else if (fish.rarity === "legendary") {
-      adjustedChance += totalBonus * 0.1; // +2%
+      adjustedChance += totalBonus * 0.1; // +1%
     }
     
     return { ...fish, adjustedChance };
