@@ -314,6 +314,24 @@ export class GameStatsService {
     }
 
     /**
+     * Lấy top 1 user có nhiều FishCoin nhất
+     */
+    static async getTopFishCoinUser(guildId: string): Promise<string | null> {
+        try {
+            const topFishCoinUser = await prisma.user.findFirst({
+                where: { guildId },
+                orderBy: { fishBalance: 'desc' },
+                select: { userId: true }
+            });
+
+            return topFishCoinUser?.userId || null;
+        } catch (error) {
+            console.error('Error getting top FishCoin user:', error);
+            return null;
+        }
+    }
+
+    /**
      * Lấy thống kê lose tổng hợp của server
      */
     static async getServerLoseStats(guildId: string) {
