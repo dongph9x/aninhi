@@ -36,7 +36,7 @@ services:
     command: >
       sh -c "
         npx prisma generate &&
-        npx prisma db push --force-reset &&
+        npx prisma migrate deploy &&
         echo 'Database initialized successfully'
       "
     profiles:
