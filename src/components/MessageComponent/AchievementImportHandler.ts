@@ -100,6 +100,19 @@ export class AchievementImportHandler {
     try {
       const prisma = (await import('../../utils/prisma')).default;
 
+      // Kiểm tra xem bảng Achievement có tồn tại không
+      try {
+        await prisma.achievement.count();
+      } catch (error: any) {
+        if (error.code === 'P2021') {
+          return await interaction.reply({ 
+            content: '❌ Bảng Achievement chưa được tạo trong database. Vui lòng chạy migration trước!', 
+            ephemeral: true 
+          });
+        }
+        throw error;
+      }
+
       const achievements = await prisma.achievement.findMany({
         orderBy: { createdAt: 'desc' },
       });
@@ -221,6 +234,19 @@ export class AchievementImportHandler {
       }
 
       const prisma = (await import('../../utils/prisma')).default;
+
+      // Kiểm tra xem bảng Achievement có tồn tại không
+      try {
+        await prisma.achievement.count();
+      } catch (error: any) {
+        if (error.code === 'P2021') {
+          return await interaction.reply({ 
+            content: '❌ Bảng Achievement chưa được tạo trong database. Vui lòng chạy migration trước!', 
+            ephemeral: true 
+          });
+        }
+        throw error;
+      }
 
       const achievement = await prisma.achievement.create({
         data: {
