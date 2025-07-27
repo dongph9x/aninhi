@@ -386,7 +386,7 @@ export class FishMarketHandler {
     // Kiểm tra xem cá có thuộc về user hiện tại không
     if (fish && fish.userId === messageData.userId) {
       const stats = fish.stats || {};
-      const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0);
+      const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0) + (stats.accuracy || 0);
       
       // Tính giá gợi ý dựa trên level và power
       const suggestedPrice = Math.floor(Number(fish.value) * (1 + (fish.level - 1) * 0.1) + totalPower * 100);
@@ -516,7 +516,7 @@ export class FishMarketHandler {
       if (result.success && result.fish && result.price) {
         const fish = result.fish;
         const stats = fish.stats || {};
-        const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0);
+        const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0) + (stats.accuracy || 0);
         
         // Tạo embed thông báo thành công
         const { EmbedBuilder } = await import('discord.js');
@@ -527,7 +527,7 @@ export class FishMarketHandler {
           .addFields(
             { name: "🐟 Giá đã trả", value: `${result.price.toLocaleString()} FishCoin`, inline: true },
             { name: "📊 Thông tin cá", value: `Level: ${fish.level} | Gen: ${fish.generation} | Power: ${totalPower}`, inline: true },
-            { name: "📈 Stats", value: `💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}`, inline: false }
+            { name: "📈 Stats", value: `💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0} 🎯${stats.accuracy || 0}`, inline: false }
           )
           .setTimestamp();
 

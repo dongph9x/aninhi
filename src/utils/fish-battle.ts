@@ -2,6 +2,7 @@ import prisma from './prisma';
 import { FishBreedingService } from './fish-breeding';
 import { BattleFishInventoryService } from './battle-fish-inventory';
 import { fishCoinDB } from './fish-coin';
+import { WeaponService } from './weapon';
 import type { FishStats } from './fish-breeding';
 
 export interface BattleResult {
@@ -289,15 +290,46 @@ export class FishBattleService {
 
     // Tạo battle log
     const battleLog: string[] = [];
+    
+    // === PHASE 0: KIỂM TRA VŨ KHÍ TRANG BỊ ===
     battleLog.push(`⚔️ **${userFish.species}** vs **${opponentFish.species}**`);
     battleLog.push(`💪 Sức mạnh cơ bản: ${Math.floor(userBasePower)} vs ${Math.floor(opponentBasePower)}`);
 
+    // Lấy weapon stats của user
+    const userWeaponStats = await WeaponService.getTotalWeaponStats(userId, guildId);
+    const userEquippedWeapon = await WeaponService.getEquippedWeapon(userId, guildId);
+    
+    // Tính toán sức mạnh sau khi cộng weapon stats
+    let userPowerWithWeapon = userBasePower;
+    let opponentPowerWithWeapon = opponentBasePower;
+    
+    if (userWeaponStats.power > 0 || userWeaponStats.defense > 0 || userWeaponStats.accuracy > 0) {
+      // Cộng weapon stats vào sức mạnh
+      userPowerWithWeapon += userWeaponStats.power * 10; // 1 ATK = +10 power
+      userPowerWithWeapon += userWeaponStats.defense * 5; // 1 DEF = +5 power
+      
+      // Accuracy ảnh hưởng đến critical hit chance
+      const accuracyBonus = userWeaponStats.accuracy * 0.01; // 1% accuracy = +1% crit chance
+      
+      battleLog.push(`\n⚔️ **Vũ khí trang bị của ${userFish.species}:**`);
+      if (userEquippedWeapon) {
+        const weapon = WeaponService.getWeaponById(userEquippedWeapon.weaponId);
+        if (weapon) {
+          battleLog.push(`🗡️ ${weapon.name} (${weapon.rarity})`);
+        }
+      }
+      battleLog.push(`⚔️ ATK: +${userWeaponStats.power} | 🛡️ DEF: +${userWeaponStats.defense} | 🎯 Accuracy: +${userWeaponStats.accuracy}%`);
+      battleLog.push(`💪 Sức mạnh sau vũ khí: ${Math.floor(userPowerWithWeapon)}`);
+    } else {
+      battleLog.push(`\n⚔️ **${userFish.species}** không có vũ khí trang bị`);
+    }
+
     // Thêm chi tiết stats
     battleLog.push(`\n📊 **Stats ${userFish.species}:**`);
-    battleLog.push(`💪 Sức mạnh: ${userStats.strength || 0} | 🏃 Thể lực: ${userStats.agility || 0} | 🧠 Trí tuệ: ${userStats.intelligence || 0} | 🛡️ Phòng thủ: ${userStats.defense || 0} | 🍀 May mắn: ${userStats.luck || 0}`);
+            battleLog.push(`💪 Sức mạnh: ${userStats.strength || 0} | 🏃 Thể lực: ${userStats.agility || 0} | 🧠 Trí tuệ: ${userStats.intelligence || 0} | 🛡️ Phòng thủ: ${userStats.defense || 0} | 🍀 May mắn: ${userStats.luck || 0} | 🎯 Độ chính xác: ${userStats.accuracy || 0}`);
 
     battleLog.push(`\n📊 **Stats ${opponentFish.species}:**`);
-    battleLog.push(`💪 Sức mạnh: ${opponentStats.strength || 0} | 🏃 Thể lực: ${opponentStats.agility || 0} | 🧠 Trí tuệ: ${opponentStats.intelligence || 0} | 🛡️ Phòng thủ: ${opponentStats.defense || 0} | 🍀 May mắn: ${opponentStats.luck || 0}`);
+            battleLog.push(`💪 Sức mạnh: ${opponentStats.strength || 0} | 🏃 Thể lực: ${opponentStats.agility || 0} | 🧠 Trí tuệ: ${opponentStats.intelligence || 0} | 🛡️ Phòng thủ: ${opponentStats.defense || 0} | 🍀 May mắn: ${opponentStats.luck || 0} | 🎯 Độ chính xác: ${opponentStats.accuracy || 0}`);
 
     // === PHASE 1: KIỂM TRA ĐIỀU KIỆN ĐẶC BIỆT ===
     battleLog.push(`\n🎯 **PHASE 1: Kiểm tra điều kiện đặc biệt**`);
@@ -350,32 +382,32 @@ export class FishBattleService {
     battleLog.push(`${opponentBuffEmoji} **${opponentFish.species}** ${opponentBuffText} ${opponentBuffType.name} ${opponentBuffAmount} điểm!`);
     
     // Tính toán sức mạnh sau buff/debuff
-    let userBuffPower = userBasePower;
-    let opponentBuffPower = opponentBasePower;
+    let userBuffPower = userPowerWithWeapon;
+    let opponentBuffPower = opponentPowerWithWeapon;
     
     // Áp dụng buff/debuff vào sức mạnh
     if (userBuffType.stat === 'strength') {
-      userBuffPower = userBasePower * userBuffMultiplier;
+      userBuffPower = userPowerWithWeapon * userBuffMultiplier;
     } else if (userBuffType.stat === 'agility') {
-      userBuffPower = userBasePower * userBuffMultiplier;
+      userBuffPower = userPowerWithWeapon * userBuffMultiplier;
     } else if (userBuffType.stat === 'intelligence') {
-      userBuffPower = userBasePower * userBuffMultiplier;
+      userBuffPower = userPowerWithWeapon * userBuffMultiplier;
     } else if (userBuffType.stat === 'defense') {
-      userBuffPower = userBasePower * userBuffMultiplier;
+      userBuffPower = userPowerWithWeapon * userBuffMultiplier;
     } else if (userBuffType.stat === 'luck') {
-      userBuffPower = userBasePower * userBuffMultiplier;
+      userBuffPower = userPowerWithWeapon * userBuffMultiplier;
     }
     
     if (opponentBuffType.stat === 'strength') {
-      opponentBuffPower = opponentBasePower * opponentBuffMultiplier;
+      opponentBuffPower = opponentPowerWithWeapon * opponentBuffMultiplier;
     } else if (opponentBuffType.stat === 'agility') {
-      opponentBuffPower = opponentBasePower * opponentBuffMultiplier;
+      opponentBuffPower = opponentPowerWithWeapon * opponentBuffMultiplier;
     } else if (opponentBuffType.stat === 'intelligence') {
-      opponentBuffPower = opponentBasePower * opponentBuffMultiplier;
+      opponentBuffPower = opponentPowerWithWeapon * opponentBuffMultiplier;
     } else if (opponentBuffType.stat === 'defense') {
-      opponentBuffPower = opponentBasePower * opponentBuffMultiplier;
+      opponentBuffPower = opponentPowerWithWeapon * opponentBuffMultiplier;
     } else if (opponentBuffType.stat === 'luck') {
-      opponentBuffPower = opponentBasePower * opponentBuffMultiplier;
+      opponentBuffPower = opponentPowerWithWeapon * opponentBuffMultiplier;
     }
     
     battleLog.push(`💪 Sức mạnh sau buff/debuff: ${Math.floor(userBuffPower)} vs ${Math.floor(opponentBuffPower)}`);
@@ -402,7 +434,8 @@ export class FishBattleService {
     // === PHASE 3: KIỂM TRA CRITICAL HIT ===
     battleLog.push(`\n🎯 **PHASE 3: Kiểm tra đòn đánh quan trọng**`);
     
-    const userCritChance = (userStats.luck || 0) / 200; // 0.5% mỗi điểm luck
+            // Critical hit chance = luck + fish accuracy + weapon accuracy
+        const userCritChance = (userStats.luck || 0) / 200 + (userStats.accuracy || 0) / 200 + (userWeaponStats.accuracy || 0) / 100; // 0.5% mỗi điểm luck + 0.5% mỗi điểm fish accuracy + 1% mỗi điểm weapon accuracy
     const opponentCritChance = (opponentStats.luck || 0) / 200;
     
     const userCritRoll = Math.random();
@@ -420,6 +453,10 @@ export class FishBattleService {
       opponentCritMultiplier = 1.5;
       battleLog.push(`💥 **CRITICAL HIT!** ${opponentFish.species} gây sát thương x1.5!`);
     }
+
+    // Hiển thị critical hit chance
+            battleLog.push(`🎯 ${userFish.species} Crit Chance: ${Math.round(userCritChance * 100)}% (Luck: ${userStats.luck || 0} + Fish Accuracy: ${userStats.accuracy || 0} + Weapon Accuracy: ${userWeaponStats.accuracy || 0}%)`);
+    battleLog.push(`🎯 ${opponentFish.species} Crit Chance: ${Math.round(opponentCritChance * 100)}% (Luck: ${opponentStats.luck || 0})`);
 
     // === PHASE 4: KIỂM TRA KHẢ NĂNG ĐẶC BIỆT ===
     battleLog.push(`\n✨ **PHASE 4: Kiểm tra khả năng đặc biệt**`);

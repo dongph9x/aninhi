@@ -419,7 +419,7 @@ export class FishBarnUI {
 
   private calculateTotalPower(fish: any): number {
     const stats = fish.stats || {};
-    const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0);
+    const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0) + (stats.accuracy || 0);
     return totalPower;
   }
 
@@ -449,7 +449,7 @@ export class FishBarnUI {
     
     text += `**Thế hệ:** ${fish.generation}\n`;
     text += `**Tổng sức mạnh:** ${totalPower}\n`;
-    text += `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}`;
+    text += `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0} 🎯${stats.accuracy || 0}`;
     
     return text;
   }

@@ -86,7 +86,7 @@ export class FishMarketUI {
       embed.addFields({
         name: `🐟 ${fish.name} (Lv.${fish.level}, Gen.${fish.generation}) - 💰${listing.price.toLocaleString()}`,
         value: `**Power:** ${totalPower} | **Rarity:** ${fish.rarity} | **Còn lại:** ${timeLeft}h\n` +
-               `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}\n` +
+               `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0} 🎯${stats.accuracy || 0}\n` +
                `**ID:** \`${fish.id}\` | **Người bán:** <@${listing.sellerId}>\n` +
                `**Trạng thái:** ${buyStatus}`,
         inline: false
@@ -135,7 +135,7 @@ export class FishMarketUI {
       embed.addFields({
         name: `🐟 ${fish.name} (Lv.${fish.level}, Gen.${fish.generation})`,
         value: `**Power:** ${totalPower} | **Rarity:** ${fish.rarity}\n` +
-               `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}\n` +
+               `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0} 🎯${stats.accuracy || 0}\n` +
                `**ID:** \`${fish.id}\``,
         inline: false
       });
@@ -174,7 +174,7 @@ export class FishMarketUI {
       embed.addFields({
         name: `🐟 ${fish.name} (Lv.${fish.level}, Gen.${fish.generation}) - 💰${listing.price.toLocaleString()} ${isExpired ? '⏰ HẾT HẠN' : ''}`,
         value: `**Power:** ${totalPower} | **Còn lại:** ${isExpired ? 'Hết hạn' : `${timeLeft}h`}\n` +
-               `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}\n` +
+               `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0} 🎯${stats.accuracy || 0}\n` +
                `**ID:** \`${fish.id}\``,
         inline: false
       });
@@ -199,7 +199,7 @@ export class FishMarketUI {
       embed.addFields({
         name: `🐟 ${fish.name} (Lv.${fish.level}, Gen.${fish.generation}) - 💰${listing.price.toLocaleString()}`,
         value: `**Power:** ${totalPower} | **Rarity:** ${fish.rarity}\n` +
-               `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}\n` +
+               `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0} 🎯${stats.accuracy || 0}\n` +
                `**ID:** \`${fish.id}\` | **Người bán:** <@${listing.sellerId}>`,
         inline: false
       });
@@ -491,7 +491,7 @@ export class FishMarketUI {
 
   private calculateTotalPower(fish: any): number {
     const stats = fish.stats || {};
-    return (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0);
+    return (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0) + (stats.accuracy || 0);
   }
 
   private getListedFishIds(): string[] {

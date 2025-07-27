@@ -8,6 +8,7 @@ export interface FishStats {
   intelligence: number;  // Trí thông minh (1-100)
   defense: number;       // Phòng thủ (1-100)
   luck: number;          // May mắn (1-100)
+  accuracy: number;      // Độ chính xác (1-100) - MỚI THÊM
 }
 
 export interface FishBreedingPair {
@@ -116,6 +117,7 @@ export class FishBreedingService {
       intelligence: Math.floor(Math.random() * 50) + 25,  // 25-75
       defense: Math.floor(Math.random() * 50) + 25,       // 25-75
       luck: Math.floor(Math.random() * 50) + 25,          // 25-75
+      accuracy: Math.floor(Math.random() * 50) + 25,      // 25-75 - MỚI THÊM
     };
   }
 
@@ -129,6 +131,7 @@ export class FishBreedingService {
       intelligence: 0,
       defense: 0,
       luck: 0,
+      accuracy: 0,
     };
   }
 
@@ -156,6 +159,7 @@ export class FishBreedingService {
       intelligence: 0,
       defense: 0,
       luck: 0,
+      accuracy: 0,
     };
 
     // Di truyền 60% từ bố mẹ, 40% ngẫu nhiên

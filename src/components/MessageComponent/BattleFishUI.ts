@@ -77,7 +77,7 @@ export class BattleFishUI {
                     name: '🎯 Cá Được Chọn',
                     value: `**${fish.name}** (Lv.${fish.level}, Gen.${fish.generation})\n` +
                            `💪 Power: ${power} | 🐟 ${fish.value.toLocaleString()} FishCoin\n` +
-                           `📊 Stats: 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}`,
+                           `📊 Stats: 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0} 🎯${stats.accuracy || 0}`,
                     inline: false
                 });
             }
@@ -90,7 +90,7 @@ export class BattleFishUI {
                 
                 return `**${index + 1}. ${fish.name}** (Lv.${fish.level}, Gen.${fish.generation})\n` +
                        `💪 Power: ${power} | 🐟 ${fish.value.toLocaleString()} FishCoin\n` +
-                       `📊 Stats: 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}`;
+                       `📊 Stats: 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0} 🎯${stats.accuracy || 0}`;
             }).join('\n\n');
 
             embed.addFields({
@@ -108,7 +108,7 @@ export class BattleFishUI {
                 
                 return `**${index + 1}. ${fish.name}** (Lv.${fish.level}, Gen.${fish.generation})\n` +
                        `💪 Power: ${power} | 🐟 ${fish.value.toLocaleString()} FishCoin\n` +
-                       `📊 Stats: 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}`;
+                       `📊 Stats: 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0} 🎯${stats.accuracy || 0}`;
             }).join('\n\n');
 
             embed.addFields({
@@ -259,7 +259,7 @@ export class BattleFishUI {
 
     private calculatePower(fish: any): number {
         const stats = fish.stats || {};
-        const basePower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0);
+        const basePower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0) + (stats.accuracy || 0);
         return Math.floor(basePower * (1 + fish.level * 0.1));
     }
 

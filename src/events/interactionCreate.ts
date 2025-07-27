@@ -108,6 +108,26 @@ export default Bot.createEvent({
                 return;
             }
 
+            // Kiểm tra xem có phải weapon shop interaction không
+            if (interaction.customId.startsWith("weapon_shop_") || interaction.customId.startsWith("weapon_")) {
+                console.log("WeaponShop interaction:", interaction.customId);
+                
+                try {
+                    const { WeaponShopHandler } = await import("../components/MessageComponent/WeaponShopHandler");
+                    if (interaction.isButton()) {
+                        await WeaponShopHandler.handleButton(interaction);
+                    } else if (interaction.isStringSelectMenu()) {
+                        await WeaponShopHandler.handleSelectMenu(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling WeaponShop interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác weapon shop!`);
+                    }
+                }
+                return;
+            }
+
             // Kiểm tra xem có phải bank interaction không
             if (interaction.customId.startsWith("bank_")) {
                 console.log("Bank interaction:", interaction.customId);

@@ -168,13 +168,13 @@ async function showMarketListings(message: any, guildId: string, page: number = 
         for (const listing of result.listings) {
             const fish = listing.fish;
             const stats = fish.stats || {};
-            const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0);
+            const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0) + (stats.accuracy || 0);
             const timeLeft = Math.max(0, Math.floor((new Date(listing.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60)));
             
             embed.addFields({
                 name: `🐟 ${fish.name} (Lv.${fish.level}, Gen.${fish.generation}) - 🐟${listing.price.toLocaleString()}`,
                 value: `**Power:** ${totalPower} | **Rarity:** ${fish.rarity} | **Còn lại:** ${timeLeft}h\n` +
-                       `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}\n` +
+                       `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0} 🎯${stats.accuracy || 0}\n` +
                        `**ID:** \`${fish.id}\` | **Người bán:** <@${listing.sellerId}>`,
                 inline: false
             });
@@ -234,7 +234,7 @@ async function sellFish(message: any, userId: string, guildId: string, args: str
         if (result.success) {
             const fish = result.listing.fish;
             const stats = fish.stats || {};
-            const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0);
+            const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0) + (stats.accuracy || 0);
             
             const embed = new EmbedBuilder()
                 .setTitle("✅ Đã treo bán cá thành công!")
@@ -244,7 +244,7 @@ async function sellFish(message: any, userId: string, guildId: string, args: str
                     { name: "🐟 Giá bán", value: `${price.toLocaleString()} FishCoin`, inline: true },
                     { name: "⏰ Thời gian", value: `${duration} giờ`, inline: true },
                     { name: "📊 Thông tin cá", value: `Level: ${fish.level} | Gen: ${fish.generation} | Power: ${totalPower}`, inline: true },
-                    { name: "📈 Stats", value: `💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}`, inline: false },
+                    { name: "📈 Stats", value: `💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0} 🎯${stats.accuracy || 0}`, inline: false },
                     { name: "🆔 Fish ID", value: `\`${fish.id}\``, inline: false }
                 )
                 .setTimestamp();
@@ -278,7 +278,7 @@ async function buyFish(message: any, userId: string, guildId: string, args: stri
         if (result.success) {
             const fish = result.fish;
             const stats = fish.stats || {};
-            const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0);
+            const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0) + (stats.accuracy || 0);
             
             const embed = new EmbedBuilder()
                 .setTitle("🛒 Mua cá thành công!")
@@ -287,7 +287,7 @@ async function buyFish(message: any, userId: string, guildId: string, args: stri
                 .addFields(
                     { name: "🐟 Giá đã trả", value: `${result.price.toLocaleString()} FishCoin`, inline: true },
                     { name: "📊 Thông tin cá", value: `Level: ${fish.level} | Gen: ${fish.generation} | Power: ${totalPower}`, inline: true },
-                    { name: "📈 Stats", value: `💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}`, inline: false }
+                    { name: "📈 Stats", value: `💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0} 🎯${stats.accuracy || 0}`, inline: false }
                 )
                 .setTimestamp();
 
@@ -365,14 +365,14 @@ async function showUserListings(message: any, userId: string, guildId: string) {
         for (const listing of listings) {
             const fish = listing.fish;
             const stats = fish.stats || {};
-            const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0);
+            const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0) + (stats.accuracy || 0);
             const timeLeft = Math.max(0, Math.floor((new Date(listing.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60)));
             const isExpired = timeLeft <= 0;
             
             embed.addFields({
                 name: `🐟 ${fish.name} (Lv.${fish.level}, Gen.${fish.generation}) - 💰${listing.price.toLocaleString()} ${isExpired ? '⏰ HẾT HẠN' : ''}`,
                 value: `**Power:** ${totalPower} | **Còn lại:** ${isExpired ? 'Hết hạn' : `${timeLeft}h`}\n` +
-                       `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}\n` +
+                       `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0} 🎯${stats.accuracy || 0}\n` +
                        `**ID:** \`${fish.id}\` | **Hủy:** \`n.fishmarket cancel ${fish.id}\``,
                 inline: false
             });
@@ -414,12 +414,12 @@ async function searchFish(message: any, guildId: string, args: string[]) {
         for (const listing of result.listings) {
             const fish = listing.fish;
             const stats = fish.stats || {};
-            const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0);
+            const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0) + (stats.accuracy || 0);
             
             embed.addFields({
                 name: `🐟 ${fish.name} (Lv.${fish.level}, Gen.${fish.generation}) - 💰${listing.price.toLocaleString()}`,
                 value: `**Power:** ${totalPower} | **Rarity:** ${fish.rarity}\n` +
-                       `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}\n` +
+                       `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0} 🎯${stats.accuracy || 0}\n` +
                        `**ID:** \`${fish.id}\` | **Mua:** \`n.fishmarket buy ${fish.id}\``,
                 inline: false
             });
@@ -481,12 +481,12 @@ async function filterFish(message: any, guildId: string, args: string[]) {
         for (const listing of result.listings) {
             const fish = listing.fish;
             const stats = fish.stats || {};
-            const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0);
+            const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0) + (stats.accuracy || 0);
             
             embed.addFields({
                 name: `🐟 ${fish.name} (Lv.${fish.level}, Gen.${fish.generation}) - 💰${listing.price.toLocaleString()}`,
                 value: `**Power:** ${totalPower} | **Rarity:** ${fish.rarity}\n` +
-                       `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}\n` +
+                       `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0} 🎯${stats.accuracy || 0}\n` +
                        `**ID:** \`${fish.id}\` | **Mua:** \`n.fishmarket buy ${fish.id}\``,
                 inline: false
             });
