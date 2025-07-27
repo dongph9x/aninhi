@@ -4,6 +4,7 @@ import { Bot } from "@/classes";
 import { config } from "@/config";
 import { EcommerceService } from "@/utils/ecommerce-db";
 import { FishingService, FISH_LIST, FISHING_RODS, BAITS } from "@/utils/fishing";
+import { AchievementService } from "@/utils/achievement";
 import prisma from "@/utils/prisma";
 
 function getRarityColor(rarity: string): number {
@@ -135,6 +136,10 @@ async function fishWithAnimation(message: Message) {
         const topFishCoinUser = await GameStatsService.getTopFishCoinUser(guildId);
         const isTopFishCoin = topFishCoinUser === userId;
 
+        // Kiểm tra Achievement của user (PRIORITY CAO NHẤT)
+        const userAchievement = await AchievementService.getHighestPriorityAchievement(userId);
+        const hasAchievement = userAchievement !== null;
+
         // Kiểm tra điều kiện câu cá trước khi bắt đầu animation (Admin bypass)
         const cooldownCheck = await FishingService.canFish(userId, guildId, isAdmin);
         if (!cooldownCheck.canFish) {
@@ -253,9 +258,25 @@ async function fishWithAnimation(message: Message) {
                 .setTitle("💰 Top 1 FishCoin");
         }
 
-        // Gửi embed(s) dựa trên vai trò - Priority: Admin > Top Fisher > Top FishCoin > Top Lose
+        // Tạo embed cho Achievement (PRIORITY CAO NHẤT)
+        let achievementEmbed: EmbedBuilder | undefined = undefined;
+        if (hasAchievement && userAchievement) {
+            const achievementEmoji = AchievementService.getAchievementTypeEmoji(userAchievement.type);
+            const achievementTypeName = AchievementService.getAchievementTypeName(userAchievement.type);
+            
+            achievementEmbed = new EmbedBuilder()
+                .setThumbnail(userAchievement.link) // Sử dụng link ảnh từ achievement
+                .setColor("#ff6b35") // Màu cam cho achievement
+                // .setTitle(`${achievementEmoji} ${userAchievement.name}`) // Tên achievement
+                .setTitle(`${userAchievement.name}`) // Tên achievement
+                .setDescription(`🏅 **${achievementTypeName}**`); // Type achievement
+        }
+
+        // Gửi embed(s) dựa trên vai trò - Priority: Achievement > Admin > Top Fisher > Top FishCoin > Top Lose
         let embeds: EmbedBuilder[] = [fishingEmbed];
-        if (isAdmin && adminEmbed) {
+        if (hasAchievement && achievementEmbed) {
+            embeds = [achievementEmbed, fishingEmbed]; // Achievement có priority cao nhất
+        } else if (isAdmin && adminEmbed) {
             embeds = [adminEmbed, fishingEmbed];
         } else if (isTopFisher && topFisherEmbed) {
             embeds = [topFisherEmbed, fishingEmbed];
@@ -270,7 +291,19 @@ async function fishWithAnimation(message: Message) {
         for (let i = 1; i < animationSteps.length; i++) {
             await new Promise(resolve => setTimeout(resolve, 750)); // 750ms mỗi bước = 3 giây tổng
             
-            if (isAdmin && adminEmbed) {
+            if (hasAchievement && achievementEmbed) {
+                // Achievement: Cập nhật cả hai embed
+                const updatedFishingEmbed = EmbedBuilder.from(fishingMsg.embeds[1]) // Embed thứ 2 là fishing embed
+                    .setDescription(
+                        `**${message.author.username}** đang câu cá...\n\n` +
+                        `🎣 **Cần câu:** ${rodName}\n` +
+                        `🪱 **Mồi:** ${baitName}\n\n` +
+                        `⏳ ${animationSteps[i]}`
+                    );
+                
+                const updatedEmbeds = [achievementEmbed, updatedFishingEmbed];
+                await fishingMsg.edit({ embeds: updatedEmbeds });
+            } else if (isAdmin && adminEmbed) {
                 // Admin: Cập nhật cả hai embed
                 const updatedFishingEmbed = EmbedBuilder.from(fishingMsg.embeds[1]) // Embed thứ 2 là fishing embed
                     .setDescription(
@@ -451,15 +484,21 @@ async function fishWithAnimation(message: Message) {
             .setThumbnail(message.author.displayAvatarURL())
             .setTimestamp();
 
-        // Gửi kết quả dựa trên vai trò
-        if (isAdmin && adminEmbed) {
-            const finalEmbeds = [adminEmbed, successEmbed];
+        // Gửi kết quả dựa trên vai trò - Priority: Achievement > Admin > Top Fisher > Top FishCoin > Top Lose
+        if (hasAchievement && achievementEmbed) {
+            const finalEmbeds = [achievementEmbed, successEmbed];
             await fishingMsg.edit({ embeds: finalEmbeds });
-        } else if (isTopLose && topLoseEmbed) {
-            const finalEmbeds = [topLoseEmbed, successEmbed];
+        } else if (isAdmin && adminEmbed) {
+            const finalEmbeds = [adminEmbed, successEmbed];
             await fishingMsg.edit({ embeds: finalEmbeds });
         } else if (isTopFisher && topFisherEmbed) {
             const finalEmbeds = [topFisherEmbed, successEmbed];
+            await fishingMsg.edit({ embeds: finalEmbeds });
+        } else if (isTopFishCoin && topFishCoinEmbed) {
+            const finalEmbeds = [topFishCoinEmbed, successEmbed];
+            await fishingMsg.edit({ embeds: finalEmbeds });
+        } else if (isTopLose && topLoseEmbed) {
+            const finalEmbeds = [topLoseEmbed, successEmbed];
             await fishingMsg.edit({ embeds: finalEmbeds });
         } else {
             await fishingMsg.edit({ embeds: [successEmbed] });

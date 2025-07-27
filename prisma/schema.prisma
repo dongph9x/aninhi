@@ -518,3 +518,18 @@ model UserWeapon {
   @@index([weaponId])
   @@index([isEquipped])
 }
+
+model Achievement {
+  id        String   @id @default(cuid())
+  name      String
+  link      String
+  target    String   // user_id sẽ được nhận danh hiệu
+  type      Int      // 0: top câu cá, 1: top fishcoin, 2: top fishbattle, 3: top custom
+  active    Boolean  @default(false) // Danh hiệu có đang active hay không
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([target])
+  @@index([type])
+  @@index([active])
+}

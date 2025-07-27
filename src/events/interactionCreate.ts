@@ -166,6 +166,44 @@ export default Bot.createEvent({
                 return;
             }
 
+            // Kiểm tra xem có phải achievement import interaction không
+            if (interaction.customId.startsWith("achievement_")) {
+                console.log("AchievementImport interaction:", interaction.customId);
+                
+                try {
+                    const { AchievementImportHandler } = await import("../components/MessageComponent/AchievementImportHandler");
+                    if (interaction.isButton()) {
+                        await AchievementImportHandler.handleInteraction(interaction);
+                    } else if (interaction.isModalSubmit()) {
+                        await AchievementImportHandler.handleModalSubmit(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling AchievementImport interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác achievement import!`);
+                    }
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải achievement selection interaction không
+            if (interaction.customId.startsWith("activate_achievement_") || interaction.customId === "deactivate_all_achievements") {
+                console.log("Achievement selection interaction:", interaction.customId);
+                
+                try {
+                    const { AchievementHandler } = await import("../components/MessageComponent/AchievementHandler");
+                    if (interaction.isButton()) {
+                        await AchievementHandler.handleInteraction(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling Achievement selection interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác chọn danh hiệu!`);
+                    }
+                }
+                return;
+            }
+
             // Kiểm tra xem có phải vote kick button không
             try {
                 const voteKickData = JSON.parse(interaction.customId);
@@ -264,27 +302,45 @@ export default Bot.createEvent({
                 return;
             }
 
-            const payload: CustomIdData = JSON.parse(interaction.customId);
-            const component = client.components.modalSubmit.get(payload.n);
-
-            const { t, locale } = await i18n(interaction.guildId);
-
-            // Kiểm tra chế độ bảo trì cho modal submits
-            if (client.maintenanceMode) {
-                return interaction.reply(`${emojis.info} **Bot đang trong chế độ bảo trì**\nVui lòng chờ cho đến khi bảo trì hoàn tất.`);
-            }
-
-            if (!component) {
-                logger.error(`Component "${payload.n}" doesn't exist.`);
-                return interaction.reply(`${emojis.error} | ${t("errors.unknown")}`);
+            // Kiểm tra xem có phải achievement modal không
+            if (interaction.customId === 'achievement_add_modal') {
+                console.log("Achievement add modal submitted");
+                
+                try {
+                    const { AchievementImportHandler } = await import("../components/MessageComponent/AchievementImportHandler");
+                    await AchievementImportHandler.handleModalSubmit(interaction);
+                } catch (error) {
+                    console.error("Error handling Achievement modal:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý modal achievement!`);
+                    }
+                }
+                return;
             }
 
             try {
+                const payload: CustomIdData = JSON.parse(interaction.customId);
+                const component = client.components.modalSubmit.get(payload.n);
+
+                const { t, locale } = await i18n(interaction.guildId);
+
+                // Kiểm tra chế độ bảo trì cho modal submits
+                if (client.maintenanceMode) {
+                    return interaction.reply(`${emojis.info} **Bot đang trong chế độ bảo trì**\nVui lòng chờ cho đến khi bảo trì hoàn tất.`);
+                }
+
+                if (!component) {
+                    logger.error(`Component "${payload.n}" doesn't exist.`);
+                    return interaction.reply(`${emojis.error} | ${t("errors.unknown")}`);
+                }
+
                 if (!client.filter.slash(interaction, t, component.options)) return;
                 component.run({ client, interaction, t, locale, data: payload.d });
             } catch (error) {
-                interaction.reply(`${emojis.error} | ${t("errors.unknown")}`);
-                logger.error(error);
+                console.error("Error handling modal submit:", error);
+                if (!interaction.replied && !interaction.deferred) {
+                    interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý modal!`);
+                }
             }
 
             return;
