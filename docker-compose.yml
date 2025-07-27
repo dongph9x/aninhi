@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=file:/app/data/database.db
+      - DATABASE_URL=file:./data/database.db
     volumes:
       # Mount thư mục data để lưu trữ database
       - ./data:/app/data
@@ -30,7 +30,7 @@ services:
     build: .
     container_name: aninhi-db-init
     environment:
-      - DATABASE_URL=file:/app/data/database.db
+      - DATABASE_URL=file:./data/database.db
     volumes:
       - ./data:/app/data
     command: >
@@ -47,7 +47,7 @@ services:
     build: .
     container_name: aninhi-prisma-studio
     environment:
-      - DATABASE_URL=file:/app/data/database.db
+      - DATABASE_URL=file:./data/database.db
     volumes:
       - ./data:/app/data
       - ./prisma:/app/prisma
