@@ -471,13 +471,34 @@ async function fishWithAnimation(message: Message) {
             }
         }
 
+        // Lấy thông tin tổng số lần câu cá (sử dụng fishingData đã có)
+        const totalFishingCount = fishingData.totalFish;
+        
+        // Tạo hiệu ứng cho số lần câu
+        let fishingCountEffect = '';
+        if (totalFishingCount >= 1000) {
+            fishingCountEffect = '🔥 **FISHING MASTER!** 🔥';
+        } else if (totalFishingCount >= 500) {
+            fishingCountEffect = '⚡ **FISHING EXPERT!** ⚡';
+        } else if (totalFishingCount >= 100) {
+            fishingCountEffect = '🎯 **FISHING PRO!** 🎯';
+        } else if (totalFishingCount >= 50) {
+            fishingCountEffect = '🌟 **FISHING STAR!** 🌟';
+        } else if (totalFishingCount >= 10) {
+            fishingCountEffect = '⭐ **FISHING BEGINNER!** ⭐';
+        }
+
         const successEmbed = new EmbedBuilder()
             .setTitle("🎣 Câu Cá Thành Công!")
             .setDescription(
                 `**${message.author.username}** đã câu được:\n\n` +
                 `${fish.emoji} **${fish.name}**\n` +
                 `${getRarityEmoji(fish.rarity)} **${getRarityText(fish.rarity)}**\n` +
-                `🐟 **Giá trị:** ${value} FishCoin${fishInventoryMessage}${autoSwitchMessage}${autoEquipMessage}${autoSwitchRodMessage}${autoEquipRodMessage}` +
+                `🐟 **Giá trị:** ${value} FishCoin\n\n` +
+                `📊 **Thống kê câu cá:**\n` +
+                `🎣 **Tổng số lần câu:** ${totalFishingCount.toLocaleString()} lần\n` +
+                (fishingCountEffect ? `${fishingCountEffect}\n` : '') +
+                `💰 **Tổng thu nhập:** ${fishingData.totalEarnings.toLocaleString()} FishCoin${fishInventoryMessage}${autoSwitchMessage}${autoEquipMessage}${autoSwitchRodMessage}${autoEquipRodMessage}` +
                 (isAdmin && fish.rarity === 'legendary' ? '\n\n👑 **Admin đã câu được cá huyền thoại!**' : '')
             )
             .setColor(getRarityColor(fish.rarity))

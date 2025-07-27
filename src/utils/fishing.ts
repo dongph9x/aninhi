@@ -950,7 +950,7 @@ export class FishingService {
                     adjustedChance += totalBonus * 0.1;
                 } else {
                     // Giảm mạnh hơn để đảm bảo < 1%
-                    adjustedChance = fish.chance * 0.01 + totalBonus * 0.02; // giảm rất mạnh
+                    adjustedChance = fish.chance * 0.01 + totalBonus * 0.04; // giảm rất mạnh
                 }
             } else if (fish.rarity === "rare") {
                 adjustedChance += totalBonus * 0.5;
