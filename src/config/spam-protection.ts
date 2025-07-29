@@ -61,7 +61,7 @@ export interface SpamRecord {
 }
 
 export const spamProtectionConfig: SpamProtectionConfig = {
-  enabled: true,
+  enabled: false,
   cooldown: 10, // 30 giây giữa các lần câu cá
   maxAttempts: 5, // Tối đa 5 lần trong timeWindow
   timeWindow: 180, // 5 phút
@@ -75,7 +75,7 @@ export const spamProtectionConfig: SpamProtectionConfig = {
     banDuration: 1, // Ban 1 phút cho tool spam
   },
   extendedSpamMonitoring: {
-    enabled: true,
+    enabled: false,
     timeWindow: 180, // 5 phút = 300 giây
     maxAttempts: 20, // Tối đa 20 lần trong 5 phút
     warningThreshold: 15, // Cảnh cáo sau 15 lần vi phạm

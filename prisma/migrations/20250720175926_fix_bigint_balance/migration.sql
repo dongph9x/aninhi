@@ -110,6 +110,7 @@ CREATE TABLE "Tournament_new" (
     "prizePool" BIGINT NOT NULL,
     "maxParticipants" INTEGER NOT NULL,
     "currentParticipants" INTEGER NOT NULL DEFAULT 0,
+    "winnerCount" INTEGER NOT NULL DEFAULT 1,
     "status" TEXT NOT NULL,
     "startTime" DATETIME NOT NULL,
     "endTime" DATETIME NOT NULL,
@@ -120,7 +121,7 @@ CREATE TABLE "Tournament_new" (
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );
-INSERT INTO "Tournament_new" SELECT * FROM "Tournament";
+INSERT INTO "Tournament_new" SELECT "id", "name", "description", "entryFee", "prizePool", "maxParticipants", "currentParticipants", 1, "status", "startTime", "endTime", "createdBy", "guildId", "channelId", "winnerId", "createdAt", "updatedAt" FROM "Tournament";
 DROP TABLE "Tournament";
 ALTER TABLE "Tournament_new" RENAME TO "Tournament";
 CREATE INDEX "Tournament_guildId_idx" ON "Tournament"("guildId");
