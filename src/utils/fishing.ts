@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { fishCoinDB } from "./fish-coin";
+import { SeasonalFishingService } from './seasonal-fishing';
 
 const prisma = new PrismaClient();
 
@@ -82,8 +83,8 @@ export const BAITS: Record<string, Bait> = {
     "divine": { name: "Mồi thần", emoji: "🧜‍♀️", price: 1000, rarityBonus: 5, description: "Tăng 5% tỷ lệ hiếm" },
 };
 
-// Cooldown cho câu cá (30 giây)
-const FISHING_COOLDOWN = 30000;
+// Cooldown cho câu cá (theo mùa)
+const getFishingCooldown = () => SeasonalFishingService.getSeasonalCooldown() * 1000; // Chuyển sang milliseconds
 
 // Chi phí mỗi lần câu
 const FISHING_COST = 10;
@@ -364,11 +365,11 @@ export class FishingService {
             const timeSinceLastFish = now.getTime() - fishingData.lastFished.getTime();
 
             // Kiểm tra cooldown (Admin bypass cooldown)
-            if (!isAdmin && timeSinceLastFish < FISHING_COOLDOWN) {
+            if (!isAdmin && timeSinceLastFish < getFishingCooldown()) {
                 return {
                     canFish: false,
-                    remainingTime: FISHING_COOLDOWN - timeSinceLastFish,
-                    message: `Bạn cần đợi ${Math.ceil((FISHING_COOLDOWN - timeSinceLastFish) / 1000)} giây nữa để câu cá!`
+                    remainingTime: getFishingCooldown() - timeSinceLastFish,
+                    message: `Bạn cần đợi ${Math.ceil((getFishingCooldown() - timeSinceLastFish) / 1000)} giây nữa để câu cá!`
                 };
             }
 
@@ -519,7 +520,7 @@ export class FishingService {
             console.error("Error checking fishing cooldown:", error);
             return { 
                 canFish: false, 
-                remainingTime: FISHING_COOLDOWN,
+                remainingTime: getFishingCooldown(),
                 message: "Đã xảy ra lỗi khi kiểm tra điều kiện câu cá!"
             };
         }
@@ -549,7 +550,10 @@ export class FishingService {
 
             // Chọn cá ngẫu nhiên (Admin luôn câu được cá huyền thoại)
             const fish = isAdmin ? this.getAdminFish() : this.getRandomFish(fishingData);
-            const fishValue = Math.floor(Math.random() * (fish.maxValue - fish.minValue + 1)) + fish.minValue;
+            const baseFishValue = Math.floor(Math.random() * (fish.maxValue - fish.minValue + 1)) + fish.minValue;
+            
+            // Áp dụng hệ số giá trị theo mùa
+            const fishValue = SeasonalFishingService.getSeasonalFishValue(baseFishValue);
 
             // Cập nhật fishing data
             const updatedFishingData = await prisma.fishingData.update({
@@ -938,25 +942,35 @@ export class FishingService {
         const bait = BAITS[fishingData.currentBait];
         const totalBonus = rod.rarityBonus + bait.rarityBonus;
 
+        // Áp dụng hệ số may mắn theo mùa
+        const luckMultiplier = SeasonalFishingService.getSeasonalLuckMultiplier();
+        const luckBonus = (luckMultiplier - 1) * 100; // Chuyển về phần trăm (20% cho mùa xuân)
+
         // Kiểm tra xem có phải kim cương + mồi thần không
         const isDiamondDivine = fishingData.currentRod === "diamond" && fishingData.currentBait === "divine";
 
         // Tạo danh sách cá với tỷ lệ đã điều chỉnh
         const adjustedFish = FISH_LIST.map(fish => {
+            // Tính tỷ lệ cơ bản
             let adjustedChance = fish.chance;
+            
             if (fish.rarity === "legendary") {
                 if (isDiamondDivine) {
                     // Giữ nguyên logic cũ cho kim cương + mồi thần
                     adjustedChance += totalBonus * 0.1;
                 } else {
                     // Giảm mạnh hơn để đảm bảo < 1%
-                    adjustedChance = fish.chance * 0.01 + totalBonus * 0.05; // giảm rất mạnh
+                    adjustedChance = fish.chance * 0.01 + totalBonus * 0.05;
                 }
             } else if (fish.rarity === "rare") {
                 adjustedChance += totalBonus * 0.5;
             } else if (fish.rarity === "epic") {
                 adjustedChance += totalBonus * 0.3;
             }
+
+            // Áp dụng bonus may mắn theo mùa (tăng % của tỷ lệ cơ bản)
+            adjustedChance += (adjustedChance * luckBonus / 100);
+            
             return { ...fish, adjustedChance };
         });
 

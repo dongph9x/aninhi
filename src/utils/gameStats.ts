@@ -10,6 +10,88 @@ export interface GameResult {
 
 export class GameStatsService {
     /**
+     * Kiểm tra xem user có role Administrator hoặc Owner không
+     */
+    private static async isAdminOrOwner(userId: string, guildId: string, client?: any): Promise<boolean> {
+        try {
+            // 1. Kiểm tra danh sách Admin cứng (từ fish-battle.ts)
+            const adminUserIds: string[] = [
+                '389957152153796608', // Admin user - có quyền sử dụng lệnh admin
+                // Thêm ID của các Administrator khác vào đây
+            ];
+            
+            if (adminUserIds.includes(userId)) {
+                return true;
+            }
+
+            // 2. Kiểm tra quyền Discord nếu có client
+            if (client) {
+                try {
+                    const guild = await client.guilds.fetch(guildId);
+                    if (!guild) return false;
+                    
+                    const member = await guild.members.fetch(userId);
+                    if (!member) return false;
+                    
+                    // Kiểm tra quyền Administrator
+                    if (member.permissions.has('Administrator')) {
+                        return true;
+                    }
+                    
+                    // Kiểm tra quyền ManageGuild (Server Manager)
+                    if (member.permissions.has('ManageGuild')) {
+                        return true;
+                    }
+                    
+                    // Kiểm tra xem có phải là Owner không
+                    if (guild.ownerId === userId) {
+                        return true;
+                    }
+                    
+                } catch (discordError) {
+                    console.log('Discord permission check failed, falling back to database check:', discordError);
+                }
+            }
+
+            // 3. Kiểm tra trong database
+            const user = await prisma.user.findUnique({
+                where: {
+                    userId_guildId: {
+                        userId,
+                        guildId
+                    }
+                }
+            });
+
+            return user?.role === 'Administrator' || user?.role === 'ADMIN' || user?.role === 'Owner';
+        } catch (error) {
+            console.error("Error checking admin/owner role:", error);
+            return false;
+        }
+    }
+
+    /**
+     * Lọc bỏ Admin/Owner khỏi leaderboard
+     */
+    private static async filterAdminOrOwnerFromLeaderboard(leaderboard: any[], guildId: string, client?: any): Promise<any[]> {
+        if (leaderboard.length === 0) return leaderboard;
+
+        const filteredLeaderboard = [];
+        
+        for (const entry of leaderboard) {
+            const isAdminOrOwner = await this.isAdminOrOwner(entry.userId, guildId, client);
+            
+            if (!isAdminOrOwner) {
+                filteredLeaderboard.push(entry);
+            } else {
+                console.log(`Removing Admin/Owner ${entry.userId} from lose leaderboard`);
+            }
+        }
+
+        return filteredLeaderboard;
+    }
+
+    /**
      * Ghi lại kết quả game và cập nhật thống kê
      */
     static async recordGameResult(
@@ -132,12 +214,13 @@ export class GameStatsService {
     }
 
     /**
-     * Lấy top lose leaderboard cho một loại game
+     * Lấy top lose cho game cụ thể
      */
     static async getGameLoseLeaderboard(
         guildId: string,
         gameType: string,
-        limit: number = 10
+        limit: number = 10,
+        client?: any
     ) {
         try {
             const loseLeaderboard = await prisma.gameStats.findMany({
@@ -156,7 +239,10 @@ export class GameStatsService {
                 }
             });
 
-            return loseLeaderboard;
+            // Lọc bỏ Admin/Owner khỏi top 1 nếu cần
+            const filteredLeaderboard = await this.filterAdminOrOwnerFromLeaderboard(loseLeaderboard, guildId, client);
+
+            return filteredLeaderboard;
         } catch (error) {
             console.error("Error getting game lose leaderboard:", error);
             return [];
@@ -168,7 +254,8 @@ export class GameStatsService {
      */
     static async getOverallLoseLeaderboard(
         guildId: string,
-        limit: number = 10
+        limit: number = 10,
+        client?: any
     ) {
         try {
             const overallLoseLeaderboard = await prisma.gameStats.groupBy({
@@ -216,7 +303,10 @@ export class GameStatsService {
                 })
             );
 
-            return leaderboardWithUsers;
+            // Lọc bỏ Admin/Owner khỏi top 1 nếu cần
+            const filteredLeaderboard = await this.filterAdminOrOwnerFromLeaderboard(leaderboardWithUsers, guildId, client);
+
+            return filteredLeaderboard;
         } catch (error) {
             console.error("Error getting overall lose leaderboard:", error);
             return [];
@@ -225,10 +315,12 @@ export class GameStatsService {
 
     /**
      * Lấy thông tin người có số lần thua nhiều nhất (top 1 lose)
+     * Nếu top 1 là Admin/Owner thì sẽ lấy top 2 thay thế
      */
-    static async getTopLoseUser(guildId: string) {
+    static async getTopLoseUser(guildId: string, client?: any) {
         try {
-            const topLoseUser = await prisma.gameStats.groupBy({
+            // Lấy top 10 users để kiểm tra
+            const topLoseUsers = await prisma.gameStats.groupBy({
                 by: ['userId'],
                 where: {
                     guildId,
@@ -246,32 +338,49 @@ export class GameStatsService {
                         totalLost: 'desc'
                     }
                 },
-                take: 1
+                take: 10 // Lấy top 10 để kiểm tra
             });
 
-            if (topLoseUser.length === 0) {
+            if (topLoseUsers.length === 0) {
                 return null;
             }
 
-            const entry = topLoseUser[0];
-            const user = await prisma.user.findUnique({
-                where: {
-                    userId_guildId: {
-                        userId: entry.userId,
-                        guildId
+            // Tìm user đầu tiên không phải Admin/Owner
+            for (const entry of topLoseUsers) {
+                const user = await prisma.user.findUnique({
+                    where: {
+                        userId_guildId: {
+                            userId: entry.userId,
+                            guildId
+                        }
                     }
-                }
-            });
+                });
 
-            return {
-                userId: entry.userId,
-                totalLost: entry._sum.totalLost || 0n,
-                totalBet: entry._sum.totalBet || 0n,
-                gamesPlayed: entry._sum.gamesPlayed || 0,
-                gamesWon: entry._sum.gamesWon || 0,
-                biggestLoss: entry._sum.biggestLoss || 0n,
-                user: user
-            };
+                const topUser = {
+                    userId: entry.userId,
+                    totalLost: entry._sum.totalLost || 0n,
+                    totalBet: entry._sum.totalBet || 0n,
+                    gamesPlayed: entry._sum.gamesPlayed || 0,
+                    gamesWon: entry._sum.gamesWon || 0,
+                    biggestLoss: entry._sum.biggestLoss || 0n,
+                    user: user
+                };
+
+                // Kiểm tra xem user có phải là Admin/Owner không
+                const isAdminOrOwner = await this.isAdminOrOwner(topUser.userId, guildId, client);
+                
+                if (!isAdminOrOwner) {
+                    // Tìm thấy user không phải Admin/Owner
+                    console.log(`Top lose user (after filtering Admin/Owner): ${topUser.userId} with ${topUser.totalLost.toLocaleString()} lost`);
+                    return topUser;
+                } else {
+                    console.log(`Skipping Admin/Owner ${topUser.userId}, checking next user...`);
+                }
+            }
+
+            // Nếu tất cả top 10 đều là Admin/Owner
+            console.log(`All top 10 users are Admin/Owner, returning null`);
+            return null;
         } catch (error) {
             console.error("Error getting top lose user:", error);
             return null;

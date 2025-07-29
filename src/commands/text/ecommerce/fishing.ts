@@ -7,6 +7,7 @@ import { FishingService, FISH_LIST, FISHING_RODS, BAITS } from "@/utils/fishing"
 import { AchievementService } from "@/utils/achievement";
 import { SpamProtectionService } from "@/utils/spam-protection";
 import prisma from "@/utils/prisma";
+import { SeasonalFishingService } from '@/utils/seasonal-fishing';
 
 function getRarityColor(rarity: string): number {
     switch (rarity) {
@@ -89,6 +90,9 @@ export default Bot.createCommand({
             case "stats":
             case "thống kê":
                 return await showStats(message);
+            case "season":
+            case "mùa":
+                return await showSeasonInfo(message);
             case "help":
                 return await showHelp(message);
             default:
@@ -150,7 +154,7 @@ async function fishWithAnimation(message: Message) {
 
         // Kiểm tra xem user có phải là top 1 lose không
         const { GameStatsService } = await import('@/utils/gameStats');
-        const topLoseUser = await GameStatsService.getTopLoseUser(guildId);
+        const topLoseUser = await GameStatsService.getTopLoseUser(guildId, message.client);
         const isTopLose = topLoseUser && topLoseUser.userId === userId;
 
         // Kiểm tra xem user có phải là top 1 FishCoin không
@@ -509,6 +513,9 @@ async function fishWithAnimation(message: Message) {
             fishingCountEffect = '⭐ **FISHING BEGINNER!** ⭐';
         }
 
+        // Thêm thông tin mùa
+        const seasonInfo = SeasonalFishingService.getSeasonInfoText();
+
         const successEmbed = new EmbedBuilder()
             .setTitle("🎣 Câu Cá Thành Công!")
             .setDescription(
@@ -519,7 +526,8 @@ async function fishWithAnimation(message: Message) {
                 `📊 **Thống kê câu cá:**\n` +
                 `🎣 **Tổng số lần câu:** ${totalFishingCount.toLocaleString()} lần\n` +
                 (fishingCountEffect ? `${fishingCountEffect}\n` : '') +
-                `💰 **Tổng thu nhập:** ${fishingData.totalEarnings.toLocaleString()} FishCoin${fishInventoryMessage}${autoSwitchMessage}${autoEquipMessage}${autoSwitchRodMessage}${autoEquipRodMessage}` +
+                `💰 **Tổng thu nhập:** ${fishingData.totalEarnings.toLocaleString()} FishCoin\n\n` +
+                `🌍 **${seasonInfo}**${fishInventoryMessage}${autoSwitchMessage}${autoEquipMessage}${autoSwitchRodMessage}${autoEquipRodMessage}` +
                 (isAdmin && fish.rarity === 'legendary' ? '\n\n👑 **Admin đã câu được cá huyền thoại!**' : '')
             )
             .setColor(getRarityColor(fish.rarity))
@@ -863,6 +871,11 @@ async function showStats(message: Message) {
     }
 }
 
+async function showSeasonInfo(message: Message) {
+    const embed = SeasonalFishingService.createSeasonInfoEmbed();
+    return await message.reply({ embeds: [embed] });
+}
+
 async function showHelp(message: Message) {
     const embed = new EmbedBuilder()
         .setTitle("🎣 Hệ Thống Câu Cá - Hướng Dẫn")
@@ -875,7 +888,8 @@ async function showHelp(message: Message) {
             "**Set cần câu:** `n.fishing setrod <loại>`\n" +
             "**Set mồi:** `n.fishing setbait <loại>`\n" +
             "**Xem túi đồ:** `n.fishing inv` hoặc `n.fishing inventory`\n" +
-            "**Xem thống kê:** `n.fishing stats`\n\n" +
+            "**Xem thống kê:** `n.fishing stats`\n" +
+            "**Xem thông tin mùa:** `n.fishing season` hoặc `n.fishing mùa`\n\n" +
             "**Ví dụ:**\n" +
             "• `n.fishing` - Câu cá với animation\n" +
             "• `n.fishing fish` - Câu cá với animation\n" +
@@ -885,11 +899,17 @@ async function showHelp(message: Message) {
             "• `n.fishing price \"Cá rô phi\"` - Xem giá cá rô phi\n" +
             "• `n.fishing setrod copper` - Set cần câu đồng làm cần hiện tại\n" +
             "• `n.fishing setbait good` - Set mồi ngon làm mồi hiện tại\n" +
-            "• `n.fishing sell \"Cá rô phi\" 1` - Bán 1 con cá rô phi\n\n" +
+            "• `n.fishing sell \"Cá rô phi\" 1` - Bán 1 con cá rô phi\n" +
+            "• `n.fishing season` - Xem thông tin mùa hiện tại\n\n" +
+            "**🌍 Hệ Thống Câu Cá Theo Mùa:**\n" +
+            "• **Mùa Hè ☀️:** Cooldown 20s, giá cá -20%\n" +
+            "• **Mùa Thu 🍂:** Cooldown 30s, giá cá +10%\n" +
+            "• **Mùa Đông ❄️:** Cooldown 40s, giá cá +15%\n" +
+            "• **Mùa Xuân 🌸:** Cooldown 35s, giá cá +10%, may mắn +20%\n\n" +
             "**Lưu ý:**\n" +
             "• **Bạn cần mua cần câu và mồi trước khi câu cá!**\n" +
-                            "• Mỗi lần câu tốn 10 FishCoin\n" +
-            "• Cooldown 30 giây giữa các lần câu\n" +
+            "• Mỗi lần câu tốn 10 FishCoin\n" +
+            "• Cooldown thay đổi theo mùa (20-40 giây)\n" +
             "• Animation câu cá kéo dài 3 giây\n" +
             "• Cần câu và mồi tốt hơn sẽ tăng tỷ lệ bắt cá hiếm\n" +
             "• Cần câu có độ bền, mồi có số lượng giới hạn\n" +

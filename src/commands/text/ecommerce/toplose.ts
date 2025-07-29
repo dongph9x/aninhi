@@ -55,7 +55,7 @@ async function showOverallLoseLeaderboard(message: any, guildId: string) {
         .setDescription("Những người chơi thua nhiều AniCoin nhất trong tất cả game")
         .setTimestamp();
 
-    const loseLeaderboard = await GameStatsService.getOverallLoseLeaderboard(guildId, 10);
+    const loseLeaderboard = await GameStatsService.getOverallLoseLeaderboard(guildId, 10, message.client);
 
     if (loseLeaderboard.length === 0) {
         embed.setDescription("Chưa có dữ liệu thua lỗ nào!");
@@ -94,7 +94,7 @@ async function showGameLoseLeaderboard(message: any, guildId: string, gameType: 
         .setDescription(`Những người thua nhiều AniCoin nhất trong ${gameName}`)
         .setTimestamp();
 
-    const loseLeaderboard = await GameStatsService.getGameLoseLeaderboard(guildId, gameType, 10);
+    const loseLeaderboard = await GameStatsService.getGameLoseLeaderboard(guildId, gameType, 10, message.client);
 
     if (loseLeaderboard.length === 0) {
         embed.setDescription(`Chưa có dữ liệu thua lỗ ${gameName} nào!`);

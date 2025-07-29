@@ -1,3 +1,5 @@
+import { SeasonalFishingService } from '@/utils/seasonal-fishing';
+
 export interface SpamProtectionConfig {
   enabled: boolean;
   cooldown: number; // Thời gian chờ giữa các lần câu cá (giây)
@@ -60,28 +62,28 @@ export interface SpamRecord {
 
 export const spamProtectionConfig: SpamProtectionConfig = {
   enabled: true,
-  cooldown: 30, // 30 giây giữa các lần câu cá
+  cooldown: 10, // 30 giây giữa các lần câu cá
   maxAttempts: 5, // Tối đa 5 lần trong timeWindow
-  timeWindow: 300, // 5 phút
-  warningThreshold: 3, // Cảnh cáo sau 3 lần vi phạm
+  timeWindow: 180, // 5 phút
+  warningThreshold: 4, // Cảnh cáo sau 3 lần vi phạm
   banThreshold: 5, // Ban sau 5 lần vi phạm
   toolSpamDetection: {
     enabled: true,
-    minAttempts: 3, // Cần ít nhất 3 lần để phát hiện
+    minAttempts: 5, // Cần ít nhất 5 lần để phát hiện
     timeTolerance: 2, // Độ sai số 2 giây
     patternThreshold: 2, // 2 lần pattern giống nhau = tool spam
     banDuration: 1, // Ban 1 phút cho tool spam
   },
   extendedSpamMonitoring: {
     enabled: true,
-    timeWindow: 300, // 5 phút = 300 giây
+    timeWindow: 180, // 5 phút = 300 giây
     maxAttempts: 20, // Tối đa 20 lần trong 5 phút
     warningThreshold: 15, // Cảnh cáo sau 15 lần vi phạm
     banThreshold: 20, // Ban sau 20 lần vi phạm
     banDuration: 1, // Ban 1 phút cho extended spam
     frequencyDetection: {
       enabled: true,
-      minAttempts: 3, // Cần ít nhất 3 lần để phát hiện
+      minAttempts: 5, // Cần ít nhất 5 lần để phát hiện
       timeTolerance: 2, // Độ sai số 2 giây
       patternThreshold: 2, // 2 lần pattern giống nhau = frequency spam
     },
@@ -92,24 +94,12 @@ export const spamCommands = {
   fishing: {
     name: 'fishing',
     aliases: ['fish', 'câu', 'cá'],
-    cooldown: 30,
+    get cooldown() {
+      return SeasonalFishingService.getSeasonalCooldown();
+    },
     maxAttempts: 5,
     timeWindow: 300,
-  },
-  battle: {
-    name: 'battle',
-    aliases: ['đánh', 'chiến'],
-    cooldown: 60,
-    maxAttempts: 3,
-    timeWindow: 600,
-  },
-  feed: {
-    name: 'feed',
-    aliases: ['cho ăn', 'ăn'],
-    cooldown: 15,
-    maxAttempts: 10,
-    timeWindow: 300,
-  },
+  }
 };
 
 export const spamMessages = {
