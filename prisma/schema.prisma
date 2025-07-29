@@ -336,6 +336,26 @@ model BanRecord {
   @@index([expiresAt])
 }
 
+model WarningRecord {
+  id          String   @id @default(cuid())
+  userId      String
+  guildId     String
+  moderatorId String
+  warningLevel Int     @default(1) // 1, 2, 3
+  reason      String
+  message     String   // Message tùy chỉnh cho từng level
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime? // Có thể set thời gian hết hạn cảnh cáo
+
+  @@index([userId])
+  @@index([guildId])
+  @@index([moderatorId])
+  @@index([warningLevel])
+  @@index([isActive])
+  @@index([expiresAt])
+}
+
 model Fish {
   id                    String                    @id @default(cuid())
   userId                String
