@@ -5,6 +5,7 @@ import { config } from "@/config";
 import { EcommerceService } from "@/utils/ecommerce-db";
 import { FishingService, FISH_LIST, FISHING_RODS, BAITS } from "@/utils/fishing";
 import { AchievementService } from "@/utils/achievement";
+import { SpamProtectionService } from "@/utils/spam-protection";
 import prisma from "@/utils/prisma";
 
 function getRarityColor(rarity: string): number {
@@ -103,6 +104,26 @@ const fishingInProgress = new Map<string, boolean>();
 async function fishWithAnimation(message: Message) {
     const userId = message.author.id;
     const guildId = message.guildId!;
+
+    // Kiểm tra spam protection
+    const spamService = SpamProtectionService.getInstance();
+    const spamCheck = spamService.checkSpam(userId, guildId, "fishing");
+    
+    if (!spamCheck.allowed) {
+        // Trả về embed lỗi từ spam protection
+        if (spamCheck.embed) {
+            return await message.reply({ embeds: [spamCheck.embed] });
+        }
+        
+        // Fallback embed nếu không có embed từ spam service
+        const errorEmbed = new EmbedBuilder()
+            .setTitle("❌ Bị Chặn Spam")
+            .setDescription("Bạn đã spam lệnh câu cá quá nhiều lần!")
+            .setColor("#ff0000")
+            .setTimestamp();
+            
+        return await message.reply({ embeds: [errorEmbed] });
+    }
 
     // Kiểm tra xem user có đang câu cá không
     if (fishingInProgress.get(userId)) {
