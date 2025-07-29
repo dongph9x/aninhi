@@ -1113,7 +1113,7 @@ async function showFishPrices(message: Message, args: string[]) {
                     `\n\n**✨ Cá huyền thoại:**\n` +
                     `*Cá huyền thoại chỉ có thể bán trong rương nuôi cá (\`n.fishbarn\`)*\n` +
                     `*Giá trị cố định, không biến động theo thị trường*` +
-                    `\n\n**💡 Lưu ý:** Giá cá thay đổi mỗi 10 phút với biến động ±10%`
+                    `\n\n**💡 Lưu ý:** Giá cá thay đổi mỗi 10 phút với biến động ±15%`
                 )
                 .setColor("#0099ff")
                 .setTimestamp();

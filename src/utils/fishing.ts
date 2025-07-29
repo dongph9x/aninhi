@@ -142,8 +142,8 @@ export class FishPriceService {
                     continue; // Bỏ qua cá huyền thoại
                 }
                 
-                // Tạo biến động ngẫu nhiên ±10%
-                const fluctuation = (Math.random() - 0.5) * 0.2; // -10% đến +10%
+                // Tạo biến động ngẫu nhiên ±15%
+                const fluctuation = (Math.random() - 0.5) * 0.3; // -15% đến +15%
                 const basePrice = Number(fishPrice.basePrice);
                 const newPrice = Math.max(1, Math.floor(basePrice * (1 + fluctuation)));
                 const priceChange = newPrice - basePrice;
