@@ -1,4 +1,5 @@
-import { FISHING_RODS, BAITS, FishingService } from '../src/utils/fishing';
+import { FishingService } from '../src/utils/fishing';
+import { FISHING_RODS, BAITS } from '../src/config/fish-data';
 
 async function testFishingBonusReduction() {
     console.log('🎣 Test Giảm Tỷ Lệ Bonus Cần Câu Và Mồi\n');
