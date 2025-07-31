@@ -392,7 +392,7 @@ async function fishWithAnimation(message: Message) {
 
         // Thực hiện câu cá
         const result = await FishingService.fish(userId, guildId, isAdmin);
-        const { fish, value } = result;
+        const { fish, value, isPityActivated } = result;
 
         // Kiểm tra auto-switch bait sau khi câu cá
         let autoSwitchMessage = '';
@@ -516,6 +516,12 @@ async function fishWithAnimation(message: Message) {
         // Thêm thông tin mùa
         const seasonInfo = SeasonalFishingService.getSeasonInfoText();
 
+        // Thông báo pity system nếu được kích hoạt
+        let pityMessage = '';
+        if (isPityActivated) {
+            pityMessage = '\n\n🎉 **PITY SYSTEM KÍCH HOẠT!** 🎉\nBạn đã câu được cá huyền thoại nhờ hệ thống bảo hộ!';
+        }
+
         const successEmbed = new EmbedBuilder()
             .setTitle("🎣 Câu Cá Thành Công!")
             .setDescription(
@@ -527,7 +533,7 @@ async function fishWithAnimation(message: Message) {
                 `🎣 **Tổng số lần câu:** ${totalFishingCount.toLocaleString()} lần\n` +
                 (fishingCountEffect ? `${fishingCountEffect}\n` : '') +
                 `💰 **Tổng thu nhập:** ${fishingData.totalEarnings.toLocaleString()} FishCoin\n\n` +
-                `🌍 **${seasonInfo}**${fishInventoryMessage}${autoSwitchMessage}${autoEquipMessage}${autoSwitchRodMessage}${autoEquipRodMessage}` +
+                `🌍 **${seasonInfo}**${fishInventoryMessage}${autoSwitchMessage}${autoEquipMessage}${autoSwitchRodMessage}${autoEquipRodMessage}${pityMessage}` +
                 (isAdmin && fish.rarity === 'legendary' ? '\n\n👑 **Admin đã câu được cá huyền thoại!**' : '')
             )
             .setColor(getRarityColor(fish.rarity))

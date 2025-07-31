@@ -1,34 +1,10 @@
 import { PrismaClient } from "@prisma/client";
 import { fishCoinDB } from "./fish-coin";
 import { SeasonalFishingService } from './seasonal-fishing';
+import { FISH_LIST, FISHING_RODS, BAITS, FishDataService, type Fish, type FishingRod, type Bait } from '../config/fish-data';
+import { PitySystemService } from './pity-system';
 
 const prisma = new PrismaClient();
-
-export interface Fish {
-    name: string;
-    emoji: string;
-    rarity: "common" | "rare" | "epic" | "legendary";
-    minValue: number;
-    maxValue: number;
-    chance: number;
-}
-
-export interface FishingRod {
-    name: string;
-    emoji: string;
-    price: number;
-    rarityBonus: number;
-    durability: number;
-    description: string;
-}
-
-export interface Bait {
-    name: string;
-    emoji: string;
-    price: number;
-    rarityBonus: number;
-    description: string;
-}
 
 export interface CaughtFish {
     name: string;
@@ -37,51 +13,6 @@ export interface CaughtFish {
     value: number;
     quantity: number;
 }
-
-// Danh sách cá
-export const FISH_LIST: Fish[] = [
-    // Cá thường (60-70%)
-    { name: "Cá rô phi", emoji: "🐟", rarity: "common", minValue: 10, maxValue: 50, chance: 25 },
-    { name: "Cá chép", emoji: "🐟", rarity: "common", minValue: 20, maxValue: 80, chance: 20 },
-    { name: "Cá trắm", emoji: "🐟", rarity: "common", minValue: 30, maxValue: 100, chance: 15 },
-    { name: "Cá mè", emoji: "🐟", rarity: "common", minValue: 15, maxValue: 60, chance: 10 },
-
-    // Cá hiếm (20-25%)
-    { name: "Cá lóc", emoji: "🐡", rarity: "rare", minValue: 100, maxValue: 300, chance: 8 },
-    { name: "Cá trê", emoji: "🐠", rarity: "rare", minValue: 150, maxValue: 400, chance: 7 },
-    { name: "Cá quả", emoji: "🐠", rarity: "rare", minValue: 200, maxValue: 500, chance: 6 },
-    { name: "Cá chình", emoji: "🐠", rarity: "rare", minValue: 300, maxValue: 800, chance: 4 },
-
-    // Cá quý hiếm (8-12%)
-    { name: "Cá tầm", emoji: "🦈", rarity: "epic", minValue: 500, maxValue: 1500, chance: 3 },
-    { name: "Cá hồi", emoji: "🦈", rarity: "epic", minValue: 800, maxValue: 2000, chance: 2.5 },
-    { name: "Cá ngừ", emoji: "🐋", rarity: "epic", minValue: 1000, maxValue: 3000, chance: 2 },
-    { name: "Cá mập", emoji: "🦈", rarity: "epic", minValue: 2000, maxValue: 5000, chance: 1.5 },
-
-    // Cá huyền thoại (1-3%)
-    { name: "Cá voi", emoji: "🐳", rarity: "legendary", minValue: 5000, maxValue: 15000, chance: 0.8 },
-    { name: "Cá mực khổng lồ", emoji: "🦑", rarity: "legendary", minValue: 8000, maxValue: 20000, chance: 0.6 },
-    { name: "Cá rồng biển", emoji: "🐉", rarity: "legendary", minValue: 15000, maxValue: 50000, chance: 0.4 },
-    { name: "Cá thần", emoji: "🧜", rarity: "legendary", minValue: 50000, maxValue: 100000, chance: 0.2 },
-    { name: "Vua biển", emoji: "🔱", rarity: "legendary", minValue: 100000, maxValue: 150000, chance: 0.1 },
-];
-
-// Danh sách cần câu
-export const FISHING_RODS: Record<string, FishingRod> = {
-    "basic": { name: "Cần câu cơ bản", emoji: "🎣", price: 100, rarityBonus: 0, durability: 10, description: "Cần câu cơ bản, độ bền thấp" },
-    "copper": { name: "Cần câu đồng", emoji: "🎣", price: 1000, rarityBonus: 1, durability: 25, description: "Tăng 1% tỷ lệ hiếm, độ bền trung bình" },
-    "silver": { name: "Cần câu bạc", emoji: "🎣", price: 5000, rarityBonus: 2, durability: 50, description: "Tăng 2% tỷ lệ hiếm, độ bền cao" },
-    "gold": { name: "Cần câu vàng", emoji: "🎣", price: 15000, rarityBonus: 3.5, durability: 100, description: "Tăng 3.5% tỷ lệ hiếm, độ bền rất cao" },
-    "diamond": { name: "Cần câu kim cương", emoji: "💎", price: 50000, rarityBonus: 5, durability: 200, description: "Tăng 5% tỷ lệ hiếm, độ bền tối đa" },
-};
-
-// Danh sách mồi
-export const BAITS: Record<string, Bait> = {
-    "basic": { name: "Mồi cơ bản", emoji: "🪱", price: 10, rarityBonus: 0, description: "Mồi cơ bản, tỷ lệ thường" },
-    "good": { name: "Mồi ngon", emoji: "🦐", price: 50, rarityBonus: 1.5, description: "Tăng 1.5% tỷ lệ hiếm" },
-    "premium": { name: "Mồi thượng hạng", emoji: "🦀", price: 200, rarityBonus: 3, description: "Tăng 3% tỷ lệ hiếm" },
-    "divine": { name: "Mồi thần", emoji: "🧜‍♀️", price: 1000, rarityBonus: 5, description: "Tăng 5% tỷ lệ hiếm" },
-};
 
 // Cooldown cho câu cá (theo mùa)
 const getFishingCooldown = () => SeasonalFishingService.getSeasonalCooldown() * 1000; // Chuyển sang milliseconds
@@ -548,8 +479,22 @@ export class FishingService {
             // Trừ FishCoin câu cá
             await fishCoinDB.subtractFishCoin(userId, guildId, FISHING_COST, 'Fishing cost');
 
-            // Chọn cá ngẫu nhiên (Admin luôn câu được cá huyền thoại)
-            const fish = isAdmin ? this.getAdminFish() : this.getRandomFish(fishingData);
+            // Kiểm tra pity system
+            const shouldActivatePity = await PitySystemService.shouldActivatePity(userId, guildId);
+            
+            // Chọn cá ngẫu nhiên (Admin luôn câu được cá huyền thoại, hoặc khi kích hoạt pity)
+            let fish: Fish;
+            let isPityActivated = false;
+            
+            if (isAdmin) {
+                fish = this.getAdminFish();
+            } else if (shouldActivatePity) {
+                // Kích hoạt pity system - đảm bảo ra cá huyền thoại
+                fish = PitySystemService.getRandomLegendaryFish();
+                isPityActivated = true;
+            } else {
+                fish = await this.getRandomFish(fishingData, userId, guildId);
+            }
             const baseFishValue = Math.floor(Math.random() * (fish.maxValue - fish.minValue + 1)) + fish.minValue;
             
             // Áp dụng hệ số giá trị theo mùa
@@ -647,9 +592,13 @@ export class FishingService {
                 }
             }
 
+            // Cập nhật pity count sau khi câu cá
+            await PitySystemService.updatePityCount(userId, guildId, fish);
+
             return {
                 fish,
-                value: fishValue
+                value: fishValue,
+                isPityActivated
             };
         } catch (error) {
             console.error("Error fishing:", error);
@@ -937,7 +886,7 @@ export class FishingService {
     /**
      * Chọn cá ngẫu nhiên dựa trên cần câu và mồi
      */
-    private static getRandomFish(fishingData: any): Fish {
+    private static async getRandomFish(fishingData: any, userId: string, guildId: string): Promise<Fish> {
         const rod = FISHING_RODS[fishingData.currentRod];
         const bait = BAITS[fishingData.currentBait];
         const totalBonus = rod.rarityBonus + bait.rarityBonus;
@@ -945,6 +894,9 @@ export class FishingService {
         // Áp dụng hệ số may mắn theo mùa
         const luckMultiplier = SeasonalFishingService.getSeasonalLuckMultiplier();
         const luckBonus = (luckMultiplier - 1) * 100; // Chuyển về phần trăm (20% cho mùa xuân)
+
+        // Lấy pity multiplier
+        const pityMultiplier = await PitySystemService.getPityMultiplier(userId, guildId);
 
         // Kiểm tra xem có phải kim cương + mồi thần không
         const isDiamondDivine = fishingData.currentRod === "diamond" && fishingData.currentBait === "divine";
@@ -962,6 +914,9 @@ export class FishingService {
                     // Giảm mạnh hơn để đảm bảo < 1%
                     adjustedChance = fish.chance * 0.01 + totalBonus * 0.05;
                 }
+                
+                // Áp dụng pity multiplier cho cá huyền thoại
+                adjustedChance *= pityMultiplier;
             } else if (fish.rarity === "rare") {
                 adjustedChance += totalBonus * 0.5;
             } else if (fish.rarity === "epic") {
@@ -993,13 +948,7 @@ export class FishingService {
      * Lấy giá trị rarity để so sánh
      */
     private static getRarityValue(rarity: string): number {
-        switch (rarity) {
-            case "common": return 1;
-            case "rare": return 2;
-            case "epic": return 3;
-            case "legendary": return 4;
-            default: return 0;
-        }
+        return FishDataService.getRarityValue(rarity);
     }
 
     /**

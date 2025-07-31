@@ -113,6 +113,9 @@ model FishingData {
   currentRod    String        @default("basic")
   currentBait   String        @default("basic")
   lastFished    DateTime      @default(now())
+  // Pity system fields
+  legendaryPityCount Int      @default(0)  // Số lần câu không ra cá huyền thoại
+  lastLegendaryCaught DateTime? // Thời gian câu được cá huyền thoại cuối cùng
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   fish          CaughtFish[]
