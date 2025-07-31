@@ -2,7 +2,8 @@ import { EmbedBuilder, ComponentType } from "discord.js";
 
 import { Bot } from "@/classes";
 import type { MessageComponentProps } from "@/typings";
-import { FishingService, FISHING_RODS } from "@/utils/fishing";
+import { FishingService } from "@/utils/fishing";
+import { FISHING_RODS } from "@/config/fish-data";
 
 export default Bot.createMessageComponent<ComponentType.StringSelect, {}>({
     type: ComponentType.StringSelect,

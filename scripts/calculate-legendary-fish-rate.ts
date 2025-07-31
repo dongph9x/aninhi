@@ -1,4 +1,4 @@
-import { FISH_LIST, FISHING_RODS, BAITS } from '../src/utils/fishing';
+import { FISH_LIST, FISHING_RODS, BAITS } from '../src/config/fish-data';
 
 function calculateLegendaryFishRate() {
   console.log('🎣 Tính Toán Tỷ Lệ Cá Huyền Thoại (Chỉ Cần Kim Cương + Mồi Thần)\n');

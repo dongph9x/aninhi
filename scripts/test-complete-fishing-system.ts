@@ -1,4 +1,4 @@
-import { FISH_LIST, FISHING_RODS, BAITS } from '../src/utils/fishing';
+import { FISH_LIST, FISHING_RODS, BAITS } from '../src/config/fish-data';
 
 function testCompleteFishingSystem() {
     console.log('🎣 Test Toàn Bộ Hệ Thống Câu Cá\n');

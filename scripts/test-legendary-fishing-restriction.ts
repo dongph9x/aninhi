@@ -1,4 +1,4 @@
-import { FISH_LIST, FISHING_RODS, BAITS } from '../src/utils/fishing';
+import { FISH_LIST, FISHING_RODS, BAITS } from '../src/config/fish-data';
 
 function calcLegendaryRate(rodKey: string, baitKey: string) {
     const rod = FISHING_RODS[rodKey];

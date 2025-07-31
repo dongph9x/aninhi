@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
-import { FishingService, FISHING_RODS, BAITS } from "../src/utils/fishing";
+import { FishingService } from "../src/utils/fishing";
+import { FISHING_RODS, BAITS } from "../src/config/fish-data";
 
 const prisma = new PrismaClient();
 

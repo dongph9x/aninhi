@@ -1,4 +1,4 @@
-import { FISH_LIST } from '../src/utils/fishing';
+import { FISH_LIST } from '../src/config/fish-data';
 
 // Tỷ lệ bonus cũ
 const OLD_FISHING_RODS = {
