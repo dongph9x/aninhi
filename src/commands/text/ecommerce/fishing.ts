@@ -910,7 +910,7 @@ async function showHelp(message: Message) {
             "**🌍 Hệ Thống Câu Cá Theo Mùa:**\n" +
             "• **Mùa Hè ☀️:** Cooldown 20s, giá cá -20%\n" +
             "• **Mùa Thu 🍂:** Cooldown 30s, giá cá +10%\n" +
-            "• **Mùa Đông ❄️:** Cooldown 40s, giá cá +15%\n" +
+            "• **Mùa Đông ❄️:** Cooldown 40s, giá cá +40%\n" +
             "• **Mùa Xuân 🌸:** Cooldown 35s, giá cá +10%, may mắn +20%\n\n" +
             "**Lưu ý:**\n" +
             "• **Bạn cần mua cần câu và mồi trước khi câu cá!**\n" +

@@ -37,7 +37,7 @@ export class SeasonalFishingService {
       name: 'Mùa Đông',
       emoji: '❄️',
       cooldownMultiplier: 1.33, // 40s thay vì 30s
-      fishValueMultiplier: 1.15, // Tăng 15% giá trị cá
+      fishValueMultiplier: 1.4, // Tăng 40% giá trị cá
       luckMultiplier: 1.0,
       description: 'Thời gian câu cá chậm hơn nhưng giá trị cá cao hơn'
     },
