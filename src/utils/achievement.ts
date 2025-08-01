@@ -115,7 +115,8 @@ export class AchievementService {
       0: '🔥💢 Đặt cần xuống – cá lên bờ như bị thôi miên. 🌀🐠',
       1: '🪙🐠 Ngồi rung đùi đếm coin – khỏi cần thả lưới. 🐟💰', 
       2: '⚔️🐡 Vô địch toàn mặt nước – 🐟 chạm mặt là KO 🩻💢',
-      3: '🧙‍♂️🐉 Định mệnh vẫy gọi 📜🪄'
+      3: '🧙‍♂️🐉 Định mệnh vẫy gọi 📜🪄',
+      4: '𝓝𝓸 𝓰𝓸𝓭𝓼. 𝓝𝓸 𝓴𝓲𝓷𝓰𝓼. 𝓙𝓾𝓼𝓽 𝓬𝓻𝓮𝔀'
     };
     return typeNames[type as keyof typeof typeNames] || 'Unknown';
   }
