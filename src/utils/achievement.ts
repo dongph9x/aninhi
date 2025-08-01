@@ -116,7 +116,8 @@ export class AchievementService {
       1: '🪙🐠 Ngồi rung đùi đếm coin – khỏi cần thả lưới. 🐟💰', 
       2: '⚔️🐡 Vô địch toàn mặt nước – 🐟 chạm mặt là KO 🩻💢',
       3: '🧙‍♂️🐉 Định mệnh vẫy gọi 📜🪄',
-      4: '𝓝𝓸 𝓰𝓸𝓭𝓼. 𝓝𝓸 𝓴𝓲𝓷𝓰𝓼. 𝓙𝓾𝓼𝓽 𝓬𝓻𝓮𝔀'
+      4: '𝓝𝓸 𝓰𝓸𝓭𝓼. 𝓝𝓸 𝓴𝓲𝓷𝓰𝓼. 𝓙𝓾𝓼𝓽 𝓬𝓻𝓮𝔀',
+      5: '𝓑𝓸𝓻𝓷 𝓽𝓸 𝓼𝓪𝓲𝓵, 𝓫𝓾𝓲𝓵𝓽 𝓽𝓸 𝓻𝓾𝓵𝓮 𝓽𝓱𝓮 𝓽𝓲𝓭𝓮𝓼. ⚓🖤'
     };
     return typeNames[type as keyof typeof typeNames] || 'Unknown';
   }

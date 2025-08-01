@@ -770,6 +770,11 @@ async function showInventory(message: Message) {
             return fishInfo && fishInfo.rarity !== 'legendary';
         });
 
+        // Tính tổng giá trị cá
+        const totalValue = normalFish.reduce((sum: number, f: any) => {
+            return sum + (Number(f.fishValue) * f.quantity);
+        }, 0);
+
         const embed = new EmbedBuilder()
             .setTitle("🎒 Túi Đồ Câu Cá")
             .setDescription(`**${message.author.username}**\n\n` +
@@ -781,16 +786,36 @@ async function showInventory(message: Message) {
                          `${FISH_LIST.find(fish => fish.name === f.fishName)?.emoji || "🐟"} **${f.fishName}** x${f.quantity} (${f.fishValue} FishCoin)`
                      ).join("\n")
                      : "Chưa có cá nào"
-                 )
+                 ) +
+                (normalFish.length > 0 ? `\n\n💰 **Tổng giá trị:** ${totalValue.toLocaleString()} FishCoin` : "")
             )
             .setColor(config.embedColor)
             .setTimestamp();
 
-        // Tạo components với nút bán nhanh cho từng loại cá (giới hạn 5 components)
+        // Tạo components với nút bán nhanh cho từng loại cá và nút bán tất cả
         const components = [];
+        
         if (normalFish.length > 0) {
-            // Chỉ hiển thị tối đa 4 loại cá để tránh vượt quá giới hạn 5 components
-            const fishToShow = normalFish.slice(0, 4);
+            // Thêm nút "Bán tất cả" ở đầu
+            const sellAllRow = {
+                type: 1 as const,
+                components: [
+                    {
+                        type: 2 as const,
+                        style: 1 as const, // Primary button (blue)
+                        label: "💰 Bán Tất Cả",
+                        custom_id: JSON.stringify({
+                            n: "SellAllFish",
+                            d: {}
+                        }),
+                        emoji: { name: "💰" }
+                    }
+                ]
+            };
+            components.push(sellAllRow);
+
+            // Hiển thị tối đa 3 loại cá để tránh vượt quá giới hạn 5 components
+            const fishToShow = normalFish.slice(0, 3);
             
             for (let i = 0; i < fishToShow.length; i += 2) {
                 const row = {
@@ -806,7 +831,7 @@ async function showInventory(message: Message) {
                                 fishName: f.fishName
                             }
                         }),
-                        emoji: { name: "💰" }
+                        emoji: { name: "🐟" }
                     }))
                 };
                 components.push(row);
