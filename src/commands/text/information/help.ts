@@ -77,7 +77,7 @@ export default Bot.createCommand({
                 {
                     name: "🏆 **Tournament & Sự Kiện**",
                     value:
-                        `\`${prefix}tournament create\` - Tạo tournament\n` +
+                        `\`${prefix}tournament create\` - Tạo tournament (chỉ ADMIN)\n` +
                         `\`${prefix}tournament join\` - Tham gia tournament\n` +
                         `\`${prefix}tournament list\` - Danh sách tournament\n` +
                         `\`${prefix}tournament info\` - Thông tin tournament\n` +
@@ -187,13 +187,14 @@ function getSpecificCommandHelp(commandName: string, prefix: string): string | n
             "**Mô tả:** Hệ thống tournament và sự kiện\n\n" +
             `**Cách dùng:** \`${prefix}tournament <hành động> [tham số]\`\n\n` +
             "**Hành động:**\n" +
-            `• \`${prefix}tournament create_<tên>_<mô tả>_<phí>_<giải thưởng>_<số người>_<thời gian>\` - Tạo tournament\n` +
+            `• \`${prefix}tournament create_<tên>_<mô tả>_<phí>_<giải thưởng>_<số người>_<thời gian>\` - Tạo tournament (chỉ ADMIN)\n` +
             `• \`${prefix}tournament join <id>\` - Tham gia tournament\n` +
             `• \`${prefix}tournament list\` - Xem danh sách\n` +
             `• \`${prefix}tournament info <id>\` - Thông tin chi tiết\n` +
             `• \`${prefix}tournament end <id>\` - Kết thúc tournament\n` +
             "**Ví dụ:**\n" +
             `• \`${prefix}tournament create_Giải đấu test_Test tự động kết thúc_100_1000_2_1\`\n` +
+            "**Lưu ý:** Chỉ ADMIN mới có thể tạo tournament\n" +
             "• Aliases: `tour`, `t`",
 
         fishing:
