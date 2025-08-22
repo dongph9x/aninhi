@@ -495,7 +495,10 @@ export class FishingService {
             } else {
                 fish = await this.getRandomFish(fishingData, userId, guildId);
             }
-            const baseFishValue = Math.floor(Math.random() * (fish.maxValue - fish.minValue + 1)) + fish.minValue;
+            let baseFishValue = Math.floor(Math.random() * (fish.maxValue - fish.minValue + 1)) + fish.minValue;
+            if (fish.rarity === "common") {
+                baseFishValue *= 2;
+            }
             
             // Áp dụng hệ số giá trị theo mùa
             const fishValue = SeasonalFishingService.getSeasonalFishValue(baseFishValue);
@@ -912,7 +915,7 @@ export class FishingService {
                     adjustedChance += totalBonus * 0.1;
                 } else {
                     // Giảm mạnh hơn để đảm bảo < 1%
-                    adjustedChance = fish.chance * 0.01 + totalBonus * 0.05;
+                    adjustedChance = fish.chance * 0.01 + totalBonus * 0.1;
                 }
                 
                 // Áp dụng pity multiplier cho cá huyền thoại
