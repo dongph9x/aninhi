@@ -92,6 +92,10 @@ export class FishBarnHandler {
           await this.handleClone(interaction, userId, guildId);
           break;
           
+        case 'fishbarn_levelup':
+          await this.handleLevelUp(interaction, userId, guildId);
+          break;
+          
         case 'fishbarn_select_fish':
           if (interaction.isStringSelectMenu()) {
             await this.handleSelectFish(interaction, userId, guildId);
@@ -893,6 +897,109 @@ export class FishBarnHandler {
     }
   }
 
+  private static async handleLevelUp(interaction: ButtonInteraction | StringSelectMenuInteraction, userId: string, guildId: string) {
+    try {
+      // Kiểm tra quyền admin
+      const { FishBattleService } = await import('@/utils/fish-battle');
+      const isAdmin = await FishBattleService.isAdministrator(userId, guildId);
+      
+      if (!isAdmin) {
+        return interaction.reply({ 
+          content: '❌ Chỉ admin mới có thể sử dụng chức năng nâng cấp cá!', 
+          ephemeral: true 
+        });
+      }
+
+      // Lấy cá được chọn
+      const selectedFishId = this.selectedFishMap.get(userId);
+      if (!selectedFishId) {
+        return interaction.reply({ 
+          content: '❌ Vui lòng chọn một con cá để nâng cấp!', 
+          ephemeral: true 
+        });
+      }
+
+      // Lấy thông tin cá được chọn
+      const inventory = await FishInventoryService.getFishInventory(userId, guildId);
+      const selectedFish = inventory.items.find((item: any) => item.fish.id === selectedFishId);
+      
+      if (!selectedFish) {
+        return interaction.reply({ 
+          content: '❌ Không tìm thấy cá được chọn!', 
+          ephemeral: true 
+        });
+      }
+
+      const fish = selectedFish.fish;
+
+      // Kiểm tra xem cá đã đạt level 10 chưa
+      if (fish.level >= 10) {
+        return interaction.reply({ 
+          content: '❌ Cá này đã đạt level tối đa (10)!', 
+          ephemeral: true 
+        });
+      }
+
+      // Nâng cấp cá lên level 10
+      const levelUpResult = await this.levelUpFishToMax(fish.id);
+      
+      if (!levelUpResult.success) {
+        return interaction.reply({ 
+          content: `❌ Lỗi khi nâng cấp cá: ${levelUpResult.error}`, 
+          ephemeral: true 
+        });
+      }
+
+      // Tạo embed thông báo thành công
+      const successEmbed = new EmbedBuilder()
+        .setTitle('🚀 Nâng Cấp Cá Thành Công!')
+        .setColor('#00FF00')
+        .addFields(
+          { name: '🐟 Cá được nâng cấp', value: fish.species, inline: true },
+          { name: '📊 Level cũ', value: `${fish.level}`, inline: true },
+          { name: '📈 Level mới', value: '10', inline: true },
+          { name: '⭐ Độ hiếm', value: fish.rarity, inline: true },
+          { name: '💰 Giá trị cũ', value: Number(fish.value).toLocaleString(), inline: true },
+          { name: '💰 Giá trị mới', value: Number(levelUpResult.newValue).toLocaleString(), inline: true }
+        )
+        .setTimestamp();
+
+      // Cập nhật UI
+      const updatedInventory = await FishInventoryService.getFishInventory(userId, guildId);
+      const dailyFeedInfo = await FishFeedService.checkAndResetDailyFeedCount(userId, guildId);
+      
+      const ui = await this.createUIWithFishFood(
+        updatedInventory, 
+        userId, 
+        guildId, 
+        selectedFishId,
+        undefined,
+        false,
+        undefined,
+        undefined
+      );
+      
+      const newEmbed = await ui.createEmbed();
+      const newComponents = ui.createComponents();
+
+      // Cập nhật UI chính
+      await interaction.update({
+        embeds: [newEmbed],
+        components: newComponents,
+      });
+
+      // Gửi thông báo thành công
+      await interaction.followUp({ embeds: [successEmbed], ephemeral: true });
+
+    } catch (error) {
+      console.error('Error in handleLevelUp:', error);
+      await interaction.reply({ 
+        content: '❌ Có lỗi xảy ra khi nâng cấp cá!', 
+        ephemeral: true 
+      });
+    }
+  }
+
   private static async createClonedFish(originalFish: any, userId: string, guildId: string): Promise<{ success: boolean; fish?: any; error?: string }> {
     try {
       const prisma = (await import('@/utils/prisma')).default;
@@ -922,6 +1029,48 @@ export class FishBarnHandler {
     } catch (error) {
       console.error('Error creating cloned fish:', error);
       return { success: false, error: 'Lỗi database khi tạo cá nhân bản' };
+    }
+  }
+
+  private static async levelUpFishToMax(fishId: string): Promise<{ success: boolean; newValue?: number; error?: string }> {
+    try {
+      const prisma = (await import('@/utils/prisma')).default;
+      
+      // Lấy thông tin cá hiện tại
+      const currentFish = await prisma.fish.findUnique({
+        where: { id: fishId }
+      });
+
+      if (!currentFish) {
+        return { success: false, error: 'Không tìm thấy cá' };
+      }
+
+      // Kiểm tra xem cá đã đạt level 10 chưa
+      if (currentFish.level >= 10) {
+        return { success: false, error: 'Cá đã đạt level tối đa' };
+      }
+
+      // Tính toán giá trị mới dựa trên level 10
+      // Mỗi level tăng 2% giá trị
+      const levelBonus = (10 - currentFish.level) * 0.02;
+      const newValue = Math.floor(Number(currentFish.value) * (1 + levelBonus));
+
+      // Cập nhật cá lên level 10
+      const updatedFish = await prisma.fish.update({
+        where: { id: fishId },
+        data: {
+          level: 10,
+          experience: 0, // Reset experience về 0 khi đạt max level
+          value: BigInt(newValue),
+          status: 'adult', // Tự động chuyển sang trạng thái trưởng thành
+          updatedAt: new Date()
+        }
+      });
+
+      return { success: true, newValue };
+    } catch (error) {
+      console.error('Error leveling up fish:', error);
+      return { success: false, error: 'Lỗi database khi nâng cấp cá' };
     }
   }
 } 

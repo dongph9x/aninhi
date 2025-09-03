@@ -290,7 +290,7 @@ export class FishBarnUI {
         components.push(selectRow, actionRow, closeRow);
       }
     } else {
-      // Row 1: Feed, Sell, Breed và Clone (cho admin)
+      // Row 1: Feed, Sell, Breed, Clone và Level Up (cho admin)
       const actionRow1 = new ActionRowBuilder<ButtonBuilder>()
         .addComponents(
           new ButtonBuilder()
@@ -459,6 +459,12 @@ export class FishBarnUI {
           .setLabel('🔄 Nhân Bản Cá')
           .setStyle(ButtonStyle.Primary)
           .setEmoji('🔄')
+          .setDisabled(!this.selectedFishId),
+        new ButtonBuilder()
+          .setCustomId('fishbarn_levelup')
+          .setLabel('🚀 Nâng Cấp Lv.10')
+          .setStyle(ButtonStyle.Secondary)
+          .setEmoji('🚀')
           .setDisabled(!this.selectedFishId)
       );
   }
