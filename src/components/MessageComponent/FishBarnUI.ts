@@ -12,8 +12,8 @@ export class FishBarnUI {
   private selectedParent1Id?: string;
   private selectedParent2Id?: string;
   private userFishFood: any[] = [];
-  private dailyFeedInfo?: { canFeed: boolean; remainingFeeds: number; error?: string };
-  constructor(inventory: any, userId: string, guildId: string, selectedFishId?: string, selectedFoodType?: string, breedingMode: boolean = false, selectedParent1Id?: string, selectedParent2Id?: string, dailyFeedInfo?: { canFeed: boolean; remainingFeeds: number; error?: string }) {
+  private dailyFeedInfo?: { canFeed: boolean; remainingFeeds: number; error?: string; isAdmin?: boolean };
+  constructor(inventory: any, userId: string, guildId: string, selectedFishId?: string, selectedFoodType?: string, breedingMode: boolean = false, selectedParent1Id?: string, selectedParent2Id?: string, dailyFeedInfo?: { canFeed: boolean; remainingFeeds: number; error?: string; isAdmin?: boolean }) {
     this.inventory = inventory;
     this.userId = userId;
     this.guildId = guildId;
@@ -39,16 +39,20 @@ export class FishBarnUI {
 
     // Thông tin daily feed limit
     if (this.dailyFeedInfo) {
+      const isAdmin = this.dailyFeedInfo.isAdmin;
+      const limitText = isAdmin ? '100' : '20';
+      const adminBadge = isAdmin ? ' 👑 Admin' : '';
+      
       if (this.dailyFeedInfo.canFeed) {
         embed.addFields({
-          name: '🍽️ Giới Hạn Cho Cá Ăn Hôm Nay',
-          value: `✅ Còn **${this.dailyFeedInfo.remainingFeeds}/20** lần cho cá ăn`,
+          name: `🍽️ Giới Hạn Cho Cá Ăn Hôm Nay${adminBadge}`,
+          value: `✅ Còn **${this.dailyFeedInfo.remainingFeeds}/${limitText}** lần cho cá ăn`,
           inline: true
         });
       } else {
         embed.addFields({
-          name: '🍽️ Giới Hạn Cho Cá Ăn Hôm Nay',
-          value: `❌ **Đã đạt giới hạn!** (0/20)\n${this.dailyFeedInfo.error || 'Vui lòng thử lại vào ngày mai'}`,
+          name: `🍽️ Giới Hạn Cho Cá Ăn Hôm Nay${adminBadge}`,
+          value: `❌ **Đã đạt giới hạn!** (0/${limitText})\n${this.dailyFeedInfo.error || 'Vui lòng thử lại vào ngày mai'}`,
           inline: true
         });
       }
