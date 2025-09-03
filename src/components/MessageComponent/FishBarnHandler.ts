@@ -88,6 +88,10 @@ export class FishBarnHandler {
           await this.handleBreed(interaction, userId, guildId);
           break;
           
+        case 'fishbarn_clone':
+          await this.handleClone(interaction, userId, guildId);
+          break;
+          
         case 'fishbarn_select_fish':
           if (interaction.isStringSelectMenu()) {
             await this.handleSelectFish(interaction, userId, guildId);
@@ -775,5 +779,149 @@ export class FishBarnHandler {
       embeds: [embed],
       components: components,
     });
+  }
+
+  private static async handleClone(interaction: ButtonInteraction | StringSelectMenuInteraction, userId: string, guildId: string) {
+    try {
+      // Kiểm tra quyền admin
+      const { FishBattleService } = await import('@/utils/fish-battle');
+      const isAdmin = await FishBattleService.isAdministrator(userId, guildId);
+      
+      if (!isAdmin) {
+        return interaction.reply({ 
+          content: '❌ Chỉ admin mới có thể sử dụng chức năng nhân bản cá!', 
+          ephemeral: true 
+        });
+      }
+
+      // Lấy cá được chọn
+      const selectedFishId = this.selectedFishMap.get(userId);
+      if (!selectedFishId) {
+        return interaction.reply({ 
+          content: '❌ Vui lòng chọn một con cá để nhân bản!', 
+          ephemeral: true 
+        });
+      }
+
+      // Lấy thông tin cá gốc
+      const inventory = await FishInventoryService.getFishInventory(userId, guildId);
+      const selectedFish = inventory.items.find((item: any) => item.fish.id === selectedFishId);
+      
+      if (!selectedFish) {
+        return interaction.reply({ 
+          content: '❌ Không tìm thấy cá được chọn!', 
+          ephemeral: true 
+        });
+      }
+
+      const originalFish = selectedFish.fish;
+
+      if (!originalFish) {
+        return interaction.reply({ 
+          content: '❌ Không thể lấy thông tin cá gốc!', 
+          ephemeral: true 
+        });
+      }
+
+      // Tạo cá nhân bản
+      const clonedFish = await this.createClonedFish(originalFish, userId, guildId);
+      
+      if (!clonedFish.success) {
+        return interaction.reply({ 
+          content: `❌ Lỗi khi nhân bản cá: ${clonedFish.error}`, 
+          ephemeral: true 
+        });
+      }
+
+      // Thêm cá nhân bản vào inventory
+      const addResult = await FishInventoryService.addFishToInventory(userId, guildId, clonedFish.fish.id);
+      
+      if (!addResult.success) {
+        return interaction.reply({ 
+          content: `❌ Lỗi khi thêm cá nhân bản vào inventory: ${addResult.error}`, 
+          ephemeral: true 
+        });
+      }
+
+      // Tạo embed thông báo thành công
+      const successEmbed = new EmbedBuilder()
+        .setTitle('🔄 Nhân Bản Cá Thành Công!')
+        .setColor('#00FF00')
+        .addFields(
+          { name: '🐟 Cá gốc', value: originalFish.species, inline: true },
+          { name: '🔄 Cá nhân bản', value: clonedFish.fish.species, inline: true },
+          { name: '🏷️ ID cá nhân bản', value: clonedFish.fish.id, inline: true },
+          { name: '📊 Thế hệ', value: `Gen.${clonedFish.fish.generation}`, inline: true },
+          { name: '⭐ Độ hiếm', value: originalFish.rarity, inline: true },
+          { name: '💰 Giá trị', value: Number(clonedFish.fish.value).toLocaleString(), inline: true }
+        )
+        .setTimestamp();
+
+      // Cập nhật UI
+      const updatedInventory = await FishInventoryService.getFishInventory(userId, guildId);
+      const dailyFeedInfo = await FishFeedService.checkAndResetDailyFeedCount(userId, guildId);
+      
+      const ui = await this.createUIWithFishFood(
+        updatedInventory, 
+        userId, 
+        guildId, 
+        selectedFishId,
+        undefined,
+        false,
+        undefined,
+        undefined
+      );
+      
+      const newEmbed = await ui.createEmbed();
+      const newComponents = ui.createComponents();
+
+      // Cập nhật UI chính
+      await interaction.update({
+        embeds: [newEmbed],
+        components: newComponents,
+      });
+
+      // Gửi thông báo thành công
+      await interaction.followUp({ embeds: [successEmbed], ephemeral: true });
+
+    } catch (error) {
+      console.error('Error in handleClone:', error);
+      await interaction.reply({ 
+        content: '❌ Có lỗi xảy ra khi nhân bản cá!', 
+        ephemeral: true 
+      });
+    }
+  }
+
+  private static async createClonedFish(originalFish: any, userId: string, guildId: string): Promise<{ success: boolean; fish?: any; error?: string }> {
+    try {
+      const prisma = (await import('@/utils/prisma')).default;
+      
+      // Tạo cá nhân bản với thông tin giống hệt cá gốc
+      const clonedFish = await prisma.fish.create({
+        data: {
+          userId,
+          guildId,
+          species: originalFish.species,
+          level: originalFish.level,
+          experience: originalFish.experience,
+          rarity: originalFish.rarity,
+          value: originalFish.value,
+          generation: originalFish.generation, // Giữ nguyên thế hệ như cá gốc
+          status: originalFish.status,
+          stats: typeof originalFish.stats === 'string' ? originalFish.stats : JSON.stringify(originalFish.stats || {}),
+          specialTraits: typeof originalFish.specialTraits === 'string' ? originalFish.specialTraits : JSON.stringify(originalFish.specialTraits || []),
+          // Thêm thông tin nhân bản
+          isCloned: true,
+          clonedFrom: originalFish.id,
+          clonedAt: new Date()
+        }
+      });
+
+      return { success: true, fish: clonedFish };
+    } catch (error) {
+      console.error('Error creating cloned fish:', error);
+      return { success: false, error: 'Lỗi database khi tạo cá nhân bản' };
+    }
   }
 } 

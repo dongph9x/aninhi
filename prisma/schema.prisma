@@ -372,6 +372,10 @@ model Fish {
   specialTraits         String?
   stats                 String?                   // JSON string chứa stats: strength, agility, intelligence, defense, luck
   status                String                    @default("growing")
+  // Cloning fields
+  isCloned              Boolean                   @default(false)
+  clonedFrom            String?                   // ID của cá gốc được nhân bản
+  clonedAt              DateTime?                 // Thời gian nhân bản
   createdAt             DateTime                  @default(now())
   updatedAt             DateTime                  @updatedAt
   inventoryItem         FishInventoryItem?
@@ -382,6 +386,8 @@ model Fish {
   @@index([guildId])
   @@index([rarity])
   @@index([status])
+  @@index([isCloned])
+  @@index([clonedFrom])
 }
 
 model FishInventory {

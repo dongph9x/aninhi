@@ -59,7 +59,7 @@ export class FishFeedService {
       return { canFeed: true, remainingFeeds, isAdmin };
     } catch (error) {
       console.error('Error checking daily feed count:', error);
-      return { canFeed: false, remainingFeeds: 0, error: 'Đã xảy ra lỗi khi kiểm tra giới hạn cho cá ăn' };
+      return { canFeed: false, remainingFeeds: 0, error: 'Đã xảy ra lỗi khi kiểm tra giới hạn cho cá ăn', isAdmin: false };
     }
   }
 

@@ -290,7 +290,7 @@ export class FishBarnUI {
         components.push(selectRow, actionRow, closeRow);
       }
     } else {
-      // Row 1: Feed và Sell
+      // Row 1: Feed, Sell, Breed và Clone (cho admin)
       const actionRow1 = new ActionRowBuilder<ButtonBuilder>()
         .addComponents(
           new ButtonBuilder()
@@ -311,6 +311,8 @@ export class FishBarnUI {
             .setStyle(ButtonStyle.Success)
             .setEmoji('❤️')
         );
+
+
 
       // Row 2: Select menu để chọn cá
       const availableFish = this.inventory.items
@@ -341,10 +343,21 @@ export class FishBarnUI {
                 })
               )
           );
-        components.push(actionRow1, selectRow);
+        // Thêm cloneRow nếu là admin và có cá được chọn
+        const cloneRow = this.createCloneRow();
+        if (cloneRow) {
+          components.push(actionRow1, selectRow, cloneRow);
+        } else {
+          components.push(actionRow1, selectRow);
+        }
       } else {
         // Nếu không có cá nào dưới level 10, chỉ hiển thị buttons
-        components.push(actionRow1);
+        const cloneRow = this.createCloneRow();
+        if (cloneRow) {
+          components.push(actionRow1, cloneRow);
+        } else {
+          components.push(actionRow1);
+        }
       }
 
       // Row 3: Select menu để chọn thức ăn (chỉ hiển thị khi có cá được chọn)
@@ -432,6 +445,22 @@ export class FishBarnUI {
       where: { fishId },
     });
     return !!isInBattleInventory;
+  }
+
+  private createCloneRow(): ActionRowBuilder<ButtonBuilder> | null {
+    if (!this.dailyFeedInfo?.isAdmin || !this.selectedFishId) {
+      return null;
+    }
+
+    return new ActionRowBuilder<ButtonBuilder>()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId('fishbarn_clone')
+          .setLabel('🔄 Nhân Bản Cá')
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji('🔄')
+          .setDisabled(!this.selectedFishId)
+      );
   }
 
   private createFishDisplayText(fish: any, stats: any, totalPower: number, levelBar?: string, finalValue?: number, levelBonus?: number, isInBattleInventory: boolean = false): string {
