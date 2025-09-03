@@ -279,18 +279,26 @@ export class BattleFishHandler {
         const userPower = this.calculatePower(selectedFish);
         const opponentPower = this.calculatePower(opponentResult.opponent || {});
 
+        // Kiểm tra xem có phải BOT đối thủ không
+        const isBotOpponent = opponentResult.isBot || false;
+        const opponentType = isBotOpponent ? '🤖 BOT' : '👤 Người chơi';
+        const embedColor = isBotOpponent ? '#9B59B6' : '#FFD700'; // Màu tím cho BOT, vàng cho người chơi
+        const embedTitle = isBotOpponent ? '🤖 Tìm Thấy BOT Đối Thủ!' : '⚔️ Tìm Thấy Đối Thủ!';
+        const embedDescription = isBotOpponent ? '🤖 Sẵn sàng đấu với BOT! React với ⚔️ để bắt đầu đấu!' : 'React với ⚔️ để bắt đầu đấu!';
+
         const embed = new EmbedBuilder()
-            .setTitle('⚔️ Tìm Thấy Đối Thủ!')
-            .setColor('#FFD700')
+            .setTitle(embedTitle)
+            .setColor(embedColor)
             .addFields(
                 { name: '🐟 Cá của bạn', value: `${selectedFish.name} (Lv.${selectedFish.level})`, inline: true },
                 { name: '🐟 Đối thủ', value: `${opponentResult.opponent.name} (Lv.${opponentResult.opponent.level})`, inline: true },
+                { name: '👤 Loại đối thủ', value: opponentType, inline: true },
                 { name: '💪 Sức mạnh', value: `${userPower} vs ${opponentPower}`, inline: true },
-                { name: '📊 Stats của bạn', value: `💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0} 🎯${stats.accuracy || 0}`, inline: false },
-                { name: '📊 Stats đối thủ', value: `💪${opponentStats.strength || 0} 🏃${opponentStats.agility || 0} 🧠${opponentStats.intelligence || 0} 🛡️${opponentStats.defense || 0} 🍀${opponentStats.luck || 0}`, inline: false },
+                { name: '📊 Stats của bạn', value: `💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0}`, inline: false },
+                { name: '📊 Stats đối thủ', value: `💪${opponentStats.strength || 0} 🏃${opponentStats.agility || 0} 🧠${opponentStats.intelligence || 0} 🛡️${opponentStats.defense || 0} 🍀${opponentStats.luck || 0} 🎯${opponentStats.accuracy || 0}`, inline: false },
                 { name: '⏰ Giới Hạn Đấu Cá Hôm Nay', value: `✅ Còn **${dailyLimitCheck.remainingBattles}/20** lần đấu cá`, inline: true }
             )
-            .setDescription('React với ⚔️ để bắt đầu đấu!')
+            .setDescription(embedDescription)
             .setTimestamp();
 
         const battleButton = new ActionRowBuilder<ButtonBuilder>()
@@ -525,7 +533,8 @@ export class BattleFishHandler {
             messageData.userId, 
             messageData.guildId, 
             selectedFish.id, 
-            opponent.id
+            opponent.id,
+            opponent // Truyền opponentData cho BOT
         );
 
         if ('success' in battleResult && !battleResult.success) {

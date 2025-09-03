@@ -208,7 +208,15 @@ export class FishBattleService {
     });
 
     if (opponents.length === 0) {
-      return { success: false, error: 'Không có đối thủ nào trong server!' };
+      // Nếu không tìm thấy đối thủ thực tế, tạo BOT đối thủ
+      console.log(`🤖 No real opponents found, creating BOT opponent for user ${userId}`);
+      const botOpponent = this.createBotOpponent(userFish);
+      
+      return {
+        success: true,
+        opponent: botOpponent,
+        isBot: true // Đánh dấu đây là BOT đối thủ
+      };
     }
 
     // Chọn ngẫu nhiên 1 đối thủ
@@ -221,14 +229,144 @@ export class FishBattleService {
         name: randomOpponent.species,
         stats: JSON.parse((randomOpponent as any).stats || '{}'),
         traits: JSON.parse(randomOpponent.specialTraits || '[]'),
-      }
+      },
+      isBot: false // Đánh dấu đây là đối thủ thực tế
     };
+  }
+
+  /**
+   * Tạo BOT đối thủ với stats cân bằng
+   */
+  private static createBotOpponent(userFish: any) {
+    // Parse stats của user fish
+    const userStats = JSON.parse(userFish.stats || '{}');
+    
+    // Tính toán sức mạnh cơ bản của user fish
+    const userBasePower = FishBreedingService.calculateTotalPowerWithLevel({
+      ...userFish,
+      stats: userStats
+    });
+
+    // Tạo BOT đối thủ với sức mạnh thấp hơn user fish một chút
+    const powerVariation = 0.1; // ±10%
+    const randomMultiplier = 0.5 + (Math.random() * powerVariation * 2); // 0.5 - 0.7 (BOT yếu hơn user)
+    const botBasePower = userBasePower * randomMultiplier;
+    
+    // Đảm bảo BOT không quá mạnh (giới hạn tối đa 0.7x user power)
+    const maxBotPower = userBasePower * 0.7;
+    const finalBotPower = Math.min(botBasePower, maxBotPower);
+    
+    // Trừ đi level bonus vì BOT sẽ có level 10 (thêm 90 power)
+    // Chúng ta muốn stats cơ bản của BOT cân bằng với user
+    const levelBonus = 90; // (10-1) * 10
+    const statsOnlyPower = finalBotPower - levelBonus;
+
+    // Tạo stats cân bằng cho BOT (chỉ dựa trên stats, không tính level bonus)
+    const botStats = {
+      strength: Math.floor(statsOnlyPower * 0.25),
+      agility: Math.floor(statsOnlyPower * 0.2),
+      intelligence: Math.floor(statsOnlyPower * 0.2),
+      defense: Math.floor(statsOnlyPower * 0.2),
+      luck: Math.floor(statsOnlyPower * 0.1),
+      accuracy: Math.floor(statsOnlyPower * 0.05)
+    };
+
+    // Tạo BOT opponent
+    const botOpponent = {
+      id: `bot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      userId: 'BOT_OPPONENT',
+      guildId: userFish.guildId,
+      species: this.getRandomBotSpecies(),
+      level: 10,
+      experience: 0,
+      rarity: this.getRandomBotRarity(),
+      value: BigInt(Math.floor(finalBotPower * 100)), // Giá trị dựa trên sức mạnh
+      generation: 2,
+      status: 'adult',
+      stats: botStats,
+      specialTraits: this.getRandomBotTraits(),
+      isCloned: false,
+      clonedFrom: null,
+      clonedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      name: this.getRandomBotSpecies(), // Tên hiển thị
+      traits: this.getRandomBotTraits() // Traits cho battle
+    };
+
+    console.log(`🤖 Created BOT opponent: ${botOpponent.species} with power: ${Math.floor(finalBotPower)} (base: ${Math.floor(botBasePower)}, max: ${Math.floor(maxBotPower)})`);
+    return botOpponent;
+  }
+
+  /**
+   * Lấy tên loài cá ngẫu nhiên cho BOT
+   */
+  private static getRandomBotSpecies(): string {
+    const botSpecies = [
+      'BOT Warrior Fish',
+      'BOT Guardian Fish', 
+      'BOT Elite Fish',
+      'BOT Champion Fish',
+      'BOT Legend Fish',
+      'BOT Master Fish',
+      'BOT Supreme Fish',
+      'BOT Ultimate Fish'
+    ];
+    return botSpecies[Math.floor(Math.random() * botSpecies.length)];
+  }
+
+  /**
+   * Lấy độ hiếm ngẫu nhiên cho BOT
+   */
+  private static getRandomBotRarity(): string {
+    const rarities = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+    const weights = [0.4, 0.3, 0.2, 0.08, 0.02]; // Tỷ lệ xuất hiện
+    
+    const random = Math.random();
+    let cumulativeWeight = 0;
+    
+    for (let i = 0; i < weights.length; i++) {
+      cumulativeWeight += weights[i];
+      if (random <= cumulativeWeight) {
+        return rarities[i];
+      }
+    }
+    
+    return 'common'; // Fallback
+  }
+
+  /**
+   * Lấy traits ngẫu nhiên cho BOT
+   */
+  private static getRandomBotTraits(): string[] {
+    const allTraits = [
+      'BOT Enhanced',
+      'Artificial Intelligence',
+      'Machine Learning',
+      'Digital Mastery',
+      'Virtual Power',
+      'Cyber Strength',
+      'Quantum Speed',
+      'Neural Network'
+    ];
+    
+    const numTraits = Math.floor(Math.random() * 3) + 1; // 1-3 traits
+    const selectedTraits: string[] = [];
+    
+    while (selectedTraits.length < numTraits) {
+      const randomTrait = allTraits[Math.floor(Math.random() * allTraits.length)];
+      if (!selectedTraits.includes(randomTrait)) {
+        selectedTraits.push(randomTrait);
+      }
+    }
+    
+    return selectedTraits;
   }
 
   /**
    * Đấu cá với đối thủ
    */
-  static async battleFish(userId: string, guildId: string, fishId: string, opponentId: string): Promise<BattleResult | { success: false, error: string }> {
+  static async battleFish(userId: string, guildId: string, fishId: string, opponentId: string, opponentData?: any): Promise<BattleResult | { success: false, error: string }> {
     try {
       console.log(`🔍 [DEBUG] battleFish called:`);
       console.log(`  - userId: ${userId}`);
@@ -259,40 +397,89 @@ export class FishBattleService {
         where: { id: fishId, userId }
       });
 
-      const opponentFish = await prisma.fish.findFirst({
+          // Kiểm tra xem có phải BOT đối thủ không
+    const isBotOpponent = opponentId.startsWith('bot_');
+    
+    let opponentFish: any;
+    let opponentResult: any;
+    
+    if (isBotOpponent) {
+      // Nếu là BOT đối thủ, sử dụng opponentData được truyền vào
+      console.log(`  - 🤖 BOT opponent detected: ${opponentId}`);
+      if (opponentData) {
+        opponentResult = { opponent: opponentData, isBot: true };
+        opponentFish = opponentData; // Sử dụng opponentData cho BOT
+      } else {
+        // Fallback: tạo BOT opponent mới nếu không có opponentData
+        const userFish = await prisma.fish.findFirst({
+          where: { id: fishId, userId }
+        });
+        if (userFish) {
+          const botOpponent = this.createBotOpponent(userFish);
+          opponentResult = { opponent: botOpponent, isBot: true };
+          opponentFish = botOpponent;
+        }
+      }
+    } else {
+      // Nếu là đối thủ thực tế, query database
+      opponentFish = await prisma.fish.findFirst({
         where: { id: opponentId }
       });
+      opponentResult = { opponent: opponentFish, isBot: false };
+    }
 
       console.log(`  - userFish found: ${!!userFish}`);
-      console.log(`  - opponentFish found: ${!!opponentFish}`);
+      console.log(`  - opponentFish found: ${!!opponentFish || isBotOpponent}`);
 
-      if (!userFish || !opponentFish) {
-        return { success: false, error: 'Không tìm thấy cá!' };
+      if (!userFish) {
+        return { success: false, error: 'Không tìm thấy cá của bạn!' };
       }
 
-      if (userFish.status !== 'adult' || opponentFish.status !== 'adult') {
+      if (userFish.status !== 'adult') {
         return { success: false, error: 'Chỉ cá trưởng thành mới có thể đấu!' };
+      }
+
+      // Đối với BOT opponent, không cần kiểm tra status
+      if (!isBotOpponent && (!opponentFish || opponentFish.status !== 'adult')) {
+        return { success: false, error: 'Đối thủ không hợp lệ để đấu!' };
       }
 
     // Parse stats
     const userStats: FishStats = JSON.parse(userFish.stats || '{}');
-    const opponentStats: FishStats = JSON.parse(opponentFish.stats || '{}');
+    
+    // Xử lý stats của opponent (có thể là BOT hoặc thực tế)
+    let opponentStats: FishStats;
+    let opponentBasePower: number;
+    
+    if (isBotOpponent) {
+      // BOT opponent - stats đã được tạo sẵn
+      opponentStats = opponentFish?.stats || {};
+      opponentBasePower = FishBreedingService.calculateTotalPowerWithLevel({
+        ...opponentFish,
+        stats: opponentStats
+      });
+    } else {
+      // Đối thủ thực tế - parse từ database
+      opponentStats = JSON.parse(opponentFish.stats || '{}');
+      opponentBasePower = FishBreedingService.calculateTotalPowerWithLevel({
+        ...opponentFish,
+        stats: opponentStats
+      });
+    }
 
-    // Tính toán sức mạnh cơ bản
+    // Tính toán sức mạnh cơ bản của user
     const userBasePower = FishBreedingService.calculateTotalPowerWithLevel({
       ...userFish,
       stats: userStats
-    });
-    const opponentBasePower = FishBreedingService.calculateTotalPowerWithLevel({
-      ...opponentFish,
-      stats: opponentStats
     });
 
     // Tạo battle log
     const battleLog: string[] = [];
     
     // === PHASE 0: KIỂM TRA VŨ KHÍ TRANG BỊ ===
-    battleLog.push(`⚔️ **${userFish.species}** vs **${opponentFish.species}**`);
+    // Sử dụng thông tin opponent từ kết quả tìm kiếm (có thể là BOT hoặc thực tế)
+    const opponentName = isBotOpponent ? opponentResult.opponent.name : opponentFish.species;
+    battleLog.push(`⚔️ **${userFish.species}** vs **${opponentName}**`);
     battleLog.push(`💪 Sức mạnh cơ bản: ${Math.floor(userBasePower)} vs ${Math.floor(opponentBasePower)}`);
 
     // Lấy weapon stats của user
@@ -328,7 +515,7 @@ export class FishBattleService {
     battleLog.push(`\n📊 **Stats ${userFish.species}:**`);
             battleLog.push(`💪 Sức mạnh: ${userStats.strength || 0} | 🏃 Thể lực: ${userStats.agility || 0} | 🧠 Trí tuệ: ${userStats.intelligence || 0} | 🛡️ Phòng thủ: ${userStats.defense || 0} | 🍀 May mắn: ${userStats.luck || 0} | 🎯 Độ chính xác: ${userStats.accuracy || 0}`);
 
-    battleLog.push(`\n📊 **Stats ${opponentFish.species}:**`);
+    battleLog.push(`\n📊 **Stats ${opponentName}:**`);
             battleLog.push(`💪 Sức mạnh: ${opponentStats.strength || 0} | 🏃 Thể lực: ${opponentStats.agility || 0} | 🧠 Trí tuệ: ${opponentStats.intelligence || 0} | 🛡️ Phòng thủ: ${opponentStats.defense || 0} | 🍀 May mắn: ${opponentStats.luck || 0} | 🎯 Độ chính xác: ${opponentStats.accuracy || 0}`);
 
     // === PHASE 1: KIỂM TRA ĐIỀU KIỆN ĐẶC BIỆT ===
@@ -336,7 +523,7 @@ export class FishBattleService {
     
     // Kiểm tra thế hệ (cá thế hệ cao hơn có lợi thế)
     const userGen = userFish.generation || 1;
-    const opponentGen = opponentFish.generation || 1;
+    const opponentGen = isBotOpponent ? opponentResult.opponent.generation : (opponentFish.generation || 1);
     const userGenBonus = Math.max(0, (userGen - opponentGen) * 0.1); // +10% mỗi thế hệ chênh lệch
     const opponentGenBonus = Math.max(0, (opponentGen - userGen) * 0.1);
     
@@ -344,7 +531,7 @@ export class FishBattleService {
       battleLog.push(`🌟 ${userFish.species} có lợi thế thế hệ: +${Math.round(userGenBonus * 100)}%`);
     }
     if (opponentGenBonus > 0) {
-      battleLog.push(`🌟 ${opponentFish.species} có lợi thế thế hệ: +${Math.round(opponentGenBonus * 100)}%`);
+      battleLog.push(`🌟 ${opponentName} có lợi thế thế hệ: +${Math.round(opponentGenBonus * 100)}%`);
     }
 
     // === PHASE 1.5: BUFF/DEBUFF NGẪU NHIÊN ===
@@ -379,7 +566,7 @@ export class FishBattleService {
     const opponentBuffMultiplier = opponentBuffIsPositive ? 1 + (opponentBuffAmount / 100) : 1 - (opponentBuffAmount / 100);
     const opponentBuffEmoji = opponentBuffIsPositive ? '📈' : '📉';
     const opponentBuffText = opponentBuffIsPositive ? 'tăng' : 'giảm';
-    battleLog.push(`${opponentBuffEmoji} **${opponentFish.species}** ${opponentBuffText} ${opponentBuffType.name} ${opponentBuffAmount} điểm!`);
+    battleLog.push(`${opponentBuffEmoji} **${opponentName}** ${opponentBuffText} ${opponentBuffType.name} ${opponentBuffAmount} điểm!`);
     
     // Tính toán sức mạnh sau buff/debuff
     let userBuffPower = userPowerWithWeapon;
@@ -423,7 +610,7 @@ export class FishBattleService {
     const opponentLuckBonus = opponentLuckRoll * 0.3;
     
     battleLog.push(`🍀 ${userFish.species} may mắn: +${Math.round(userLuckBonus * 100)}%`);
-    battleLog.push(`🍀 ${opponentFish.species} may mắn: +${Math.round(opponentLuckBonus * 100)}%`);
+    battleLog.push(`🍀 ${opponentName} may mắn: +${Math.round(opponentLuckBonus * 100)}%`);
 
     // Tính sức mạnh cuối cùng (sau buff/debuff)
     const userFinalPower = userBuffPower * (1 + userGenBonus + userLuckBonus);
@@ -451,12 +638,12 @@ export class FishBattleService {
     
     if (opponentCritRoll < opponentCritChance) {
       opponentCritMultiplier = 1.5;
-      battleLog.push(`💥 **CRITICAL HIT!** ${opponentFish.species} gây sát thương x1.5!`);
+      battleLog.push(`💥 **CRITICAL HIT!** ${opponentName} gây sát thương x1.5!`);
     }
 
     // Hiển thị critical hit chance
             battleLog.push(`🎯 ${userFish.species} Crit Chance: ${Math.round(userCritChance * 100)}% (Luck: ${userStats.luck || 0} + Fish Accuracy: ${userStats.accuracy || 0} + Weapon Accuracy: ${userWeaponStats.accuracy || 0}%)`);
-    battleLog.push(`🎯 ${opponentFish.species} Crit Chance: ${Math.round(opponentCritChance * 100)}% (Luck: ${opponentStats.luck || 0})`);
+    battleLog.push(`🎯 ${opponentName} Crit Chance: ${Math.round(opponentCritChance * 100)}% (Luck: ${opponentStats.luck || 0})`);
 
     // === PHASE 4: KIỂM TRA KHẢ NĂNG ĐẶC BIỆT ===
     battleLog.push(`\n✨ **PHASE 4: Kiểm tra khả năng đặc biệt**`);
@@ -481,7 +668,7 @@ export class FishBattleService {
       const specialChance = 0.15; // 15% chance
       if (Math.random() < specialChance) {
         opponentSpecialBonus = 0.2; // +20%
-        battleLog.push(`🔥 **KHẢ NĂNG ĐẶC BIỆT!** ${opponentFish.species} kích hoạt sức mạnh tiềm ẩn! +20%`);
+        battleLog.push(`🔥 **KHẢ NĂNG ĐẶC BIỆT!** ${opponentName} kích hoạt sức mạnh tiềm ẩn! +20%`);
       }
     }
 
@@ -515,7 +702,7 @@ export class FishBattleService {
           loserPower = userTotalPower;
           isUserWinner = false;
           battleType = 'upset';
-          battleLog.push(`🎭 **BẤT NGỜ!** ${opponentFish.species} thắng dù yếu hơn! (Upset)`);
+          battleLog.push(`🎭 **BẤT NGỜ!** ${opponentName} thắng dù yếu hơn! (Upset)`);
         } else {
           winner = userFish;
           loser = opponentFish;
@@ -556,7 +743,7 @@ export class FishBattleService {
             loserPower = userTotalPower;
             isUserWinner = false;
             battleType = 'tie';
-            battleLog.push(`🤝 **Hòa!** ${opponentFish.species} thắng nhờ may mắn cao hơn!`);
+            battleLog.push(`🤝 **Hòa!** ${opponentName} thắng nhờ may mắn cao hơn!`);
           }
         }
       }
@@ -591,7 +778,7 @@ export class FishBattleService {
           loserPower = userTotalPower;
           isUserWinner = false;
           battleType = 'tie';
-          battleLog.push(`🤝 **Hòa!** ${opponentFish.species} thắng nhờ may mắn cao hơn!`);
+          battleLog.push(`🤝 **Hòa!** ${opponentName} thắng nhờ may mắn cao hơn!`);
         }
       }
     }
@@ -677,7 +864,7 @@ export class FishBattleService {
         guildId,
         fishId,
         opponentId,
-        opponentUserId: opponentFish.userId,
+        opponentUserId: isBotOpponent ? 'BOT_OPPONENT' : opponentFish.userId,
         userPower: Math.floor(userTotalPower),
         opponentPower: Math.floor(opponentTotalPower),
         userWon: isUserWinner,
@@ -693,12 +880,12 @@ export class FishBattleService {
     return {
       winner: {
         ...winner,
-        name: winner.species,
+        name: winner === userFish ? userFish.species : (isBotOpponent ? opponentResult.opponent.name : opponentFish.species),
         stats: winner === userFish ? userStats : opponentStats
       },
       loser: {
         ...loser,
-        name: loser.species,
+        name: loser === userFish ? userFish.species : (isBotOpponent ? opponentResult.opponent.name : opponentFish.species),
         stats: loser === userFish ? userStats : opponentStats
       },
       winnerPower: Math.floor(winnerPower),
