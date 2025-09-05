@@ -13,6 +13,21 @@ export class FishBarnUI {
   private selectedParent2Id?: string;
   private userFishFood: any[] = [];
   private dailyFeedInfo?: { canFeed: boolean; remainingFeeds: number; error?: string; isAdmin?: boolean };
+
+  /**
+   * Helper function để parse stats từ string hoặc object
+   */
+  private parseStats(stats: any): any {
+    if (typeof stats === 'string') {
+      try {
+        return JSON.parse(stats);
+      } catch (error) {
+        console.error('Error parsing stats:', error);
+        return {};
+      }
+    }
+    return stats || {};
+  }
   constructor(inventory: any, userId: string, guildId: string, selectedFishId?: string, selectedFoodType?: string, breedingMode: boolean = false, selectedParent1Id?: string, selectedParent2Id?: string, dailyFeedInfo?: { canFeed: boolean; remainingFeeds: number; error?: string; isAdmin?: boolean }) {
     this.inventory = inventory;
     this.userId = userId;
@@ -77,7 +92,7 @@ export class FishBarnUI {
       if (this.selectedParent1Id) {
         const parent1 = this.inventory.items.find((item: any) => item.fish.id === this.selectedParent1Id);
         if (parent1) {
-          const stats = parent1.fish.stats || {};
+          const stats = this.parseStats(parent1.fish.stats);
           const totalPower = this.calculateTotalPower(parent1.fish);
           const isInBattleInventory = await this.isFishInBattleInventory(parent1.fish.id);
           embed.addFields({
@@ -91,7 +106,7 @@ export class FishBarnUI {
       if (this.selectedParent2Id) {
         const parent2 = this.inventory.items.find((item: any) => item.fish.id === this.selectedParent2Id);
         if (parent2) {
-          const stats = parent2.fish.stats || {};
+          const stats = this.parseStats(parent2.fish.stats);
           const totalPower = this.calculateTotalPower(parent2.fish);
           const isInBattleInventory = await this.isFishInBattleInventory(parent2.fish.id);
           embed.addFields({
@@ -124,7 +139,7 @@ export class FishBarnUI {
             name: `🏷️ Thế Hệ ${generation} (${genFish.length} cá có thể lai tạo)`,
             value: displayFish.map((item: any) => {
               const fish = item.fish;
-              const stats = fish.stats || {};
+              const stats = this.parseStats(fish.stats);
               const totalPower = this.calculateTotalPower(fish);
               const isSelected = fish.id === this.selectedParent1Id || fish.id === this.selectedParent2Id;
               const statusEmoji = isSelected ? '✅' : '🐟';
@@ -145,7 +160,7 @@ export class FishBarnUI {
       
       if (selected) {
         const fish = selected.fish;
-        const stats = fish.stats || {};
+        const stats = this.parseStats(fish.stats);
         const totalPower = this.calculateTotalPower(fish);
         const statusEmoji = fish.status === 'adult' ? '🐟' : '🐠';
         const levelBar = this.createLevelBar(fish.level, fish.experience, fish.experienceToNext);
@@ -179,7 +194,7 @@ export class FishBarnUI {
           .slice(0, 5);
         for (const item of displayItems) {
           const fish = item.fish;
-          const stats = fish.stats || {};
+          const stats = this.parseStats(fish.stats);
           const totalPower = this.calculateTotalPower(fish);
           const statusEmoji = fish.status === 'adult' ? '🐟' : '🐠';
           const levelBar = this.createLevelBar(fish.level, fish.experience, fish.experienceToNext);
@@ -247,7 +262,7 @@ export class FishBarnUI {
                   .slice(0, 25) // Giới hạn tối đa 25 options
                   .map((item: any) => {
                     const fish = item.fish;
-                    const stats = fish.stats || {};
+                    const stats = this.parseStats(fish.stats);
                     const totalPower = this.calculateTotalPower(fish);
                     const isSelected = fish.id === this.selectedParent1Id || fish.id === this.selectedParent2Id;
                     
@@ -328,7 +343,7 @@ export class FishBarnUI {
               .addOptions(
                 availableFish.map((item: any, index: number) => {
                   const fish = item.fish;
-                  const stats = fish.stats || {};
+                  const stats = this.parseStats(fish.stats);
                   const totalPower = this.calculateTotalPower(fish);
                   // Tính giá theo level (tăng 2% mỗi level)
                   const levelBonus = fish.level > 1 ? (fish.level - 1) * 0.02 : 0;
@@ -435,7 +450,9 @@ export class FishBarnUI {
   }
 
   private calculateTotalPower(fish: any): number {
-    const stats = fish.stats || {};
+    // Đảm bảo stats được parse đúng cách
+    const stats = this.parseStats(fish.stats);
+    
     const totalPower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0) + (stats.accuracy || 0);
     return totalPower;
   }
@@ -470,6 +487,9 @@ export class FishBarnUI {
   }
 
   private createFishDisplayText(fish: any, stats: any, totalPower: number, levelBar?: string, finalValue?: number, levelBonus?: number, isInBattleInventory: boolean = false): string {
+    // Đảm bảo stats được parse đúng cách
+    const parsedStats = this.parseStats(stats);
+    
     let text = `**Trạng thái:** ${fish.status === 'adult' ? 'Trưởng thành' : 'Đang lớn'}\n`;
     
     if (isInBattleInventory) {
@@ -488,7 +508,7 @@ export class FishBarnUI {
     
     text += `**Thế hệ:** ${fish.generation}\n`;
     text += `**Tổng sức mạnh:** ${totalPower}\n`;
-    text += `**Stats:** 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0} 🎯${stats.accuracy || 0}`;
+    text += `**Stats:** 💪${parsedStats.strength || 0} 🏃${parsedStats.agility || 0} 🧠${parsedStats.intelligence || 0} 🛡️${parsedStats.defense || 0} 🍀${parsedStats.luck || 0} 🎯${parsedStats.accuracy || 0}`;
     
     return text;
   }

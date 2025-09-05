@@ -62,7 +62,7 @@ async function testDailyBattleLimitAllUsers() {
 
     // 6. Test cooldown system
     console.log('\n6️⃣ Testing cooldown system...');
-    const cooldownCheck = FishBattleService.checkBattleCooldown(testUserId, testGuildId);
+    const cooldownCheck = await FishBattleService.checkBattleCooldown(testUserId, testGuildId, false);
     console.log('Cooldown check:');
     console.log(`   Can Battle: ${cooldownCheck.canBattle}`);
     if (!cooldownCheck.canBattle) {

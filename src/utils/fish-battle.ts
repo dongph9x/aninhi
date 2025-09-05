@@ -29,12 +29,18 @@ export class FishBattleService {
   // Lưu trữ thời gian cooldown của mỗi user
   private static battleCooldowns = new Map<string, number>();
   private static readonly BATTLE_COOLDOWN = 60000; // 60 giây (1 phút)
-  private static readonly DAILY_BATTLE_LIMIT = 20; // Giới hạn 20 lần đấu cá mỗi ngày
+  private static readonly DAILY_BATTLE_LIMIT = 20; // Giới hạn 20 lần đấu cá mỗi ngày cho user thường
+  private static readonly ADMIN_DAILY_BATTLE_LIMIT = 100; // Giới hạn 100 lần đấu cá mỗi ngày cho admin
 
   /**
    * Kiểm tra cooldown battle
    */
-  static checkBattleCooldown(userId: string, guildId: string): { canBattle: boolean; remainingTime?: number } {
+  static async checkBattleCooldown(userId: string, guildId: string, isAdmin: boolean = false): Promise<{ canBattle: boolean; remainingTime?: number }> {
+    // Admin bypass cooldown
+    if (isAdmin) {
+      return { canBattle: true };
+    }
+    
     const key = `${userId}_${guildId}`;
     const lastBattleTime = this.battleCooldowns.get(key);
     
@@ -65,7 +71,7 @@ export class FishBattleService {
   /**
    * Kiểm tra và reset daily battle count nếu cần
    */
-  static async checkAndResetDailyBattleCount(userId: string, guildId: string): Promise<{ canBattle: boolean; remainingBattles: number; error?: string }> {
+  static async checkAndResetDailyBattleCount(userId: string, guildId: string): Promise<{ canBattle: boolean; remainingBattles: number; error?: string; isAdmin?: boolean }> {
     try {
       const user = await prisma.user.findUnique({
         where: { userId_guildId: { userId, guildId } }
@@ -83,6 +89,10 @@ export class FishBattleService {
                       now.getMonth() !== lastReset.getMonth() || 
                       now.getFullYear() !== lastReset.getFullYear();
 
+      // Kiểm tra xem user có phải admin không
+      const isAdmin = await this.isAdministrator(userId, guildId);
+      const dailyLimit = isAdmin ? this.ADMIN_DAILY_BATTLE_LIMIT : this.DAILY_BATTLE_LIMIT;
+
       if (isNewDay) {
         // Reset daily battle count cho ngày mới
         await prisma.user.update({
@@ -93,20 +103,21 @@ export class FishBattleService {
           }
         });
         
-        return { canBattle: true, remainingBattles: this.DAILY_BATTLE_LIMIT };
+        return { canBattle: true, remainingBattles: dailyLimit, isAdmin };
       }
 
-      // Kiểm tra xem có vượt quá giới hạn không (áp dụng cho tất cả người dùng)
-      if (user.dailyBattleCount >= this.DAILY_BATTLE_LIMIT) {
+      // Kiểm tra xem có vượt quá giới hạn không
+      if (user.dailyBattleCount >= dailyLimit) {
         return { 
           canBattle: false, 
           remainingBattles: 0, 
-          error: `Bạn đã đạt giới hạn ${this.DAILY_BATTLE_LIMIT} lần đấu cá trong ngày! Vui lòng thử lại vào ngày mai.` 
+          error: `Bạn đã đạt giới hạn ${dailyLimit} lần đấu cá trong ngày! Vui lòng thử lại vào ngày mai.`,
+          isAdmin
         };
       }
 
-      const remainingBattles = this.DAILY_BATTLE_LIMIT - user.dailyBattleCount;
-      return { canBattle: true, remainingBattles };
+      const remainingBattles = dailyLimit - user.dailyBattleCount;
+      return { canBattle: true, remainingBattles, isAdmin };
     } catch (error) {
       console.error('Error checking daily battle count:', error);
       return { canBattle: false, remainingBattles: 0, error: 'Đã xảy ra lỗi khi kiểm tra giới hạn đấu cá' };
@@ -374,8 +385,11 @@ export class FishBattleService {
       console.log(`  - fishId: ${fishId}`);
       console.log(`  - opponentId: ${opponentId}`);
 
-      // Kiểm tra cooldown và daily battle limit (áp dụng cho tất cả người dùng)
-      const cooldownCheck = this.checkBattleCooldown(userId, guildId);
+      // Kiểm tra quyền admin trước
+      const isAdmin = await this.isAdministrator(userId, guildId);
+      
+      // Kiểm tra cooldown và daily battle limit (admin bypass cooldown)
+      const cooldownCheck = await this.checkBattleCooldown(userId, guildId, isAdmin);
       if (!cooldownCheck.canBattle) {
         const remainingSeconds = Math.ceil((cooldownCheck.remainingTime || 0) / 1000);
         return { 
@@ -873,8 +887,10 @@ export class FishBattleService {
       }
     });
 
-    // Cập nhật cooldown và daily battle count
-    this.updateBattleCooldown(userId, guildId);
+    // Cập nhật cooldown và daily battle count (admin không bị cập nhật cooldown)
+    if (!isAdmin) {
+      this.updateBattleCooldown(userId, guildId);
+    }
     await this.incrementDailyBattleCount(userId, guildId);
 
     return {

@@ -282,39 +282,59 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
     const collector = battleMessage.createReactionCollector({ filter, time: 30000, max: 1 });
 
     collector.on('collect', async (collected: any, user: any) => {
-        // Bắt đầu animation với GIF
-        const battleGifUrl = "https://cdn.discordapp.com/attachments/1362234245392765201/1397459618434650203/youtube_video_0r2OSVD2A8_8.gif?ex=6881cd30&is=68807bb0&hm=835f0a83c15c79348d507e57bfa33a2b78220ea02cab55ec46fa29231a8f607a&";
-        
-        const animationFrames = [
-            '⚔️ **Bắt đầu chiến đấu!** ⚔️',
-            '🔯 **Nhận buff/debuff** 🔯',
-            '💥 **Đang đấu...** 💥',
-            '⚡ **Chiến đấu gay cấn!** ⚡',
-            '🔥 **Kết quả sắp có!** 🔥'
-        ];
-
-        const animationEmbed = new EmbedBuilder()
-            .setTitle('⚔️ Đang Chiến Đấu...')
-            .setColor('#FF6B6B')
-            .setDescription(animationFrames[0])
-            .setImage(battleGifUrl) // Thêm GIF animation
-            .setTimestamp();
-
-        await battleMessage.edit({ embeds: [animationEmbed] });
-
-        // Chạy animation trong 3 giây với GIF
-        for (let i = 1; i < animationFrames.length; i++) {
-            await new Promise(resolve => setTimeout(resolve, 600)); // 600ms mỗi frame
+        // Bắt đầu battle với visual system mới - 3 hiệp
+        try {
+            // Import BattleVisualSystem
+            const { BattleVisualSystem } = await import("@/utils/battle-visual");
             
-            const currentFrame = animationFrames[i]
-                .replace('${selectedFish.name}', selectedFish.name)
-                .replace('${opponentResult.opponent.name}', opponentResult.opponent.name);
+            const userMaxHP = calculateMaxHP(selectedFish);
+            const opponentMaxHP = calculateMaxHP(opponentResult.opponent);
             
-            // Sử dụng EmbedBuilder.from để tránh nháy GIF
-            const updatedEmbed = EmbedBuilder.from(battleMessage.embeds[0])
-                .setDescription(currentFrame);
+            // Tạo animation data cho 3 hiệp
+            const battleRounds = BattleVisualSystem.createBattleAnimation(
+                selectedFish, 
+                opponentResult.opponent, 
+                userMaxHP, 
+                opponentMaxHP
+            );
             
-            await battleMessage.edit({ embeds: [updatedEmbed] });
+            // Hiển thị từng hiệp với delay
+            for (let i = 0; i < battleRounds.length; i++) {
+                const roundData = battleRounds[i];
+                const roundDisplay = BattleVisualSystem.createMultiRoundBattle(
+                    selectedFish, 
+                    opponentResult.opponent, 
+                    [roundData]
+                );
+                
+                const battleEmbed = new EmbedBuilder()
+                    .setTitle(`⚔️ HIỆP ${roundData.round} - BATTLE ARENA`)
+                    .setColor('#FF6B6B')
+                    .setDescription(`\`\`\`\n${roundDisplay}\n\`\`\``)
+                    .setTimestamp();
+
+                await battleMessage.edit({ embeds: [battleEmbed] });
+                
+                // Chờ 1.5 giây giữa các hiệp
+                if (i < battleRounds.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                }
+            }
+            
+            // Chờ thêm 1 giây trước khi hiển thị kết quả
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+        } catch (error) {
+            console.error('❌ Error creating battle animation:', error);
+            // Fallback to simple message
+            const battleEmbed = new EmbedBuilder()
+                .setTitle('⚔️ Đang Chiến Đấu...')
+                .setColor('#FF6B6B')
+                .setDescription(`**${selectedFish.name}** vs **${opponentResult.opponent.name}**`)
+                .setTimestamp();
+
+            await battleMessage.edit({ embeds: [battleEmbed] });
+            await new Promise(resolve => setTimeout(resolve, 2000));
         }
 
         // Thực hiện battle
@@ -340,26 +360,65 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
         // Kiểm tra quyền admin
         const isAdmin = await FishBattleService.isAdministrator(userId, guildId);
         
-        const battleEmbed = new EmbedBuilder()
-            .setTitle(isUserWinner ? '🏆 Chiến Thắng!' : '💀 Thất Bại!')
-            .setColor(isUserWinner ? '#00FF00' : '#FF0000')
-            .addFields(
-                { name: '🐟 Người thắng', value: result.winner.name, inline: true },
-                { name: '🐟 Người thua', value: result.loser.name, inline: true },
-                { name: '🐟 Phần thưởng', value: `${reward.toLocaleString()} FishCoin`, inline: true },
-                { name: '💪 Sức mạnh', value: `${result.winnerPower} vs ${result.loserPower}`, inline: true },
-                { 
-                    name: isAdmin ? '⏰ Giới Hạn Đấu Cá Hôm Nay (👑 Admin)' : '⏰ Giới Hạn Đấu Cá Hôm Nay', 
-                    value: isAdmin 
-                        ? `✅ Còn **${updatedDailyLimitCheck.remainingBattles}/20** lần đấu cá\n👑 **Không bị giới hạn - có thể đấu vô hạn**`
-                        : `✅ Còn **${updatedDailyLimitCheck.remainingBattles}/20** lần đấu cá`, 
-                    inline: true 
-                }
-            )
-            .setDescription(result.battleLog.join('\n'))
-            .setTimestamp();
+        // Hiển thị kết quả với visual system mới
+        try {
+            // Import BattleVisualSystem
+            const { BattleVisualSystem } = await import("@/utils/battle-visual");
+            const battleResultDisplay = BattleVisualSystem.createDetailedBattleResult(result, isUserWinner, result.battleLog);
+            
+            // Kiểm tra độ dài và chia nhỏ nếu cần
+            const maxLength = 1000; // Để lại chỗ cho markdown
+            let displayValue = `\`\`\`\n${battleResultDisplay}\n\`\`\``;
+            
+            if (displayValue.length > maxLength) {
+                // Rút gọn bằng cách chỉ hiển thị thông tin chính
+                displayValue = `\`\`\`\n🏆 **${result.winner.name}** thắng **${result.loser.name}**\n💪 Sức mạnh: ${result.winnerPower} vs ${result.loserPower}\n💰 Phần thưởng: ${reward.toLocaleString()} FishCoin\n\`\`\``;
+            }
+            
+            const battleEmbed = new EmbedBuilder()
+                .setTitle(isUserWinner ? '🏆 Chiến Thắng!' : '💀 Thất Bại!')
+                .setColor(isUserWinner ? '#00FF00' : '#FF0000')
+                .addFields(
+                    { 
+                        name: '⚔️ Kết Quả Trận Đấu', 
+                        value: displayValue, 
+                        inline: false 
+                    },
+                    { 
+                        name: isAdmin ? '⏰ Giới Hạn Đấu Cá Hôm Nay (👑 Admin)' : '⏰ Giới Hạn Đấu Cá Hôm Nay', 
+                        value: isAdmin 
+                            ? `✅ Còn **${updatedDailyLimitCheck.remainingBattles}/20** lần đấu cá\n👑 **Không bị giới hạn - có thể đấu vô hạn**`
+                            : `✅ Còn **${updatedDailyLimitCheck.remainingBattles}/20** lần đấu cá`, 
+                        inline: true 
+                    }
+                )
+                .setTimestamp();
 
-        battleMessage.edit({ embeds: [battleEmbed] });
+            battleMessage.edit({ embeds: [battleEmbed] });
+        } catch (error) {
+            console.error('Error creating visual battle result:', error);
+            // Fallback to old display
+            const battleEmbed = new EmbedBuilder()
+                .setTitle(isUserWinner ? '🏆 Chiến Thắng!' : '💀 Thất Bại!')
+                .setColor(isUserWinner ? '#00FF00' : '#FF0000')
+                .addFields(
+                    { name: '🐟 Người thắng', value: result.winner.name, inline: true },
+                    { name: '🐟 Người thua', value: result.loser.name, inline: true },
+                    { name: '🐟 Phần thưởng', value: `${reward.toLocaleString()} FishCoin`, inline: true },
+                    { name: '💪 Sức mạnh', value: `${result.winnerPower} vs ${result.loserPower}`, inline: true },
+                    { 
+                        name: isAdmin ? '⏰ Giới Hạn Đấu Cá Hôm Nay (👑 Admin)' : '⏰ Giới Hạn Đấu Cá Hôm Nay', 
+                        value: isAdmin 
+                            ? `✅ Còn **${updatedDailyLimitCheck.remainingBattles}/20** lần đấu cá\n👑 **Không bị giới hạn - có thể đấu vô hạn**`
+                            : `✅ Còn **${updatedDailyLimitCheck.remainingBattles}/20** lần đấu cá`, 
+                        inline: true 
+                    }
+                )
+                .setDescription(result.battleLog.join('\n'))
+                .setTimestamp();
+
+            battleMessage.edit({ embeds: [battleEmbed] });
+        }
     });
 
     collector.on('end', (collected) => {
@@ -502,4 +561,17 @@ async function showBattleLeaderboard(message: any, guildId: string) {
     embeds.push(embed);
     
     message.reply({ embeds });
+}
+
+// Helper function để tính max HP
+function calculateMaxHP(fish: any): number {
+    try {
+        const baseHP = 100;
+        const levelBonus = (fish.level || 1) * 10;
+        const defenseBonus = (fish.stats?.defense || 0) * 5;
+        return baseHP + levelBonus + defenseBonus;
+    } catch (error) {
+        console.error('Error calculating max HP:', error);
+        return 100;
+    }
 } 

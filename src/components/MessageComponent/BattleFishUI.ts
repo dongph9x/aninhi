@@ -8,6 +8,7 @@ import {
 } from "discord.js";
 import { BattleFishInventoryService } from "@/utils/battle-fish-inventory";
 import { FishBattleService } from "@/utils/fish-battle";
+import { BattleVisualSystem } from "@/utils/battle-visual";
 
 export class BattleFishUI {
     private inventory: any;
@@ -15,8 +16,8 @@ export class BattleFishUI {
     private selectedFishId?: string;
     private userId: string;
     private guildId: string;
-    private dailyBattleInfo?: { canBattle: boolean; remainingBattles: number; error?: string };
-    constructor(inventory: any, eligibleFish: any[], userId: string, guildId: string, selectedFishId?: string, dailyBattleInfo?: { canBattle: boolean; remainingBattles: number; error?: string }) {
+    private dailyBattleInfo?: { canBattle: boolean; remainingBattles: number; error?: string; isAdmin?: boolean };
+    constructor(inventory: any, eligibleFish: any[], userId: string, guildId: string, selectedFishId?: string, dailyBattleInfo?: { canBattle: boolean; remainingBattles: number; error?: string; isAdmin?: boolean }) {
         this.inventory = inventory;
         this.eligibleFish = eligibleFish;
         this.userId = userId;
@@ -34,16 +35,20 @@ export class BattleFishUI {
 
         // Thông tin daily battle limit
         if (this.dailyBattleInfo) {
+            const isAdmin = this.dailyBattleInfo.isAdmin;
+            const limitText = isAdmin ? '100' : '20';
+            const adminBadge = isAdmin ? ' 👑 Admin' : '';
+            
             if (this.dailyBattleInfo.canBattle) {
                 embed.addFields({
-                    name: '⏰ Giới Hạn Đấu Cá Hôm Nay',
-                    value: `✅ Còn **${this.dailyBattleInfo.remainingBattles}/20** lần đấu cá`,
+                    name: `⏰ Giới Hạn Đấu Cá Hôm Nay${adminBadge}`,
+                    value: `✅ Còn **${this.dailyBattleInfo.remainingBattles}/${limitText}** lần đấu cá`,
                     inline: true
                 });
             } else {
                 embed.addFields({
-                    name: '⏰ Giới Hạn Đấu Cá Hôm Nay',
-                    value: `❌ **Đã đạt giới hạn!** (0/20)\n${this.dailyBattleInfo.error || 'Vui lòng thử lại vào ngày mai'}`,
+                    name: `⏰ Giới Hạn Đấu Cá Hôm Nay${adminBadge}`,
+                    value: `❌ **Đã đạt giới hạn!** (0/${limitText})\n${this.dailyBattleInfo.error || 'Vui lòng thử lại vào ngày mai'}`,
                     inline: true
                 });
             }
@@ -73,13 +78,33 @@ export class BattleFishUI {
                 const stats = fish.stats || {};
                 const power = this.calculatePower(fish);
                 
-                embed.addFields({
-                    name: '🎯 Cá Được Chọn',
-                    value: `**${fish.name}** (Lv.${fish.level}, Gen.${fish.generation})\n` +
-                           `💪 Power: ${power} | 🐟 ${fish.value.toLocaleString()} FishCoin\n` +
-                           `📊 Stats: 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0} 🎯${stats.accuracy || 0}`,
-                    inline: false
-                });
+                // Sử dụng visual system để hiển thị cá được chọn
+                try {
+                    const fishDisplay = BattleVisualSystem.createDetailedFishDisplay(fish, true);
+                    const statsDisplay = BattleVisualSystem.createStatsBox(stats);
+                    
+                    embed.addFields({
+                        name: '🎯 Cá Được Chọn',
+                        value: `\`\`\`\n${fishDisplay}\n\`\`\``,
+                        inline: false
+                    });
+                    
+                    embed.addFields({
+                        name: '📊 Thống Kê Chi Tiết',
+                        value: `\`\`\`\n${statsDisplay}\n\`\`\``,
+                        inline: false
+                    });
+                } catch (error) {
+                    console.error('Error creating visual display:', error);
+                    // Fallback to old display
+                    embed.addFields({
+                        name: '🎯 Cá Được Chọn',
+                        value: `**${fish.name}** (Lv.${fish.level}, Gen.${fish.generation})\n` +
+                               `💪 Power: ${power} | 🐟 ${fish.value.toLocaleString()} FishCoin\n` +
+                               `📊 Stats: 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0}`,
+                        inline: false
+                    });
+                }
             }
         } else {
             // Hiển thị tất cả cá trong túi đấu
@@ -88,9 +113,19 @@ export class BattleFishUI {
                 const stats = fish.stats || {};
                 const power = this.calculatePower(fish);
                 
-                return `**${index + 1}. ${fish.name}** (Lv.${fish.level}, Gen.${fish.generation})\n` +
-                       `💪 Power: ${power} | 🐟 ${fish.value.toLocaleString()} FishCoin\n` +
-                       `📊 Stats: 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0} 🎯${stats.accuracy || 0}`;
+                try {
+                    // Sử dụng visual system để hiển thị cá
+                    const fishDisplay = BattleVisualSystem.createFishDisplay(fish);
+                    const statsDisplay = BattleVisualSystem.createStatsDisplay(stats);
+                    
+                    return `**${index + 1}.** ${fishDisplay}\n${statsDisplay}`;
+                } catch (error) {
+                    console.error('Error creating visual display for fish list:', error);
+                    // Fallback to old display
+                    return `**${index + 1}. ${fish.name}** (Lv.${fish.level}, Gen.${fish.generation})\n` +
+                           `💪 Power: ${power} | 🐟 ${fish.value.toLocaleString()} FishCoin\n` +
+                           `📊 Stats: 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0}`;
+                }
             }).join('\n\n');
 
             embed.addFields({

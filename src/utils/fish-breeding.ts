@@ -136,13 +136,24 @@ export class FishBreedingService {
   }
 
   /**
-   * Tăng stats ngẫu nhiên khi lên cấp (1-3 điểm cho mỗi stat)
+   * Tăng stats ngẫu nhiên khi lên cấp (1-10 điểm cho mỗi stat)
    */
   static increaseStatsOnLevelUp(currentStats: FishStats): FishStats {
-    const newStats = { ...currentStats };
+    // Đảm bảo currentStats có giá trị mặc định
+    const defaultStats: FishStats = {
+      strength: 0,
+      agility: 0,
+      intelligence: 0,
+      defense: 0,
+      luck: 0,
+      accuracy: 0,
+    };
+    
+    const baseStats = currentStats || defaultStats;
+    const newStats = { ...baseStats };
     
     Object.keys(newStats).forEach((stat) => {
-      const increase = Math.floor(Math.random() * 10) + 1; // 1-3 điểm
+      const increase = Math.floor(Math.random() * 10) + 1; // 1-10 điểm
       newStats[stat as keyof FishStats] = Math.min(100, newStats[stat as keyof FishStats] + increase);
     });
     
@@ -220,24 +231,36 @@ export class FishBreedingService {
     let expForNext = getExpForLevel(newLevel);
     let becameAdult = false;
     
-    // Lên level nếu đủ exp
+    // Lên level nếu đủ exp và tăng stats cho mỗi level
+    let newStats = fish.stats;
+    let currentStats = JSON.parse(fish.stats || '{}');
+    
     while (newExp >= expForNext && newLevel < MAX_LEVEL) {
       newExp -= expForNext;
       newLevel++;
       expForNext = getExpForLevel(newLevel);
+      
+      // Tăng stats cho mỗi level nếu là cá thế hệ 2+
+      if (fish.generation >= 2) {
+        currentStats = this.increaseStatsOnLevelUp(currentStats);
+        newStats = JSON.stringify(currentStats);
+      }
+    }
+    
+    // Nếu cá đã có level > 1 nhưng stats vẫn rỗng, tăng stats cho tất cả level đã có
+    if (fish.generation >= 2 && newLevel > 1 && Object.keys(currentStats).length === 0) {
+      console.log(`🔧 Fixing stats for fish ${fish.species} (Level ${newLevel}, Gen ${fish.generation})`);
+      // Tăng stats cho tất cả level từ 1 đến current level
+      for (let level = 1; level < newLevel; level++) {
+        currentStats = this.increaseStatsOnLevelUp(currentStats);
+      }
+      newStats = JSON.stringify(currentStats);
+      console.log(`🔧 Fixed stats:`, currentStats);
     }
     
     // Tính giá mới (tăng 2% mỗi level)
     const valueIncrease = (newLevel - fish.level) * 0.02;
     const newValue = Math.floor(Number(fish.value) * (1 + valueIncrease));
-    
-    // Cập nhật stats nếu lên cấp và là cá thế hệ 2+
-    let newStats = fish.stats;
-    if (newLevel > fish.level && fish.generation >= 2) {
-      const currentStats = JSON.parse(fish.stats || '{}');
-      const updatedStats = this.increaseStatsOnLevelUp(currentStats);
-      newStats = JSON.stringify(updatedStats);
-    }
     
     // Cập nhật trạng thái
     let newStatus = fish.status;
@@ -319,24 +342,36 @@ export class FishBreedingService {
     let expForNext = getExpForLevel(newLevel);
     let becameAdult = false;
     
-    // Lên level nếu đủ exp
+    // Lên level nếu đủ exp và tăng stats cho mỗi level
+    let newStats = fish.stats;
+    let currentStats = JSON.parse(fish.stats || '{}');
+    
     while (newExp >= expForNext && newLevel < MAX_LEVEL) {
       newExp -= expForNext;
       newLevel++;
       expForNext = getExpForLevel(newLevel);
+      
+      // Tăng stats cho mỗi level nếu là cá thế hệ 2+
+      if (fish.generation >= 2) {
+        currentStats = this.increaseStatsOnLevelUp(currentStats);
+        newStats = JSON.stringify(currentStats);
+      }
+    }
+    
+    // Nếu cá đã có level > 1 nhưng stats vẫn rỗng, tăng stats cho tất cả level đã có
+    if (fish.generation >= 2 && newLevel > 1 && Object.keys(currentStats).length === 0) {
+      console.log(`🔧 Fixing stats for fish ${fish.species} (Level ${newLevel}, Gen ${fish.generation})`);
+      // Tăng stats cho tất cả level từ 1 đến current level
+      for (let level = 1; level < newLevel; level++) {
+        currentStats = this.increaseStatsOnLevelUp(currentStats);
+      }
+      newStats = JSON.stringify(currentStats);
+      console.log(`🔧 Fixed stats:`, currentStats);
     }
     
     // Tính giá mới (tăng 2% mỗi level)
     const valueIncrease = (newLevel - fish.level) * 0.02;
     const newValue = Math.floor(Number(fish.value) * (1 + valueIncrease));
-    
-    // Cập nhật stats nếu lên cấp và là cá thế hệ 2+
-    let newStats = fish.stats;
-    if (newLevel > fish.level && fish.generation >= 2) {
-      const currentStats = JSON.parse(fish.stats || '{}');
-      const updatedStats = this.increaseStatsOnLevelUp(currentStats);
-      newStats = JSON.stringify(updatedStats);
-    }
     
     // Cập nhật trạng thái
     let newStatus = fish.status;

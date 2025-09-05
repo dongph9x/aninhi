@@ -9,6 +9,7 @@ import {
 import { BattleFishInventoryService } from "@/utils/battle-fish-inventory";
 import { FishBattleService } from "@/utils/fish-battle";
 import { BattleFishUI } from "./BattleFishUI";
+import { BattleVisualSystem } from "@/utils/battle-visual";
 
 export class BattleFishHandler {
     private static battleFishMessages = new Map<string, {
@@ -286,17 +287,31 @@ export class BattleFishHandler {
         const embedTitle = isBotOpponent ? '🤖 Tìm Thấy BOT Đối Thủ!' : '⚔️ Tìm Thấy Đối Thủ!';
         const embedDescription = isBotOpponent ? '🤖 Sẵn sàng đấu với BOT! React với ⚔️ để bắt đầu đấu!' : 'React với ⚔️ để bắt đầu đấu!';
 
+        // Tạo visual comparison sử dụng BattleVisualSystem
+        let battleVisual = '';
+        try {
+            battleVisual = BattleVisualSystem.createStatsComparison(stats, opponentStats);
+        } catch (error) {
+            console.error('Error creating battle visual:', error);
+            battleVisual = '❌ Lỗi hiển thị thông tin trận đấu';
+        }
+
         const embed = new EmbedBuilder()
             .setTitle(embedTitle)
             .setColor(embedColor)
             .addFields(
-                { name: '🐟 Cá của bạn', value: `${selectedFish.name} (Lv.${selectedFish.level})`, inline: true },
-                { name: '🐟 Đối thủ', value: `${opponentResult.opponent.name} (Lv.${opponentResult.opponent.level})`, inline: true },
-                { name: '👤 Loại đối thủ', value: opponentType, inline: true },
-                { name: '💪 Sức mạnh', value: `${userPower} vs ${opponentPower}`, inline: true },
-                { name: '📊 Stats của bạn', value: `💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0}`, inline: false },
-                { name: '📊 Stats đối thủ', value: `💪${opponentStats.strength || 0} 🏃${opponentStats.agility || 0} 🧠${opponentStats.intelligence || 0} 🛡️${opponentStats.defense || 0} 🍀${opponentStats.luck || 0} 🎯${opponentStats.accuracy || 0}`, inline: false },
-                { name: '⏰ Giới Hạn Đấu Cá Hôm Nay', value: `✅ Còn **${dailyLimitCheck.remainingBattles}/20** lần đấu cá`, inline: true }
+                // Thông tin cơ bản - 2 cột
+                { name: '🐟 **CÁ CỦA BẠN**', value: `${selectedFish.name} (Lv.${selectedFish.level})\n💪 Power: ${userPower}`, inline: true },
+                { name: '🐟 **ĐỐI THỦ**', value: `${opponentResult.opponent.name} (Lv.${opponentResult.opponent.level})\n💪 Power: ${opponentPower}`, inline: true },
+                { name: '👤 **Loại đối thủ**', value: opponentType, inline: true },
+                
+                // Stats comparison - sử dụng visual system
+                { name: '📊 **SO SÁNH STATS**', value: `\`\`\`\n${battleVisual}\n\`\`\``, inline: false },
+                
+                // Thông tin chi tiết - 2 cột
+                { name: '📊 **STATS CỦA BẠN**', value: `💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0}\n🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0}`, inline: true },
+                { name: '📊 **STATS ĐỐI THỦ**', value: `💪${opponentStats.strength || 0} 🏃${opponentStats.agility || 0} 🧠${opponentStats.intelligence || 0}\n🛡️${opponentStats.defense || 0} 🍀${opponentStats.luck || 0} 🎯${opponentStats.accuracy || 0}`, inline: true },
+                { name: `⏰ **Giới Hạn Đấu Cá**${dailyLimitCheck.isAdmin ? ' 👑 Admin' : ''}`, value: `✅ Còn **${dailyLimitCheck.remainingBattles}/${dailyLimitCheck.isAdmin ? '100' : '20'}** lần đấu cá`, inline: true }
             )
             .setDescription(embedDescription)
             .setTimestamp();
@@ -494,38 +509,65 @@ export class BattleFishHandler {
         const selectedFish = messageData.currentUserFish;
         const opponent = messageData.currentOpponent;
 
-        // Bắt đầu animation
+        // Bắt đầu battle với visual system
         await interaction.deferReply({ ephemeral: true });
 
-        // Animation frames
-        const animationFrames = [
-            '⚔️ **Bắt đầu chiến đấu!** ⚔️',
-            '🔯 **Nhận buff/debuff** 🔯',
-            '💥 **Đang đấu...** 💥',
-            '⚡ **Chiến đấu gay cấn!** ⚡',
-            '🔥 **Kết quả sắp có!** 🔥'
-        ];
-
-        const animationEmbed = new EmbedBuilder()
-            .setTitle('⚔️ Đang Chiến Đấu...')
-            .setColor('#FF6B6B')
-            .setDescription(animationFrames[0])
-            .setTimestamp();
-
-        const animationMessage = await interaction.editReply({ 
-            embeds: [animationEmbed]
-        });
-
-        // Chạy animation trong 3 giây
-        for (let i = 1; i < animationFrames.length; i++) {
-            await new Promise(resolve => setTimeout(resolve, 600)); // 600ms mỗi frame
+        // Tạo battle animation với 3 hiệp
+        try {
+            console.log('🎨 Creating multi-round battle animation...');
+            console.log('Selected fish:', selectedFish);
+            console.log('Opponent:', opponent);
             
-            const currentFrame = animationFrames[i]
-                .replace('${selectedFish.name}', selectedFish.name)
-                .replace('${opponent.name}', opponent.name);
+            const userMaxHP = this.calculateMaxHP(selectedFish);
+            const opponentMaxHP = this.calculateMaxHP(opponent);
             
-            animationEmbed.setDescription(currentFrame);
-            await interaction.editReply({ embeds: [animationEmbed] });
+            // Tạo animation data cho 3 hiệp
+            const battleRounds = BattleVisualSystem.createBattleAnimation(
+                selectedFish, 
+                opponent, 
+                userMaxHP, 
+                opponentMaxHP
+            );
+            
+            console.log('Battle rounds created:', battleRounds.length);
+            
+            // Hiển thị từng hiệp với delay
+            for (let i = 0; i < battleRounds.length; i++) {
+                const roundData = battleRounds[i];
+                const roundDisplay = BattleVisualSystem.createMultiRoundBattle(
+                    selectedFish, 
+                    opponent, 
+                    [roundData]
+                );
+                
+                const battleEmbed = new EmbedBuilder()
+                    .setTitle(`⚔️ HIỆP ${roundData.round} - BATTLE ARENA`)
+                    .setColor('#FF6B6B')
+                    .setDescription(`\`\`\`\n${roundDisplay}\n\`\`\``)
+                    .setTimestamp();
+
+                await interaction.editReply({ embeds: [battleEmbed] });
+                
+                // Chờ 1.5 giây giữa các hiệp
+                if (i < battleRounds.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                }
+            }
+            
+            // Chờ thêm 1 giây trước khi hiển thị kết quả
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+        } catch (error) {
+            console.error('❌ Error creating battle animation:', error);
+            // Fallback to simple message
+            const battleEmbed = new EmbedBuilder()
+                .setTitle('⚔️ Đang Chiến Đấu...')
+                .setColor('#FF6B6B')
+                .setDescription(`**${selectedFish.name}** vs **${opponent.name}**`)
+                .setTimestamp();
+
+            await interaction.editReply({ embeds: [battleEmbed] });
+            await new Promise(resolve => setTimeout(resolve, 2000));
         }
 
         // Thực hiện battle
@@ -561,27 +603,63 @@ export class BattleFishHandler {
         // Kiểm tra quyền admin
         const isAdmin = await FishBattleService.isAdministrator(messageData.userId, messageData.guildId);
 
-        // Hiển thị kết quả
-        const battleEmbed = new EmbedBuilder()
-            .setTitle(isUserWinner ? '🏆 Chiến Thắng!' : '💀 Thất Bại!')
-            .setColor(isUserWinner ? '#00FF00' : '#FF0000')
-            .addFields(
-                { name: '🐟 Người thắng', value: result.winner.name, inline: true },
-                { name: '🐟 Người thua', value: result.loser.name, inline: true },
-                { name: '🐟 Phần thưởng', value: `${reward.toLocaleString()} FishCoin`, inline: true },
-                { name: '💪 Sức mạnh', value: `${result.winnerPower} vs ${result.loserPower}`, inline: true },
-                { 
-                    name: isAdmin ? '⏰ Giới Hạn Đấu Cá Hôm Nay (👑 Admin)' : '⏰ Giới Hạn Đấu Cá Hôm Nay', 
-                    value: isAdmin 
-                        ? `✅ Còn **${updatedDailyLimitCheck.remainingBattles}/20** lần đấu cá\n👑 **Không bị giới hạn - có thể đấu vô hạn**`
-                        : `✅ Còn **${updatedDailyLimitCheck.remainingBattles}/20** lần đấu cá`, 
-                    inline: true 
-                }
-            )
-            .setDescription(result.battleLog.join('\n'))
-            .setTimestamp();
+        // Hiển thị kết quả với visual system
+        try {
+            const battleResultDisplay = BattleVisualSystem.createDetailedBattleResult(result, isUserWinner, result.battleLog);
+            
+            // Kiểm tra độ dài và chia nhỏ nếu cần
+            const maxLength = 1000; // Để lại chỗ cho markdown
+            let displayValue = `\`\`\`\n${battleResultDisplay}\n\`\`\``;
+            
+            if (displayValue.length > maxLength) {
+                // Rút gọn bằng cách chỉ hiển thị thông tin chính
+                displayValue = `\`\`\`\n🏆 **${result.winner.name}** thắng **${result.loser.name}**\n💪 Sức mạnh: ${result.winnerPower} vs ${result.loserPower}\n💰 Phần thưởng: ${reward.toLocaleString()} FishCoin\n\`\`\``;
+            }
+            
+            const battleEmbed = new EmbedBuilder()
+                .setTitle(isUserWinner ? '🏆 Chiến Thắng!' : '💀 Thất Bại!')
+                .setColor(isUserWinner ? '#00FF00' : '#FF0000')
+                .addFields(
+                    { 
+                        name: '⚔️ Kết Quả Trận Đấu', 
+                        value: displayValue, 
+                        inline: false 
+                    },
+                    { 
+                        name: isAdmin ? '⏰ Giới Hạn Đấu Cá Hôm Nay (👑 Admin)' : '⏰ Giới Hạn Đấu Cá Hôm Nay', 
+                        value: isAdmin 
+                            ? `✅ Còn **${updatedDailyLimitCheck.remainingBattles}/20** lần đấu cá\n👑 **Không bị giới hạn - có thể đấu vô hạn**`
+                            : `✅ Còn **${updatedDailyLimitCheck.remainingBattles}/20** lần đấu cá`, 
+                        inline: true 
+                    }
+                )
+                .setTimestamp();
 
-        await interaction.editReply({ embeds: [battleEmbed] });
+            await interaction.editReply({ embeds: [battleEmbed] });
+        } catch (error) {
+            console.error('Error creating visual battle result:', error);
+            // Fallback to old display
+            const battleEmbed = new EmbedBuilder()
+                .setTitle(isUserWinner ? '🏆 Chiến Thắng!' : '💀 Thất Bại!')
+                .setColor(isUserWinner ? '#00FF00' : '#FF0000')
+                .addFields(
+                    { name: '🐟 Người thắng', value: result.winner.name, inline: true },
+                    { name: '🐟 Người thua', value: result.loser.name, inline: true },
+                    { name: '🐟 Phần thưởng', value: `${reward.toLocaleString()} FishCoin`, inline: true },
+                    { name: '💪 Sức mạnh', value: `${result.winnerPower} vs ${result.loserPower}`, inline: true },
+                    { 
+                        name: isAdmin ? '⏰ Giới Hạn Đấu Cá Hôm Nay (👑 Admin)' : '⏰ Giới Hạn Đấu Cá Hôm Nay', 
+                        value: isAdmin 
+                            ? `✅ Còn **${updatedDailyLimitCheck.remainingBattles}/20** lần đấu cá\n👑 **Không bị giới hạn - có thể đấu vô hạn**`
+                            : `✅ Còn **${updatedDailyLimitCheck.remainingBattles}/20** lần đấu cá`, 
+                        inline: true 
+                    }
+                )
+                .setDescription(result.battleLog.join('\n'))
+                .setTimestamp();
+
+            await interaction.editReply({ embeds: [battleEmbed] });
+        }
     }
 
     private static async handleShowHelp(interaction: ButtonInteraction, messageData: any) {
@@ -647,6 +725,13 @@ export class BattleFishHandler {
         const stats = fish.stats || {};
         const basePower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0) + (stats.accuracy || 0);
         return Math.floor(basePower * (1 + fish.level * 0.1));
+    }
+
+    private static calculateMaxHP(fish: any): number {
+        const baseHP = 100;
+        const levelBonus = (fish.level || 1) * 10;
+        const defenseBonus = (fish.stats?.defense || 0) * 5;
+        return baseHP + levelBonus + defenseBonus;
     }
 
     // Lưu message data vào cache
