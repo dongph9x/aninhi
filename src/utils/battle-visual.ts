@@ -650,10 +650,10 @@ export class BattleVisualSystem {
                 
                 display += `
 ══════════════════════════════════════
-                    ⚔️ HIỆP ${roundData.round} ⚔️               
+      ⚔️ HIỆP ${roundData.round} ⚔️               
 ${combinedFrames}
                                                              
-  📝 **Hành động:** ${roundData.action.padEnd(50)}           
+  📝 **Hành động:** \n ${roundData.action.padEnd(50)}           
                                                             
 ══════════════════════════════════════
                 `;
