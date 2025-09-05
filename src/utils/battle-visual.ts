@@ -90,9 +90,9 @@ export class BattleVisualSystem {
         const maxStat = 100;
         const barLength = 10;
         
-        let display = `══════════════════════════════════════════════════════════════\n`;
-        display += `                        📊 STATS DISPLAY 📊                        \n`;
-        display += `══════════════════════════════════════════════════════════════\n`;
+        let display = `══════════════════════════════════════\n`;
+        display += `           📊 STATS DISPLAY 📊       \n`;
+        display += `══════════════════════════════════════\n`;
         display += `                                                              \n`;
         
         // Row 1: Strength, Agility, Intelligence
@@ -118,7 +118,7 @@ export class BattleVisualSystem {
                           (stats.defense || 0) + (stats.luck || 0) + (stats.accuracy || 0);
         display += `  💪 **TỔNG SỨC MẠNH:** ${totalPower.toString().padEnd(35)}  \n`;
         display += `                                                              \n`;
-        display += `══════════════════════════════════════════════════════════════`;
+        display += `══════════════════════════════════════`;
         
         return display;
     }
@@ -130,9 +130,9 @@ export class BattleVisualSystem {
         const maxStat = 100;
         const barLength = 8;
         
-        let display = `══════════════════════════════════════════════════════════════\n`;
-        display += `                    📊 STATS COMPARISON 📊                    \n`;
-        display += `══════════════════════════════════════════════════════════════\n`;
+        let display = `══════════════════════════════════════\n`;
+        display += `           📊 STATS COMPARISON 📊       \n`;
+        display += `══════════════════════════════════════\n`;
         display += `                                                              \n`;
         
         // Row 1: Strength vs Agility
@@ -190,7 +190,7 @@ export class BattleVisualSystem {
         
         display += `  💪 **TỔNG SỨC MẠNH:** ${userTotalPower.toString().padEnd(3)} vs ${opponentTotalPower.toString().padEnd(3)} ${totalResult}                    \n`;
         display += `                                                             \n`;
-        display += `══════════════════════════════════════════════════════════════`;
+        display += `══════════════════════════════════════`;
         
         return display;
     }
@@ -242,9 +242,7 @@ export class BattleVisualSystem {
         const levelEmoji = this.getLevelEmoji(fish.level);
         const statusEmoji = fish.status === 'adult' ? '🐟' : '🐠';
         
-        let display = `══════════════════════════════════════════════════════════════\n`;
-        display += `                    ${fishEmoji} ${fish.name} ${rarityEmoji}                    \n`;
-        display += `══════════════════════════════════════════════════════════════\n`;
+        let display = `  ${fishEmoji} ${fish.name} ${rarityEmoji}                    \n`;
         display += `                                                              \n`;
         display += `  ${statusEmoji} **Trạng thái:** ${fish.status === 'adult' ? 'Trưởng thành' : 'Đang lớn'}                    \n`;
         display += `  ${levelEmoji} **Level:** ${fish.level} | **Gen:** ${fish.generation} | **Power:** ${this.calculatePower(fish)}  \n`;
@@ -261,8 +259,6 @@ export class BattleVisualSystem {
         if (isSelected) {
             display += `  🎯 **ĐÃ CHỌN CHO TRẬN ĐẤU**                              \n`;
         }
-        
-        display += `══════════════════════════════════════════════════════════════`;
         
         return display;
     }
@@ -360,9 +356,9 @@ export class BattleVisualSystem {
         const loserFishEmoji = this.getFishEmoji(result.loser.name);
         
         let display = `
-══════════════════════════════════════════════════════════════
-                    ${winnerEmoji} BATTLE RESULT ${winnerEmoji}
-══════════════════════════════════════════════════════════════
+══════════════════════════════════════
+${winnerEmoji} BATTLE RESULT ${winnerEmoji}
+══════════════════════════════════════
                                                               
   ${resultColor} **${isUserWinner ? 'CHIẾN THẮNG!' : 'THẤT BẠI!'}** ${resultColor}                    
                                                               
@@ -382,7 +378,7 @@ export class BattleVisualSystem {
             display += `                                                               \n`;
         }
         
-        display += `══════════════════════════════════════════════════════════════`;
+        display += `══════════════════════════════════════`;
         
         return display;
     }
@@ -397,9 +393,9 @@ export class BattleVisualSystem {
             const winnerFishEmoji = this.getFishEmoji(result.winner.name || 'Unknown');
             const loserFishEmoji = this.getFishEmoji(result.loser.name || 'Unknown');
             
-            let display = `══════════════════════════════════════════════════════════════\n`;
-            display += `                    ${winnerEmoji} BATTLE RESULT ${winnerEmoji} \n`;
-            display += `══════════════════════════════════════════════════════════════\n`;
+            let display = `══════════════════════════════════════\n`;
+            display += `   ${winnerEmoji} BATTLE RESULT ${winnerEmoji} \n`;
+            display += `══════════════════════════════════════\n`;
             display += `                                                              \n`;
             display += `  ${resultColor} **${isUserWinner ? 'CHIẾN THẮNG!' : 'THẤT BẠI!'}** ${resultColor}\n`;
             display += `                                                              \n`;
@@ -438,7 +434,7 @@ export class BattleVisualSystem {
                 display += `                                                              \n`;
             }
             
-            display += `══════════════════════════════════════════════════════════════`;
+            display += `══════════════════════════════════════`;
             
             return display;
         } catch (error) {

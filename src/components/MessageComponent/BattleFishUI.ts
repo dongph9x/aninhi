@@ -89,11 +89,11 @@ export class BattleFishUI {
                         inline: false
                     });
                     
-                    embed.addFields({
-                        name: '📊 Thống Kê Chi Tiết',
-                        value: `\`\`\`\n${statsDisplay}\n\`\`\``,
-                        inline: false
-                    });
+                    // embed.addFields({
+                    //     name: '📊 Thống Kê Chi Tiết',
+                    //     value: `\`\`\`\n${statsDisplay}\n\`\`\``,
+                    //     inline: false
+                    // });
                 } catch (error) {
                     console.error('Error creating visual display:', error);
                     // Fallback to old display
