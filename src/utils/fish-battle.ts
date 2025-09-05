@@ -15,6 +15,18 @@ export interface BattleResult {
     winner: number;
     loser: number;
   };
+  finalHP?: {
+    winner: {
+      current: number;
+      max: number;
+      percentage: number;
+    };
+    loser: {
+      current: number;
+      max: number;
+      percentage: number;
+    };
+  };
 }
 
 export interface BattleStats {
@@ -893,6 +905,29 @@ export class FishBattleService {
     }
     await this.incrementDailyBattleCount(userId, guildId);
 
+    // Tính toán HP cuối cùng dựa trên sức mạnh
+    const calculateFinalHP = (fish: any, isWinner: boolean, power: number) => {
+      const baseHP = 100;
+      const levelBonus = (fish.level || 1) * 10;
+      const defenseBonus = (fish.stats?.defense || 0) * 5;
+      const maxHP = baseHP + levelBonus + defenseBonus;
+      
+      // Người thắng giữ lại 20-80% HP, người thua giữ lại 0-30% HP
+      const hpPercentage = isWinner 
+        ? Math.max(0.2, Math.min(0.8, 0.5 + (power / 1000) * 0.3)) // 20-80%
+        : Math.max(0, Math.min(0.3, 0.1 + (power / 1000) * 0.2)); // 0-30%
+      
+      const currentHP = Math.floor(maxHP * hpPercentage);
+      return {
+        current: currentHP,
+        max: maxHP,
+        percentage: Math.floor(hpPercentage * 100)
+      };
+    };
+
+    const winnerFinalHP = calculateFinalHP(winner, true, winnerPower);
+    const loserFinalHP = calculateFinalHP(loser, false, loserPower);
+
     return {
       winner: {
         ...winner,
@@ -910,6 +945,10 @@ export class FishBattleService {
       rewards: {
         winner: winnerReward,
         loser: loserReward
+      },
+      finalHP: {
+        winner: winnerFinalHP,
+        loser: loserFinalHP
       }
     };
   } catch (error) {

@@ -548,9 +548,9 @@ export class BattleFishHandler {
 
                 await interaction.editReply({ embeds: [battleEmbed] });
                 
-                // Chờ 1.5 giây giữa các hiệp
+                // Chờ 2 giây giữa các hiệp
                 if (i < battleRounds.length - 1) {
-                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                 }
             }
             
@@ -612,8 +612,17 @@ export class BattleFishHandler {
             let displayValue = `\`\`\`\n${battleResultDisplay}\n\`\`\``;
             
             if (displayValue.length > maxLength) {
-                // Rút gọn bằng cách chỉ hiển thị thông tin chính
-                displayValue = `\`\`\`\n🏆 **${result.winner.name}** thắng **${result.loser.name}**\n💪 Sức mạnh: ${result.winnerPower} vs ${result.loserPower}\n💰 Phần thưởng: ${reward.toLocaleString()} FishCoin\n\`\`\``;
+                // Rút gọn bằng cách chỉ hiển thị thông tin chính nhưng vẫn có HP
+                let shortDisplay = `🏆 **${result.winner.name}** thắng **${result.loser.name}**\n💪 Sức mạnh: ${result.winnerPower} vs ${result.loserPower}\n💰 Phần thưởng: ${reward.toLocaleString()} FishCoin`;
+                
+                // Thêm HP nếu có
+                if (result.finalHP) {
+                    const winnerHP = result.finalHP.winner;
+                    const loserHP = result.finalHP.loser;
+                    shortDisplay += `\n❤️ HP Người thắng: ${winnerHP.current}/${winnerHP.max} (${winnerHP.percentage}%)\n💔 HP Người thua: ${loserHP.current}/${loserHP.max} (${loserHP.percentage}%)`;
+                }
+                
+                displayValue = `\`\`\`\n${shortDisplay}\n\`\`\``;
             }
             
             const battleEmbed = new EmbedBuilder()

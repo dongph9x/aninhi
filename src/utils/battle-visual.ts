@@ -359,7 +359,7 @@ export class BattleVisualSystem {
         const winnerFishEmoji = this.getFishEmoji(result.winner.name);
         const loserFishEmoji = this.getFishEmoji(result.loser.name);
         
-        return `
+        let display = `
 ══════════════════════════════════════════════════════════════
                     ${winnerEmoji} BATTLE RESULT ${winnerEmoji}
 ══════════════════════════════════════════════════════════════
@@ -371,8 +371,20 @@ export class BattleVisualSystem {
   💰 **Phần thưởng:** ${result.rewards.winner.toLocaleString().padEnd(35)} FishCoin  
   💪 **Sức mạnh:** ${result.winnerPower} vs ${result.loserPower}                    
                                                               
-══════════════════════════════════════════════════════════════
-        `;
+`;
+        
+        // Thêm thông tin HP cuối cùng nếu có
+        if (result.finalHP) {
+            const winnerHP = result.finalHP.winner;
+            const loserHP = result.finalHP.loser;
+            display += `  ❤️ **HP Người thắng:** ${winnerHP.current}/${winnerHP.max} (${winnerHP.percentage}%)                    \n`;
+            display += `  💔 **HP Người thua:** ${loserHP.current}/${loserHP.max} (${loserHP.percentage}%)                    \n`;
+            display += `                                                               \n`;
+        }
+        
+        display += `══════════════════════════════════════════════════════════════`;
+        
+        return display;
     }
 
     /**
@@ -401,6 +413,15 @@ export class BattleVisualSystem {
             display += `  💪 **Sức mạnh:** ${result.winnerPower || 0} vs ${result.loserPower || 0}                    \n`;
             display += `  📊 **Chênh lệch:** ${Math.abs((result.winnerPower || 0) - (result.loserPower || 0))}                    \n`;
             display += `                                                              \n`;
+            
+            // HP cuối cùng
+            if (result.finalHP) {
+                const winnerHP = result.finalHP.winner;
+                const loserHP = result.finalHP.loser;
+                display += `  ❤️ **HP Người thắng:** ${winnerHP.current}/${winnerHP.max} (${winnerHP.percentage}%)                    \n`;
+                display += `  💔 **HP Người thua:** ${loserHP.current}/${loserHP.max} (${loserHP.percentage}%)                    \n`;
+                display += `                                                              \n`;
+            }
             
             // Rewards
             display += `  💰 **Phần thưởng người thắng:** ${(result.rewards?.winner || 0).toLocaleString().padEnd(25)} FishCoin  \n`;
