@@ -27,6 +27,7 @@ export interface BattleResult {
       percentage: number;
     };
   };
+  battleId?: string; // ID để lưu trữ battle log
 }
 
 export interface BattleStats {
@@ -39,7 +40,10 @@ export interface BattleStats {
 
 export class FishBattleService {
   // Lưu trữ thời gian cooldown của mỗi user
-  private static battleCooldowns = new Map<string, number>();
+  private static battleCooldowns = new Map<string, number>()
+  
+  // Lưu trữ battle logs tạm thời (battleId -> battleLog)
+  private static battleLogs = new Map<string, string[]>();
   private static readonly BATTLE_COOLDOWN = 60000; // 60 giây (1 phút)
   private static readonly DAILY_BATTLE_LIMIT = 20; // Giới hạn 20 lần đấu cá mỗi ngày cho user thường
   private static readonly ADMIN_DAILY_BATTLE_LIMIT = 100; // Giới hạn 100 lần đấu cá mỗi ngày cho admin
@@ -152,6 +156,39 @@ export class FishBattleService {
     } catch (error) {
       console.error('Error incrementing daily battle count:', error);
     }
+  }
+
+  /**
+   * Tạo battle ID duy nhất
+   */
+  private static generateBattleId(): string {
+    return `battle_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * Lưu battle log
+   */
+  static saveBattleLog(battleId: string, battleLog: string[]): void {
+    this.battleLogs.set(battleId, battleLog);
+    
+    // Tự động xóa sau 1 giờ để tránh memory leak
+    setTimeout(() => {
+      this.battleLogs.delete(battleId);
+    }, 60 * 60 * 1000); // 1 giờ
+  }
+
+  /**
+   * Lấy battle log
+   */
+  static getBattleLog(battleId: string): string[] | null {
+    return this.battleLogs.get(battleId) || null;
+  }
+
+  /**
+   * Xóa battle log
+   */
+  static deleteBattleLog(battleId: string): void {
+    this.battleLogs.delete(battleId);
   }
 
   /**
@@ -1013,6 +1050,10 @@ export class FishBattleService {
       percentage: Math.floor(((loser === userFish ? userHP : opponentHP) / (loser === userFish ? userMaxHP : opponentMaxHP)) * 100)
     };
 
+    // Tạo battle ID và lưu battle log
+    const battleId = this.generateBattleId();
+    this.saveBattleLog(battleId, battleLog);
+
     return {
       winner: {
         ...winner,
@@ -1026,7 +1067,7 @@ export class FishBattleService {
       },
       winnerPower: Math.floor(winnerPower),
       loserPower: Math.floor(loserPower),
-      battleLog,
+      battleLog, // Vẫn giữ để backward compatibility
       rewards: {
         winner: winnerReward,
         loser: loserReward
@@ -1034,7 +1075,8 @@ export class FishBattleService {
       finalHP: {
         winner: winnerFinalHP,
         loser: loserFinalHP
-      }
+      },
+      battleId // Thêm battle ID để có thể lấy log sau
     };
   } catch (error) {
     console.error(`❌ Error in battleFish:`, error);

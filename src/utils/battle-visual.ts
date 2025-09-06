@@ -384,9 +384,9 @@ ${winnerEmoji} BATTLE RESULT ${winnerEmoji}
     }
 
     /**
-     * Tạo visual battle result chi tiết
+     * Tạo visual battle result tóm tắt (không hiển thị full log)
      */
-    static createDetailedBattleResult(result: any, isUserWinner: boolean, battleLog: string[]): string {
+    static createSummaryBattleResult(result: any, isUserWinner: boolean, battleId?: string): string {
         try {
             const winnerEmoji = isUserWinner ? '🏆' : '💀';
             const resultColor = isUserWinner ? '🟢' : '🔴';
@@ -424,22 +424,47 @@ ${winnerEmoji} BATTLE RESULT ${winnerEmoji}
             display += `  💰 **Phần thưởng người thua:** ${(result.rewards?.loser || 0).toLocaleString().padEnd(26)} FishCoin  \n`;
             display += `                                                              \n`;
             
-            // Battle log summary (first 3 lines)
-            if (battleLog && battleLog.length > 0) {
-                display += `  📝 **TÓM TẮT TRẬN ĐẤU:**                                    \n`;
-                for (let i = 0; i < Math.min(3, battleLog.length); i++) {
-                    const logLine = battleLog[i].substring(0, 50); // Limit length
-                    display += `  ${logLine.padEnd(60)}  \n`;
-                }
-                display += `                                                              \n`;
+            // Battle summary thay vì full log
+            display += `  📝 **TÓM TẮT TRẬN ĐẤU:**                                    \n`;
+            display += `  ${winnerEmoji} ${result.winner.name} đã chiến thắng!                    \n`;
+            display += `  💪 Sức mạnh: ${result.winnerPower} vs ${result.loserPower}                    \n`;
+            display += `  💰 Phần thưởng: ${result.rewards.winner.toLocaleString()} FishCoin                    \n`;
+            if (battleId) {
+                display += `  🔍 Sử dụng button "Xem chi tiết" để xem log đầy đủ                    \n`;
             }
+            display += `                                                              \n`;
             
             display += `══════════════════════════════════════`;
             
             return display;
         } catch (error) {
-            console.error('Error creating detailed battle result:', error);
+            console.error('Error creating summary battle result:', error);
             return `❌ Lỗi hiển thị kết quả trận đấu: ${error}`;
+        }
+    }
+
+    /**
+     * Tạo detailed battle log để hiển thị khi user click "Xem chi tiết"
+     */
+    static createDetailedBattleLog(battleLog: string[]): string {
+        try {
+            let display = `📜 **CHI TIẾT TRẬN ĐẤU**\n`;
+            display += `══════════════════════════════════════\n\n`;
+            
+            if (battleLog && battleLog.length > 0) {
+                battleLog.forEach((logLine, index) => {
+                    display += `${logLine}\n`;
+                });
+            } else {
+                display += `Không có thông tin chi tiết về trận đấu.\n`;
+            }
+            
+            display += `\n══════════════════════════════════════`;
+            
+            return display;
+        } catch (error) {
+            console.error('Error creating detailed battle log:', error);
+            return `❌ Lỗi hiển thị chi tiết trận đấu: ${error}`;
         }
     }
 
@@ -813,71 +838,13 @@ ${combinedFrames}
                         break;
                 }
                 
-                // Thêm thông tin né tránh và thứ tự tấn công vào action message
-                let dodgeInfo = '';
-                if (userDodges && opponentDodges) {
-                    dodgeInfo = '\n💨 Cả hai đều né tránh được một phần!';
-                } else if (userDodges) {
-                    dodgeInfo = '\n💨 User né tránh được một phần damage!';
-                } else if (opponentDodges) {
-                    dodgeInfo = '\n💨 Opponent né tránh được một phần damage!';
-                }
-                
-                let attackOrderInfo = '';
-                if (userAttacksFirst) {
-                    attackOrderInfo = `\n⚡ ${userFish.name} tấn công trước (Agility: ${userAgility} vs ${opponentAgility})!`;
-                } else {
-                    attackOrderInfo = `\n⚡ ${opponentFish.name} tấn công trước (Agility: ${opponentAgility} vs ${userAgility})!`;
-                }
-                
-                // Thêm thông tin về dodge chance và defense
-                let dodgeChanceInfo = '';
-                if (userDodgeChance > 0 || opponentDodgeChance > 0) {
-                    dodgeChanceInfo = `\n🧠 Dodge: ${userFish.name} ${(userDodgeChance * 100).toFixed(1)}% (Agi:${userAgility} Int:${userIntelligence}) vs ${opponentFish.name} ${(opponentDodgeChance * 100).toFixed(1)}% (Agi:${opponentAgility} Int:${opponentIntelligence})`;
-                }
-                
-                let defenseInfo = '';
-                if (userDefenseReduction > 0 || opponentDefenseReduction > 0) {
-                    defenseInfo = `\n🛡️ Defense: ${userFish.name} -${(userDefenseReduction * 100).toFixed(1)}% damage (Def:${userDefense}) vs ${opponentFish.name} -${(opponentDefenseReduction * 100).toFixed(1)}% damage (Def:${opponentDefense})`;
-                }
-                
-                let critInfo = '';
-                if (userCritChance > 0 || opponentCritChance > 0) {
-                    critInfo = `\n🍀 Crit: ${userFish.name} ${(userCritChance * 100).toFixed(1)}% (Luck:${userLuck}) vs ${opponentFish.name} ${(opponentCritChance * 100).toFixed(1)}% (Luck:${opponentLuck})`;
-                }
-                
-                // Thêm thông tin critical hit nếu xảy ra
-                let critResultInfo = '';
-                if (userCrits && opponentCrits) {
-                    critResultInfo = '\n💥 Cả hai đều critical hit!';
-                } else if (userCrits) {
-                    critResultInfo = '\n💥 User critical hit!';
-                } else if (opponentCrits) {
-                    critResultInfo = '\n💥 Opponent critical hit!';
-                }
-                
-                let accuracyInfo = '';
-                if (userHitChance < 1.0 || opponentHitChance < 1.0) {
-                    accuracyInfo = `\n🎯 Hit: ${userFish.name} ${(userHitChance * 100).toFixed(1)}% (Acc:${userAccuracy}) vs ${opponentFish.name} ${(opponentHitChance * 100).toFixed(1)}% (Acc:${opponentAccuracy})`;
-                }
-                
-                // Thêm thông tin miss nếu xảy ra
-                let missInfo = '';
-                if (!userHits && !opponentHits) {
-                    missInfo = '\n❌ Cả hai đều miss!';
-                } else if (!userHits) {
-                    missInfo = '\n❌ User miss!';
-                } else if (!opponentHits) {
-                    missInfo = '\n❌ Opponent miss!';
-                }
-                
                 rounds.push({
                     round: roundNumber++,
                     userHP,
                     opponentHP,
                     userMaxHP,
                     opponentMaxHP,
-                    action: action + dodgeInfo + attackOrderInfo + dodgeChanceInfo + defenseInfo + critInfo + critResultInfo + accuracyInfo + missInfo
+                    action: action
                 });
                 
                 // Kiểm tra kết thúc

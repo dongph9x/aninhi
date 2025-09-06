@@ -10,6 +10,7 @@ import { BattleFishInventoryService } from "@/utils/battle-fish-inventory";
 import { FishBattleService } from "@/utils/fish-battle";
 import { BattleFishUI } from "./BattleFishUI";
 import { BattleVisualSystem } from "@/utils/battle-visual";
+import { BattleLogHandler } from "./BattleLogHandler";
 
 export class BattleFishHandler {
     private static battleFishMessages = new Map<string, {
@@ -115,6 +116,12 @@ export class BattleFishHandler {
 
     private static async handleButton(interaction: ButtonInteraction, messageData: any) {
         const customId = interaction.customId;
+
+        // Xử lý button "Xem chi tiết" battle log
+        if (customId.startsWith('view_battle_details_')) {
+            await BattleLogHandler.handleViewBattleDetails(interaction);
+            return;
+        }
 
         switch (customId) {
             case 'battle_fish_add':

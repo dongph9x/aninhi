@@ -1,4 +1,4 @@
-import { EmbedBuilder } from "discord.js";
+import { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } from "discord.js";
 import { Bot } from "@/classes";
 import { FishBattleService } from "@/utils/fish-battle";
 import { BattleFishInventoryService } from "@/utils/battle-fish-inventory";
@@ -177,7 +177,7 @@ async function removeFishFromBattleInventory(message: any, userId: string, guild
         const embed = new EmbedBuilder()
             .setTitle('❌ Không thể xóa cá!')
             .setColor('#FF0000')
-            .setDescription(result.error)
+            .setDescription(result.error || 'Không thể xóa cá khỏi túi đấu')
             .setTimestamp();
 
         return message.reply({ embeds: [embed] });
@@ -364,7 +364,7 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
         try {
             // Import BattleVisualSystem
             const { BattleVisualSystem } = await import("@/utils/battle-visual");
-            const battleResultDisplay = BattleVisualSystem.createDetailedBattleResult(result, isUserWinner, result.battleLog);
+            const battleResultDisplay = BattleVisualSystem.createSummaryBattleResult(result, isUserWinner, result.battleId);
             
             // Kiểm tra độ dài và chia nhỏ nếu cần
             const maxLength = 1000; // Để lại chỗ cho markdown
@@ -384,6 +384,20 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
                 displayValue = `\`\`\`\n${shortDisplay}\n\`\`\``;
             }
             
+            // Tạo button "Xem chi tiết" nếu có battleId
+            const components = [];
+            if (result.battleId) {
+                const viewDetailsButton = new ActionRowBuilder<ButtonBuilder>()
+                    .addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`view_battle_details_${result.battleId}`)
+                            .setLabel('📜 Xem Chi Tiết')
+                            .setStyle(ButtonStyle.Secondary)
+                            .setEmoji('🔍')
+                    );
+                components.push(viewDetailsButton);
+            }
+
             const battleEmbed = new EmbedBuilder()
                 .setTitle(isUserWinner ? '🏆 Chiến Thắng!' : '💀 Thất Bại!')
                 .setColor(isUserWinner ? '#00FF00' : '#FF0000')
@@ -403,10 +417,26 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
                 )
                 .setTimestamp();
 
-            battleMessage.edit({ embeds: [battleEmbed] });
+            battleMessage.edit({ 
+                embeds: [battleEmbed],
+                components: components.length > 0 ? components : undefined
+            });
         } catch (error) {
             console.error('Error creating visual battle result:', error);
             // Fallback to old display
+            const fallbackComponents = [];
+            if (result.battleId) {
+                const viewDetailsButton = new ActionRowBuilder<ButtonBuilder>()
+                    .addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`view_battle_details_${result.battleId}`)
+                            .setLabel('📜 Xem Chi Tiết')
+                            .setStyle(ButtonStyle.Secondary)
+                            .setEmoji('🔍')
+                    );
+                fallbackComponents.push(viewDetailsButton);
+            }
+
             const battleEmbed = new EmbedBuilder()
                 .setTitle(isUserWinner ? '🏆 Chiến Thắng!' : '💀 Thất Bại!')
                 .setColor(isUserWinner ? '#00FF00' : '#FF0000')
@@ -426,11 +456,14 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
                 .setDescription(result.battleLog.join('\n'))
                 .setTimestamp();
 
-            battleMessage.edit({ embeds: [battleEmbed] });
+            battleMessage.edit({ 
+                embeds: [battleEmbed],
+                components: fallbackComponents.length > 0 ? fallbackComponents : undefined
+            });
         }
     });
 
-    collector.on('end', (collected) => {
+    collector.on('end', (collected: any) => {
         if (collected.size === 0) {
             const timeoutEmbed = new EmbedBuilder()
                 .setTitle('⏰ Hết thời gian!')
@@ -481,7 +514,7 @@ async function showBattleHistory(message: any, userId: string, guildId: string) 
 
     battles.forEach((battle, index) => {
         const result = battle.userWon ? '🏆' : '💀';
-        const fishName = battle.fish?.name || 'Unknown';
+        const fishName = battle.userFish?.name || 'Unknown';
         const reward = battle.reward.toLocaleString();
         const date = new Date(battle.battledAt).toLocaleDateString('vi-VN');
 

@@ -204,6 +204,44 @@ export default Bot.createEvent({
                 return;
             }
 
+            // Kiểm tra xem có phải battle log button không
+            if (interaction.customId.startsWith('view_battle_details_')) {
+                console.log("Battle log button clicked:", interaction.customId);
+                
+                // Import và gọi handler từ BattleLogHandler
+                const { BattleLogHandler } = await import("../components/MessageComponent/BattleLogHandler");
+                
+                try {
+                    await BattleLogHandler.handleViewBattleDetails(interaction);
+                } catch (error) {
+                    // Kiểm tra xem interaction đã được reply chưa
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi hiển thị chi tiết trận đấu!`);
+                    }
+                    logger.error({ id: interaction.customId, error });
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải battle round select menu không
+            if (interaction.customId.startsWith('battle_round_select_')) {
+                console.log("Battle round select clicked:", interaction.customId);
+                
+                // Import và gọi handler từ BattleLogHandler
+                const { BattleLogHandler } = await import("../components/MessageComponent/BattleLogHandler");
+                
+                try {
+                    await BattleLogHandler.handleRoundSelect(interaction);
+                } catch (error) {
+                    // Kiểm tra xem interaction đã được reply chưa
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi hiển thị hiệp đấu!`);
+                    }
+                    logger.error({ id: interaction.customId, error });
+                }
+                return;
+            }
+
             // Kiểm tra xem có phải vote kick button không
             try {
                 const voteKickData = JSON.parse(interaction.customId);
