@@ -282,7 +282,7 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
     const collector = battleMessage.createReactionCollector({ filter, time: 30000, max: 1 });
 
     collector.on('collect', async (collected: any, user: any) => {
-        // Bắt đầu battle với visual system mới - 3 hiệp
+        // Bắt đầu battle với visual system mới - kết thúc khi HP về 0
         try {
             // Import BattleVisualSystem
             const { BattleVisualSystem } = await import("@/utils/battle-visual");
@@ -290,7 +290,7 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
             const userMaxHP = calculateMaxHP(selectedFish);
             const opponentMaxHP = calculateMaxHP(opponentResult.opponent);
             
-            // Tạo animation data cho 3 hiệp
+            // Tạo animation data (kết thúc khi HP về 0)
             const battleRounds = BattleVisualSystem.createBattleAnimation(
                 selectedFish, 
                 opponentResult.opponent, 
@@ -315,9 +315,9 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
 
                 await battleMessage.edit({ embeds: [battleEmbed] });
                 
-                // Chờ 2 giây giữa các hiệp
+                // Chờ 0.5 giây giữa các hiệp
                 if (i < battleRounds.length - 1) {
-                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 }
             }
             
@@ -334,7 +334,7 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
                 .setTimestamp();
 
             await battleMessage.edit({ embeds: [battleEmbed] });
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
 
         // Thực hiện battle

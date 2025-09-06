@@ -521,7 +521,7 @@ export class BattleFishHandler {
             const userMaxHP = this.calculateMaxHP(selectedFish);
             const opponentMaxHP = this.calculateMaxHP(opponent);
             
-            // Tạo animation data cho 3 hiệp
+            // Tạo animation data (kết thúc khi HP về 0)
             const battleRounds = BattleVisualSystem.createBattleAnimation(
                 selectedFish, 
                 opponent, 
@@ -548,9 +548,9 @@ export class BattleFishHandler {
 
                 await interaction.editReply({ embeds: [battleEmbed] });
                 
-                // Chờ 2 giây giữa các hiệp
+                // Chờ 0.5 giây giữa các hiệp
                 if (i < battleRounds.length - 1) {
-                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 }
             }
             
@@ -567,7 +567,7 @@ export class BattleFishHandler {
                 .setTimestamp();
 
             await interaction.editReply({ embeds: [battleEmbed] });
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
 
         // Thực hiện battle

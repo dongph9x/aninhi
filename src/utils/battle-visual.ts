@@ -443,29 +443,6 @@ ${winnerEmoji} BATTLE RESULT ${winnerEmoji}
         }
     }
 
-    /**
-     * Tạo visual stats comparison
-     */
-    static createStatsComparison(userStats: any, opponentStats: any): string {
-        const userStrength = userStats.strength || 0;
-        const opponentStrength = opponentStats.strength || 0;
-        const strengthDiff = userStrength - opponentStrength;
-        
-        const userAgility = userStats.agility || 0;
-        const opponentAgility = opponentStats.agility || 0;
-        const agilityDiff = userAgility - opponentAgility;
-        
-        const userDefense = userStats.defense || 0;
-        const opponentDefense = opponentStats.defense || 0;
-        const defenseDiff = userDefense - opponentDefense;
-        
-        return `
-📊 **SO SÁNH STATS:**
-💪 **Sức mạnh:** ${userStrength} vs ${opponentStrength} ${strengthDiff > 0 ? '🟢' : strengthDiff < 0 ? '🔴' : '⚪'}
-🏃 **Thể lực:** ${userAgility} vs ${opponentAgility} ${agilityDiff > 0 ? '🟢' : agilityDiff < 0 ? '🔴' : '⚪'}
-🛡️ **Phòng thủ:** ${userDefense} vs ${opponentDefense} ${defenseDiff > 0 ? '🟢' : defenseDiff < 0 ? '🔴' : '⚪'}
-        `;
-    }
 
     /**
      * Helper methods
@@ -516,7 +493,6 @@ ${winnerEmoji} BATTLE RESULT ${winnerEmoji}
             'Cá rô phi sọc': '🐠',
             'Cá chép trắng': '🐠',
             'Cá trắm đen': '🐠',
-            'Cá mè hoa': '🐠',
             'Cá rô đồng lớn': '🐠',
             'Cá chạch bùn': '🐠',
             'Cá trê phi đen': '🐠',
@@ -684,7 +660,7 @@ ${combinedFrames}
     }
 
     /**
-     * Tạo battle animation với 3 hiệp
+     * Tạo battle animation với logic HP thực tế (đồng bộ với battle system)
      */
     static createBattleAnimation(userFish: any, opponentFish: any, userMaxHP: number, opponentMaxHP: number): Array<{
         round: number;
@@ -698,66 +674,238 @@ ${combinedFrames}
             const rounds = [];
             let userHP = userMaxHP;
             let opponentHP = opponentMaxHP;
+            let roundNumber = 1;
             
-            // Hiệp 1: Giao tranh ban đầu
-            const damage1 = Math.floor(Math.random() * 30) + 20; // 20-50 damage
-            const userDamage1 = Math.floor(damage1 * 0.7); // User nhận ít damage hơn
-            const opponentDamage1 = damage1;
+            // Tính sức mạnh để tính damage (tương tự như battle thực tế)
+            const userTotalPower = this.calculateFishPower(userFish);
+            const opponentTotalPower = this.calculateFishPower(opponentFish);
             
-            userHP = Math.max(0, userHP - userDamage1);
-            opponentHP = Math.max(0, opponentHP - opponentDamage1);
+            const maxRounds = 10; // Giới hạn tối đa 10 hiệp
             
-            rounds.push({
-                round: 1,
-                userHP,
-                opponentHP,
-                userMaxHP,
-                opponentMaxHP,
-                action: `💥 Giao tranh dữ dội! Cả hai đều bị thương!`
-            });
-            
-            // Hiệp 2: Chiến đấu gay cấn
-            if (userHP > 0 && opponentHP > 0) {
-                const damage2 = Math.floor(Math.random() * 40) + 30; // 30-70 damage
-                const userDamage2 = Math.floor(damage2 * 0.8);
-                const opponentDamage2 = damage2;
+            while (userHP > 0 && opponentHP > 0 && roundNumber <= maxRounds) {
+                // Tính damage dựa trên sức mạnh (điều chỉnh để battle kết thúc khi HP về 0)
+                const userBaseDamage = Math.floor((userTotalPower / 8) * (0.8 + Math.random() * 0.4)); // 80-120% của base damage
+                const opponentBaseDamage = Math.floor((opponentTotalPower / 8) * (0.8 + Math.random() * 0.4));
                 
-                userHP = Math.max(0, userHP - userDamage2);
-                opponentHP = Math.max(0, opponentHP - opponentDamage2);
+                // Tính khả năng né tránh dựa trên Agility và Intelligence
+                const userAgility = userFish.stats?.agility || 0;
+                const opponentAgility = opponentFish.stats?.agility || 0;
+                const userIntelligence = userFish.stats?.intelligence || 0;
+                const opponentIntelligence = opponentFish.stats?.intelligence || 0;
+                
+                // Khả năng né tránh: 0-40% dựa trên Agility (70%) + Intelligence (30%)
+                const userDodgeChance = Math.min(0.4, (userAgility * 0.7 + userIntelligence * 0.3) / 1000); // Tối đa 40%
+                const opponentDodgeChance = Math.min(0.4, (opponentAgility * 0.7 + opponentIntelligence * 0.3) / 1000);
+                
+                // Kiểm tra né tránh
+                const userDodges = Math.random() < userDodgeChance;
+                const opponentDodges = Math.random() < opponentDodgeChance;
+                
+                // Tính damage thực tế sau khi né tránh
+                let userDamage = userDodges ? Math.floor(userBaseDamage * 0.3) : userBaseDamage; // Né tránh giảm 70% damage
+                let opponentDamage = opponentDodges ? Math.floor(opponentBaseDamage * 0.3) : opponentBaseDamage;
+                
+                // Áp dụng Defense để giảm damage nhận vào
+                const userDefense = userFish.stats?.defense || 0;
+                const opponentDefense = opponentFish.stats?.defense || 0;
+                
+                // Defense giảm damage: 0-25% dựa trên Defense
+                const userDefenseReduction = Math.min(0.25, userDefense / 1000); // Tối đa 25%
+                const opponentDefenseReduction = Math.min(0.25, opponentDefense / 1000);
+                
+                // Áp dụng defense reduction cho damage nhận vào
+                userDamage = Math.floor(userDamage * (1 - opponentDefenseReduction));
+                opponentDamage = Math.floor(opponentDamage * (1 - userDefenseReduction));
+                
+                // Tính khả năng critical hit dựa trên Luck
+                const userLuck = userFish.stats?.luck || 0;
+                const opponentLuck = opponentFish.stats?.luck || 0;
+                
+                // Critical hit chance: 0-20% dựa trên Luck
+                const userCritChance = Math.min(0.2, userLuck / 1000); // Tối đa 20%
+                const opponentCritChance = Math.min(0.2, opponentLuck / 1000);
+                
+                // Kiểm tra critical hit
+                const userCrits = Math.random() < userCritChance;
+                const opponentCrits = Math.random() < opponentCritChance;
+                
+                // Áp dụng critical damage (x2) nếu crit
+                if (userCrits) {
+                    userDamage = Math.floor(userDamage * 2); // Critical damage x2
+                }
+                if (opponentCrits) {
+                    opponentDamage = Math.floor(opponentDamage * 2); // Critical damage x2
+                }
+                
+                // Tính khả năng hit dựa trên Accuracy
+                const userAccuracy = userFish.stats?.accuracy || 0;
+                const opponentAccuracy = opponentFish.stats?.accuracy || 0;
+                
+                // Hit chance: 70-100% dựa trên Accuracy (tối thiểu 70% để không miss quá nhiều)
+                const userHitChance = Math.min(1.0, 0.7 + (userAccuracy / 1000)); // 70-100%
+                const opponentHitChance = Math.min(1.0, 0.7 + (opponentAccuracy / 1000));
+                
+                // Kiểm tra hit/miss
+                const userHits = Math.random() < userHitChance;
+                const opponentHits = Math.random() < opponentHitChance;
+                
+                // Áp dụng miss (damage = 0) nếu miss
+                if (!userHits) {
+                    userDamage = 0; // Miss = 0 damage
+                }
+                if (!opponentHits) {
+                    opponentDamage = 0; // Miss = 0 damage
+                }
+                
+                // Xác định thứ tự tấn công dựa trên Agility
+                const userAttacksFirst = userAgility >= opponentAgility;
+                
+                // Áp dụng damage theo thứ tự tấn công
+                if (userAttacksFirst) {
+                    // User tấn công trước
+                    opponentHP = Math.max(0, opponentHP - userDamage);
+                    if (opponentHP > 0) {
+                        userHP = Math.max(0, userHP - opponentDamage);
+                    }
+                } else {
+                    // Opponent tấn công trước
+                    userHP = Math.max(0, userHP - opponentDamage);
+                    if (userHP > 0) {
+                        opponentHP = Math.max(0, opponentHP - userDamage);
+                    }
+                }
+                
+                // Tạo action message đa dạng cho từng hiệp
+                let action = '';
+                switch (roundNumber) {
+                    case 1:
+                        action = `💥 Giao tranh dữ dội! Cả hai đều bị thương!`;
+                        break;
+                    case 2:
+                        action = `⚡ Chiến đấu gay cấn! Sức mạnh tăng cao!`;
+                        break;
+                    case 3:
+                        action = `🔥 Hiệp 3! Cuộc chiến ngày càng khốc liệt!`;
+                        break;
+                    case 4:
+                        action = `💀 Hiệp 4! Cả hai đều đã mệt mỏi!`;
+                        break;
+                    case 5:
+                        action = `⚔️ Hiệp 5! Thời khắc quyết định đang đến!`;
+                        break;
+                    case 6:
+                        action = `🌪️ Hiệp 6! Bão tố chiến đấu bùng nổ!`;
+                        break;
+                    case 7:
+                        action = `💢 Hiệp 7! Sức mạnh cuối cùng được giải phóng!`;
+                        break;
+                    case 8:
+                        action = `🎯 Hiệp 8! Đòn đánh chí mạng!`;
+                        break;
+                    case 9:
+                        action = `⚡ Hiệp 9! Thời khắc sinh tử!`;
+                        break;
+                    case 10:
+                        action = `🏁 Hiệp 10! Trận đấu cuối cùng!`;
+                        break;
+                    default:
+                        action = `🔥 Hiệp ${roundNumber}! Quyết định thắng thua!`;
+                        break;
+                }
+                
+                // Thêm thông tin né tránh và thứ tự tấn công vào action message
+                let dodgeInfo = '';
+                if (userDodges && opponentDodges) {
+                    dodgeInfo = '\n💨 Cả hai đều né tránh được một phần!';
+                } else if (userDodges) {
+                    dodgeInfo = '\n💨 User né tránh được một phần damage!';
+                } else if (opponentDodges) {
+                    dodgeInfo = '\n💨 Opponent né tránh được một phần damage!';
+                }
+                
+                let attackOrderInfo = '';
+                if (userAttacksFirst) {
+                    attackOrderInfo = `\n⚡ ${userFish.name} tấn công trước (Agility: ${userAgility} vs ${opponentAgility})!`;
+                } else {
+                    attackOrderInfo = `\n⚡ ${opponentFish.name} tấn công trước (Agility: ${opponentAgility} vs ${userAgility})!`;
+                }
+                
+                // Thêm thông tin về dodge chance và defense
+                let dodgeChanceInfo = '';
+                if (userDodgeChance > 0 || opponentDodgeChance > 0) {
+                    dodgeChanceInfo = `\n🧠 Dodge: ${userFish.name} ${(userDodgeChance * 100).toFixed(1)}% (Agi:${userAgility} Int:${userIntelligence}) vs ${opponentFish.name} ${(opponentDodgeChance * 100).toFixed(1)}% (Agi:${opponentAgility} Int:${opponentIntelligence})`;
+                }
+                
+                let defenseInfo = '';
+                if (userDefenseReduction > 0 || opponentDefenseReduction > 0) {
+                    defenseInfo = `\n🛡️ Defense: ${userFish.name} -${(userDefenseReduction * 100).toFixed(1)}% damage (Def:${userDefense}) vs ${opponentFish.name} -${(opponentDefenseReduction * 100).toFixed(1)}% damage (Def:${opponentDefense})`;
+                }
+                
+                let critInfo = '';
+                if (userCritChance > 0 || opponentCritChance > 0) {
+                    critInfo = `\n🍀 Crit: ${userFish.name} ${(userCritChance * 100).toFixed(1)}% (Luck:${userLuck}) vs ${opponentFish.name} ${(opponentCritChance * 100).toFixed(1)}% (Luck:${opponentLuck})`;
+                }
+                
+                // Thêm thông tin critical hit nếu xảy ra
+                let critResultInfo = '';
+                if (userCrits && opponentCrits) {
+                    critResultInfo = '\n💥 Cả hai đều critical hit!';
+                } else if (userCrits) {
+                    critResultInfo = '\n💥 User critical hit!';
+                } else if (opponentCrits) {
+                    critResultInfo = '\n💥 Opponent critical hit!';
+                }
+                
+                let accuracyInfo = '';
+                if (userHitChance < 1.0 || opponentHitChance < 1.0) {
+                    accuracyInfo = `\n🎯 Hit: ${userFish.name} ${(userHitChance * 100).toFixed(1)}% (Acc:${userAccuracy}) vs ${opponentFish.name} ${(opponentHitChance * 100).toFixed(1)}% (Acc:${opponentAccuracy})`;
+                }
+                
+                // Thêm thông tin miss nếu xảy ra
+                let missInfo = '';
+                if (!userHits && !opponentHits) {
+                    missInfo = '\n❌ Cả hai đều miss!';
+                } else if (!userHits) {
+                    missInfo = '\n❌ User miss!';
+                } else if (!opponentHits) {
+                    missInfo = '\n❌ Opponent miss!';
+                }
                 
                 rounds.push({
-                    round: 2,
+                    round: roundNumber++,
                     userHP,
                     opponentHP,
                     userMaxHP,
                     opponentMaxHP,
-                    action: `⚡ Chiến đấu gay cấn! Sức mạnh tăng cao!`
+                    action: action + dodgeInfo + attackOrderInfo + dodgeChanceInfo + defenseInfo + critInfo + critResultInfo + accuracyInfo + missInfo
                 });
-            }
-            
-            // Hiệp 3: Kết thúc
-            if (userHP > 0 && opponentHP > 0) {
-                const damage3 = Math.floor(Math.random() * 50) + 40; // 40-90 damage
-                const userDamage3 = Math.floor(damage3 * 0.9);
-                const opponentDamage3 = damage3;
                 
-                userHP = Math.max(0, userHP - userDamage3);
-                opponentHP = Math.max(0, opponentHP - opponentDamage3);
-                
-                rounds.push({
-                    round: 3,
-                    userHP,
-                    opponentHP,
-                    userMaxHP,
-                    opponentMaxHP,
-                    action: `🔥 Hiệp cuối! Quyết định thắng thua!`
-                });
+                // Kiểm tra kết thúc
+                if (userHP <= 0 || opponentHP <= 0) {
+                    break;
+                }
             }
             
             return rounds;
         } catch (error) {
             console.error('Error creating battle animation:', error);
             return [];
+        }
+    }
+    
+    /**
+     * Tính sức mạnh của cá (tương tự như FishBreedingService)
+     */
+    private static calculateFishPower(fish: any): number {
+        try {
+            const stats = fish.stats || {};
+            const basePower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0);
+            const levelBonus = (fish.level || 1) * 5;
+            const generationBonus = (fish.generation || 1) * 10;
+            return basePower + levelBonus + generationBonus;
+        } catch (error) {
+            console.error('Error calculating fish power:', error);
+            return 100; // Default power
         }
     }
 }
