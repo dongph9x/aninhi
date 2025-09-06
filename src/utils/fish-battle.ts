@@ -307,14 +307,15 @@ export class FishBattleService {
       stats: userStats
     });
 
-    // Tạo BOT đối thủ với sức mạnh thấp hơn user fish một chút
-    const powerVariation = 0.1; // ±10%
-    const randomMultiplier = 0.5 + (Math.random() * powerVariation * 2); // 0.5 - 0.7 (BOT yếu hơn user)
+    // Tạo BOT đối thủ với sức mạnh cân bằng với user fish
+    const powerVariation = 0.3; // ±30% variation
+    const randomMultiplier = 0.7 + (Math.random() * powerVariation * 2); // 0.7 - 1.3 (BOT có thể mạnh hơn user)
     const botBasePower = userBasePower * randomMultiplier;
     
-    // Đảm bảo BOT không quá mạnh (giới hạn tối đa 0.7x user power)
-    const maxBotPower = userBasePower * 0.7;
-    const finalBotPower = Math.min(botBasePower, maxBotPower);
+    // Đảm bảo BOT có sức mạnh hợp lý (0.7x - 1.3x user power)
+    const minBotPower = userBasePower * 0.7;
+    const maxBotPower = userBasePower * 1.3;
+    const finalBotPower = Math.max(minBotPower, Math.min(botBasePower, maxBotPower));
     
     // Trừ đi level bonus vì BOT sẽ có level 10 (thêm 90 power)
     // Chúng ta muốn stats cơ bản của BOT cân bằng với user
@@ -354,7 +355,7 @@ export class FishBattleService {
       traits: this.getRandomBotTraits() // Traits cho battle
     };
 
-    console.log(`🤖 Created BOT opponent: ${botOpponent.species} with power: ${Math.floor(finalBotPower)} (base: ${Math.floor(botBasePower)}, max: ${Math.floor(maxBotPower)})`);
+    console.log(`🤖 Created BOT opponent: ${botOpponent.species} with power: ${Math.floor(finalBotPower)} (user: ${Math.floor(userBasePower)}, ratio: ${(finalBotPower/userBasePower).toFixed(2)}x)`);
     return botOpponent;
   }
 
@@ -541,7 +542,7 @@ export class FishBattleService {
     
     // === PHASE 0: KIỂM TRA VŨ KHÍ TRANG BỊ ===
     // Sử dụng thông tin opponent từ kết quả tìm kiếm (có thể là BOT hoặc thực tế)
-    const opponentName = isBotOpponent ? opponentResult.opponent.name : opponentFish.species;
+    const opponentName = isBotOpponent ? opponentResult.opponent.species : opponentFish.species;
     battleLog.push(`⚔️ **${userFish.species}** vs **${opponentName}**`);
     battleLog.push(`💪 Sức mạnh cơ bản: ${Math.floor(userBasePower)} vs ${Math.floor(opponentBasePower)}`);
 
@@ -773,6 +774,10 @@ export class FishBattleService {
       const userBaseDamage = Math.floor((userTotalPower / 8) * (0.8 + Math.random() * 0.4)); // 80-120% của base damage
       const opponentBaseDamage = Math.floor((opponentTotalPower / 8) * (0.8 + Math.random() * 0.4));
       
+      // Lưu base damage để hiển thị trong log
+      const userOriginalDamage = userBaseDamage;
+      const opponentOriginalDamage = opponentBaseDamage;
+      
       // Tính khả năng né tránh dựa trên Agility và Intelligence
       const userAgility = userStats.agility || 0;
       const opponentAgility = opponentStats.agility || 0;
@@ -787,43 +792,7 @@ export class FishBattleService {
       const userDodges = Math.random() < userDodgeChance;
       const opponentDodges = Math.random() < opponentDodgeChance;
       
-      // Tính damage thực tế sau khi né tránh
-      let userDamage = userDodges ? Math.floor(userBaseDamage * 0.3) : userBaseDamage; // Né tránh giảm 70% damage
-      let opponentDamage = opponentDodges ? Math.floor(opponentBaseDamage * 0.3) : opponentBaseDamage;
-      
-      // Áp dụng Defense để giảm damage nhận vào
-      const userDefense = userStats.defense || 0;
-      const opponentDefense = opponentStats.defense || 0;
-      
-      // Defense giảm damage: 0-25% dựa trên Defense
-      const userDefenseReduction = Math.min(0.25, userDefense / 1000); // Tối đa 25%
-      const opponentDefenseReduction = Math.min(0.25, opponentDefense / 1000);
-      
-      // Áp dụng defense reduction cho damage nhận vào
-      userDamage = Math.floor(userDamage * (1 - opponentDefenseReduction));
-      opponentDamage = Math.floor(opponentDamage * (1 - userDefenseReduction));
-      
-      // Tính khả năng critical hit dựa trên Luck
-      const userLuck = userStats.luck || 0;
-      const opponentLuck = opponentStats.luck || 0;
-      
-      // Critical hit chance: 0-20% dựa trên Luck
-      const userCritChance = Math.min(0.2, userLuck / 1000); // Tối đa 20%
-      const opponentCritChance = Math.min(0.2, opponentLuck / 1000);
-      
-      // Kiểm tra critical hit
-      const userCrits = Math.random() < userCritChance;
-      const opponentCrits = Math.random() < opponentCritChance;
-      
-      // Áp dụng critical damage (x2) nếu crit
-      if (userCrits) {
-        userDamage = Math.floor(userDamage * 2); // Critical damage x2
-      }
-      if (opponentCrits) {
-        opponentDamage = Math.floor(opponentDamage * 2); // Critical damage x2
-      }
-      
-      // Tính khả năng hit dựa trên Accuracy
+      // Tính khả năng hit dựa trên Accuracy (kiểm tra miss trước)
       const userAccuracy = userStats.accuracy || 0;
       const opponentAccuracy = opponentStats.accuracy || 0;
       
@@ -835,48 +804,94 @@ export class FishBattleService {
       const userHits = Math.random() < userHitChance;
       const opponentHits = Math.random() < opponentHitChance;
       
-      // Áp dụng miss (damage = 0) nếu miss
-      if (!userHits) {
-        userDamage = 0; // Miss = 0 damage
+      // Tính damage thực tế (chỉ tính nếu không miss)
+      let userDamage = userHits ? userBaseDamage : 0;
+      let opponentDamage = opponentHits ? opponentBaseDamage : 0;
+      
+      // Tính khả năng critical hit dựa trên Luck (chỉ nếu hit)
+      const userLuck = userStats.luck || 0;
+      const opponentLuck = opponentStats.luck || 0;
+      
+      // Critical hit chance: 0-20% dựa trên Luck
+      const userCritChance = Math.min(0.2, userLuck / 1000); // Tối đa 20%
+      const opponentCritChance = Math.min(0.2, opponentLuck / 1000);
+      
+      // Kiểm tra critical hit
+      const userCrits = userHits && Math.random() < userCritChance;
+      const opponentCrits = opponentHits && Math.random() < opponentCritChance;
+      
+      // Áp dụng critical damage (x2) nếu crit
+      if (userCrits) {
+        userDamage = Math.floor(userDamage * 2); // Critical damage x2
       }
-      if (!opponentHits) {
-        opponentDamage = 0; // Miss = 0 damage
+      if (opponentCrits) {
+        opponentDamage = Math.floor(opponentDamage * 2); // Critical damage x2
+      }
+      
+      // Tính damage thực tế sau khi né tránh (chỉ nếu hit)
+      if (userHits) {
+        userDamage = userDodges ? Math.floor(userDamage * 0.3) : userDamage; // Né tránh giảm 70% damage
+      }
+      if (opponentHits) {
+        opponentDamage = opponentDodges ? Math.floor(opponentDamage * 0.3) : opponentDamage;
+      }
+      
+      // Áp dụng Defense để giảm damage nhận vào (chỉ nếu có damage)
+      const userDefense = userStats.defense || 0;
+      const opponentDefense = opponentStats.defense || 0;
+      
+      // Defense giảm damage: 0-25% dựa trên Defense
+      const userDefenseReduction = Math.min(0.25, userDefense / 1000); // Tối đa 25%
+      const opponentDefenseReduction = Math.min(0.25, opponentDefense / 1000);
+      
+      // Áp dụng defense reduction cho damage nhận vào (chỉ nếu có damage)
+      if (userDamage > 0) {
+        userDamage = Math.floor(userDamage * (1 - opponentDefenseReduction));
+      }
+      if (opponentDamage > 0) {
+        opponentDamage = Math.floor(opponentDamage * (1 - userDefenseReduction));
       }
       
       // Xác định thứ tự tấn công dựa trên Agility
       const userAttacksFirst = userAgility >= opponentAgility;
       
-      // Log với thông tin né tránh, defense và stats
-      let userDodgeText = userDodges ? ` (né tránh 70% damage! Dodge: ${(userDodgeChance * 100).toFixed(1)}%)` : '';
-      let opponentDodgeText = opponentDodges ? ` (né tránh 70% damage! Dodge: ${(opponentDodgeChance * 100).toFixed(1)}%)` : '';
+      // Log với thông tin chi tiết về các hiệu ứng đặc biệt
+      // Dodge text cho người bị tấn công (khi họ né được đòn tấn công)
+      let userDodgeText = userDodges ? `\n🛡️ **${userFish.species} NÉ!** (Nhanh nhẹn: ${userAgility}, Trí tuệ: ${userIntelligence} → Tỷ lệ né: ${(userDodgeChance * 100).toFixed(1)}%)` : '';
+      let opponentDodgeText = opponentDodges ? `\n🛡️ **${opponentName} NÉ!** (Nhanh nhẹn: ${opponentAgility}, Trí tuệ: ${opponentIntelligence} → Tỷ lệ né: ${(opponentDodgeChance * 100).toFixed(1)}%)` : '';
       
-      let userDefenseText = userDefenseReduction > 0 ? ` (Defense -${(userDefenseReduction * 100).toFixed(1)}% damage!)` : '';
-      let opponentDefenseText = opponentDefenseReduction > 0 ? ` (Defense -${(opponentDefenseReduction * 100).toFixed(1)}% damage!)` : '';
+      // Defense text cho người bị tấn công (chỉ hiển thị khi có damage thực tế và không miss)
+      let userDefenseText = (userDefenseReduction > 0 && userDamage > 0) ? `\n🛡️ **Phòng thủ giảm sát thương!** (Phòng thủ: ${userDefense} → -${(userDefenseReduction * 100).toFixed(1)}% sát thương)` : '';
+      let opponentDefenseText = (opponentDefenseReduction > 0 && opponentDamage > 0) ? `\n🛡️ **Phòng thủ giảm sát thương!** (Phòng thủ: ${opponentDefense} → -${(opponentDefenseReduction * 100).toFixed(1)}% sát thương)` : '';
       
-      let userCritText = userCrits ? ` (CRITICAL HIT! x2 damage!)` : '';
-      let opponentCritText = opponentCrits ? ` (CRITICAL HIT! x2 damage!)` : '';
+      let userCritText = userCrits ? `\n💥 **CHÍ MẠNG!** (May mắn: ${userLuck} → Tỷ lệ chí mạng: ${(userCritChance * 100).toFixed(1)}% → x2 sát thương!)` : '';
+      let opponentCritText = opponentCrits ? `\n💥 **CHÍ MẠNG!** (May mắn: ${opponentLuck} → Tỷ lệ chí mạng: ${(opponentCritChance * 100).toFixed(1)}% → x2 sát thương!)` : '';
       
-      let userMissText = !userHits ? ` (MISS! 0 damage!)` : '';
-      let opponentMissText = !opponentHits ? ` (MISS! 0 damage!)` : '';
+      let userMissText = !userHits ? `\n❌ **ĐÁNH TRƯỢT!** (Độ chính xác: ${userAccuracy} → Tỷ lệ trúng: ${(userHitChance * 100).toFixed(1)}% → 0 sát thương!)` : '';
+      let opponentMissText = !opponentHits ? `\n❌ **ĐÁNH TRƯỢT!** (Độ chính xác: ${opponentAccuracy} → Tỷ lệ trúng: ${(opponentHitChance * 100).toFixed(1)}% → 0 sát thương!)` : '';
+      
+      // Tạo damage comparison text
+      let userDamageComparison = userOriginalDamage !== userDamage ? ` (${userOriginalDamage} → ${userDamage})` : '';
+      let opponentDamageComparison = opponentOriginalDamage !== opponentDamage ? ` (${opponentOriginalDamage} → ${opponentDamage})` : '';
       
       // Áp dụng damage theo thứ tự tấn công và log
       if (userAttacksFirst) {
         // User tấn công trước
         opponentHP = Math.max(0, opponentHP - userDamage);
-        battleLog.push(`💥 ${userFish.species} gây ${userDamage} damage!${userDodgeText}${opponentDefenseText}${userCritText}${userMissText} ${opponentName} còn ${opponentHP}/${opponentMaxHP} HP`);
+        battleLog.push(`💥 ${userFish.species} gây ${userDamage} sát thương!${userDamageComparison}${userCritText}${userMissText}${opponentDodgeText}${opponentDefenseText} ${opponentName} còn ${opponentHP}/${opponentMaxHP} HP`);
         
         if (opponentHP > 0) {
           userHP = Math.max(0, userHP - opponentDamage);
-          battleLog.push(`💥 ${opponentName} gây ${opponentDamage} damage!${opponentDodgeText}${userDefenseText}${opponentCritText}${opponentMissText} ${userFish.species} còn ${userHP}/${userMaxHP} HP`);
+          battleLog.push(`💥 ${opponentName} gây ${opponentDamage} sát thương!${opponentDamageComparison}${opponentCritText}${opponentMissText}${userDodgeText}${userDefenseText} ${userFish.species} còn ${userHP}/${userMaxHP} HP`);
         }
       } else {
         // Opponent tấn công trước
         userHP = Math.max(0, userHP - opponentDamage);
-        battleLog.push(`💥 ${opponentName} gây ${opponentDamage} damage!${opponentDodgeText}${userDefenseText}${opponentCritText}${opponentMissText} ${userFish.species} còn ${userHP}/${userMaxHP} HP`);
+        battleLog.push(`💥 ${opponentName} gây ${opponentDamage} sát thương!${opponentDamageComparison}${opponentCritText}${opponentMissText}${userDodgeText}${userDefenseText} ${userFish.species} còn ${userHP}/${userMaxHP} HP`);
         
         if (userHP > 0) {
           opponentHP = Math.max(0, opponentHP - userDamage);
-          battleLog.push(`💥 ${userFish.species} gây ${userDamage} damage!${userDodgeText}${opponentDefenseText}${userCritText}${userMissText} ${opponentName} còn ${opponentHP}/${opponentMaxHP} HP`);
+          battleLog.push(`💥 ${userFish.species} gây ${userDamage} sát thương!${userDamageComparison}${userCritText}${userMissText}${opponentDodgeText}${opponentDefenseText} ${opponentName} còn ${opponentHP}/${opponentMaxHP} HP`);
         }
       }
       
@@ -941,14 +956,7 @@ export class FishBattleService {
       }
     }
 
-    // Hiển thị kết quả
-    if (battleType === 'upset') {
-      battleLog.push(`\n🎭 **${winner.species} chiến thắng trong trận đấu đầy bất ngờ!**`);
-    } else if (battleType === 'tie') {
-      battleLog.push(`\n🤝 **${winner.species} chiến thắng sau trận đấu cân bằng!**`);
-    } else {
-      battleLog.push(`\n🏆 **${winner.species} chiến thắng!**`);
-    }
+    // Kết quả đã được hiển thị ở trên, không cần duplicate
 
     // === PHASE 7: TÍNH TOÁN PHẦN THƯỞNG ===
     battleLog.push(`\n💰 **PHASE 7: Tính toán phần thưởng**`);

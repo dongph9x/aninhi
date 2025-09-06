@@ -800,8 +800,31 @@ ${combinedFrames}
                     }
                 }
                 
-                // Tạo action message đa dạng cho từng hiệp
+                // Tạo action message với thông tin chi tiết về các hiệu ứng đặc biệt
                 let action = '';
+                let specialEffects = [];
+                
+                // Kiểm tra các hiệu ứng đặc biệt
+                if (userCrits) {
+                    specialEffects.push(`💥 **${userFish.species} CHÍ MẠNG!** (May mắn: ${userLuck})`);
+                }
+                if (opponentCrits) {
+                    specialEffects.push(`💥 **${opponentFish.species} CHÍ MẠNG!** (May mắn: ${opponentLuck})`);
+                }
+                if (userDodges) {
+                    specialEffects.push(`🛡️ **${userFish.species} NÉ!** (Nhanh nhẹn: ${userAgility})`);
+                }
+                if (opponentDodges) {
+                    specialEffects.push(`🛡️ **${opponentFish.species} NÉ!** (Nhanh nhẹn: ${opponentAgility})`);
+                }
+                if (!userHits) {
+                    specialEffects.push(`❌ **${userFish.species} ĐÁNH TRƯỢT!** (Độ chính xác: ${userAccuracy})`);
+                }
+                if (!opponentHits) {
+                    specialEffects.push(`❌ **${opponentFish.species} ĐÁNH TRƯỢT!** (Độ chính xác: ${opponentAccuracy})`);
+                }
+                
+                // Tạo action message cơ bản
                 switch (roundNumber) {
                     case 1:
                         action = `💥 Giao tranh dữ dội! Cả hai đều bị thương!`;
@@ -836,6 +859,11 @@ ${combinedFrames}
                     default:
                         action = `🔥 Hiệp ${roundNumber}! Quyết định thắng thua!`;
                         break;
+                }
+                
+                // Thêm thông tin hiệu ứng đặc biệt nếu có
+                if (specialEffects.length > 0) {
+                    action += `\n${specialEffects.join(' | ')}`;
                 }
                 
                 rounds.push({

@@ -135,8 +135,10 @@ export class BattleLogHandler {
         
         // Tìm thông tin damage và HP
         let summary = `Hiệp ${roundNumber}`;
+        let specialEffects = [];
         
         for (const line of round) {
+            // Tìm thông tin HP
             if (line.includes('damage!') && line.includes('còn')) {
                 const hpMatch = line.match(/còn (\d+)\/(\d+) HP/);
                 if (hpMatch) {
@@ -147,6 +149,22 @@ export class BattleLogHandler {
                     break;
                 }
             }
+            
+            // Tìm các hiệu ứng đặc biệt
+            if (line.includes('CHÍ MẠNG!')) {
+                specialEffects.push('💥 Chí mạng');
+            }
+            if (line.includes('NÉ!')) {
+                specialEffects.push('🛡️ Né');
+            }
+            if (line.includes('ĐÁNH TRƯỢT!')) {
+                specialEffects.push('❌ Trượt');
+            }
+        }
+        
+        // Thêm thông tin hiệu ứng đặc biệt
+        if (specialEffects.length > 0) {
+            summary += ` - ${specialEffects.join(', ')}`;
         }
         
         // Giới hạn độ dài
@@ -175,17 +193,45 @@ export class BattleLogHandler {
             }
             
             if (selectedValue === 'all_rounds') {
-                // Hiển thị tất cả rounds
-                const allRoundsEmbed = new EmbedBuilder()
-                    .setTitle('📜 Toàn Bộ Trận Đấu')
-                    .setColor(0x4ECDC4)
-                    .setDescription('```\n' + battleLog.join('\n') + '\n```')
-                    .setTimestamp();
+                // Hiển thị tất cả rounds (chia nhỏ nếu quá dài)
+                const fullLog = battleLog.join('\n');
+                const maxLength = 4000; // Để lại chỗ cho ``` và các ký tự khác
                 
-                await interaction.reply({
-                    embeds: [allRoundsEmbed],
-                    ephemeral: true
-                });
+                if (fullLog.length <= maxLength) {
+                    // Log ngắn, hiển thị bình thường
+                    const allRoundsEmbed = new EmbedBuilder()
+                        .setTitle('📜 Toàn Bộ Trận Đấu')
+                        .setColor(0x4ECDC4)
+                        .setDescription('```\n' + fullLog + '\n```')
+                        .setTimestamp();
+                    
+                    await interaction.reply({
+                        embeds: [allRoundsEmbed],
+                        ephemeral: true
+                    });
+                } else {
+                    // Log dài, chia thành nhiều embed
+                    const chunks = this.splitLogIntoChunks(fullLog, maxLength);
+                    const embeds = chunks.map((chunk, index) => {
+                        const embed = new EmbedBuilder()
+                            .setColor(0x4ECDC4)
+                            .setTimestamp();
+                        
+                        if (index === 0) {
+                            embed.setTitle('📜 Toàn Bộ Trận Đấu (Phần 1)');
+                        } else {
+                            embed.setTitle(`📜 Toàn Bộ Trận Đấu (Phần ${index + 1})`);
+                        }
+                        
+                        embed.setDescription('```\n' + chunk + '\n```');
+                        return embed;
+                    });
+                    
+                    await interaction.reply({
+                        embeds: embeds,
+                        ephemeral: true
+                    });
+                }
             } else {
                 // Hiển thị hiệp cụ thể
                 const roundNumber = parseInt(selectedValue.replace('round_', ''));
@@ -221,15 +267,59 @@ export class BattleLogHandler {
             });
         }
     }
-    
+
     /**
-     * Chia string thành các chunk nhỏ hơn
+     * Chia log thành các chunk nhỏ hơn để tránh vượt quá giới hạn Discord
      */
-    private static chunkString(str: string, chunkSize: number): string[] {
+    private static splitLogIntoChunks(log: string, maxLength: number): string[] {
         const chunks: string[] = [];
-        for (let i = 0; i < str.length; i += chunkSize) {
-            chunks.push(str.slice(i, i + chunkSize));
+        const lines = log.split('\n');
+        let currentChunk = '';
+        
+        for (const line of lines) {
+            // Nếu thêm line này sẽ vượt quá maxLength
+            if (currentChunk.length + line.length + 1 > maxLength) {
+                if (currentChunk.length > 0) {
+                    chunks.push(currentChunk.trim());
+                    currentChunk = '';
+                }
+                
+                // Nếu line đơn lẻ quá dài, cắt nó
+                if (line.length > maxLength) {
+                    const subChunks = this.splitLongLine(line, maxLength);
+                    chunks.push(...subChunks);
+                } else {
+                    currentChunk = line;
+                }
+            } else {
+                currentChunk += (currentChunk ? '\n' : '') + line;
+            }
         }
+        
+        if (currentChunk.length > 0) {
+            chunks.push(currentChunk.trim());
+        }
+        
         return chunks;
     }
+
+    /**
+     * Cắt một dòng dài thành nhiều chunk
+     */
+    private static splitLongLine(line: string, maxLength: number): string[] {
+        const chunks: string[] = [];
+        let remaining = line;
+        
+        while (remaining.length > maxLength) {
+            chunks.push(remaining.substring(0, maxLength));
+            remaining = remaining.substring(maxLength);
+        }
+        
+        if (remaining.length > 0) {
+            chunks.push(remaining);
+        }
+        
+        return chunks;
+    }
+    
 }
