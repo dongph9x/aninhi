@@ -272,18 +272,57 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
         .setDescription(embedDescription)
         .setTimestamp();
 
-    const battleMessage = await message.reply({ embeds: [embed] });
-    
-    // Thêm reaction để xác nhận đấu
-    await battleMessage.react('⚔️');
+    // Tạo buttons Accept và Cancel
+    const acceptButton = new ButtonBuilder()
+        .setCustomId(`battle_accept_${selectedFish.id}_${opponentResult.opponent.id}`)
+        .setLabel(' Chấp Nhận Đấu')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('⚔️');
 
-    // Tạo collector để chờ reaction
-    const filter = (reaction: any, user: any) => reaction.emoji.name === '⚔️' && user.id === userId;
-    const collector = battleMessage.createReactionCollector({ filter, time: 30000, max: 1 });
+    const cancelButton = new ButtonBuilder()
+        .setCustomId(`battle_cancel_${selectedFish.id}_${opponentResult.opponent.id}`)
+        .setLabel(' Hủy Đấu')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('❌');
 
-    collector.on('collect', async (collected: any, user: any) => {
-        // Bắt đầu battle với visual system mới - kết thúc khi HP về 0
-        try {
+    const buttonRow = new ActionRowBuilder<ButtonBuilder>()
+        .addComponents(acceptButton, cancelButton);
+
+    const battleMessage = await message.reply({ 
+        embeds: [embed], 
+        components: [buttonRow] 
+    });
+
+    // Tạo collector để chờ button interaction
+    const buttonFilter = (interaction: any) => interaction.user.id === userId;
+    const buttonCollector = battleMessage.createMessageComponentCollector({ 
+        filter: buttonFilter, 
+        time: 30000, 
+        max: 1 
+    });
+
+    buttonCollector.on('collect', async (interaction: any) => {
+        if (interaction.customId.startsWith('battle_cancel_')) {
+            // Người dùng hủy đấu
+            const cancelEmbed = new EmbedBuilder()
+                .setTitle('❌ Đã Hủy Đấu')
+                .setColor('#FF0000')
+                .setDescription('Bạn đã hủy trận đấu.')
+                .setTimestamp();
+
+            await interaction.update({ 
+                embeds: [cancelEmbed], 
+                components: [] 
+            });
+            return;
+        }
+
+        if (interaction.customId.startsWith('battle_accept_')) {
+            // Người dùng chấp nhận đấu
+            await interaction.deferUpdate();
+
+            // Bắt đầu battle với visual system mới - kết thúc khi HP về 0
+            try {
             // Import BattleVisualSystem
             const { BattleVisualSystem } = await import("@/utils/battle-visual");
             
@@ -460,10 +499,11 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
                 embeds: [battleEmbed],
                 components: fallbackComponents.length > 0 ? fallbackComponents : undefined
             });
+            }
         }
     });
 
-    collector.on('end', (collected: any) => {
+    buttonCollector.on('end', (collected: any) => {
         if (collected.size === 0) {
             const timeoutEmbed = new EmbedBuilder()
                 .setTitle('⏰ Hết thời gian!')
@@ -471,7 +511,7 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
                 .setDescription('Bạn không phản hồi kịp thời. Trận đấu bị hủy.')
                 .setTimestamp();
 
-            battleMessage.edit({ embeds: [timeoutEmbed] });
+            battleMessage.edit({ embeds: [timeoutEmbed], components: [] });
         }
     });
 }
