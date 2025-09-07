@@ -918,6 +918,22 @@ async function invitePlayerToBattle(message: any, userId: string, guildId: strin
             const targetInventory = await BattleFishInventoryService.getBattleFishInventory(targetId, guildId);
             const targetFish = targetInventory.items[0].fish;
 
+            // Ẩn buttons ngay khi bắt đầu battle
+            const battleStartEmbed = new EmbedBuilder()
+                .setTitle('⚔️ Trận Đấu Đang Diễn Ra!')
+                .setColor('#FF6B6B')
+                .setDescription('Trận đấu đang được xử lý, vui lòng chờ...')
+                .setTimestamp();
+
+            try {
+                await inviteMessage.edit({ 
+                    embeds: [battleStartEmbed], 
+                    components: [] // Ẩn tất cả buttons
+                });
+            } catch (error) {
+                console.error('Error hiding buttons at battle start:', error);
+            }
+
             // Bắt đầu battle
             try {
                 // Import BattleVisualSystem
