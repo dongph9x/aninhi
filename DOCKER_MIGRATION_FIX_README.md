@@ -149,22 +149,22 @@ chmod +x docker-migration-fix.sh
 ### **2. Manual Steps (Alternative)**
 ```bash
 # 1. Stop containers
-docker-compose down
+docker compose down
 
 # 2. Remove old database volume
 docker volume rm aninhi_postgres_data
 
 # 3. Start containers
-docker-compose up -d --build
+docker compose up -d --build
 
 # 4. Wait for database
 sleep 10
 
 # 5. Run migrations
-docker-compose exec app npx prisma migrate deploy
+docker compose exec app npx prisma migrate deploy
 
 # 6. Generate client
-docker-compose exec app npx prisma generate
+docker compose exec app npx prisma generate
 ```
 
 ## 📊 Database Schema
@@ -321,10 +321,10 @@ const migrateExistingFish = async () => {
 ### **2. Backup Before Migration**
 ```bash
 # Backup database trước khi migration
-docker-compose exec postgres pg_dump -U postgres aninhi > backup.sql
+docker compose exec postgres pg_dump -U postgres aninhi > backup.sql
 
 # Restore nếu cần
-docker-compose exec -T postgres psql -U postgres aninhi < backup.sql
+docker compose exec -T postgres psql -U postgres aninhi < backup.sql
 ```
 
 ### **3. Health Check**
