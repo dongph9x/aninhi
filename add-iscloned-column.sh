@@ -12,18 +12,46 @@ const prisma = new PrismaClient();
 
 async function addCloningColumns() {
   try {
-    console.log('🔄 Adding isCloned column...');
-    await prisma.\$executeRaw\`ALTER TABLE \"Fish\" ADD COLUMN IF NOT EXISTS \"isCloned\" BOOLEAN NOT NULL DEFAULT false\`;
+    // Kiểm tra xem cột đã tồn tại chưa
+    console.log('🔍 Checking existing columns...');
+    const tableInfo = await prisma.\$queryRaw\`PRAGMA table_info(Fish)\`;
+    const existingColumns = tableInfo.map(col => col.name);
     
-    console.log('🔄 Adding clonedFrom column...');
-    await prisma.\$executeRaw\`ALTER TABLE \"Fish\" ADD COLUMN IF NOT EXISTS \"clonedFrom\" TEXT\`;
+    if (!existingColumns.includes('isCloned')) {
+      console.log('🔄 Adding isCloned column...');
+      await prisma.\$executeRaw\`ALTER TABLE \"Fish\" ADD COLUMN \"isCloned\" BOOLEAN NOT NULL DEFAULT false\`;
+    } else {
+      console.log('✅ isCloned column already exists');
+    }
     
-    console.log('🔄 Adding clonedAt column...');
-    await prisma.\$executeRaw\`ALTER TABLE \"Fish\" ADD COLUMN IF NOT EXISTS \"clonedAt\" DATETIME\`;
+    if (!existingColumns.includes('clonedFrom')) {
+      console.log('🔄 Adding clonedFrom column...');
+      await prisma.\$executeRaw\`ALTER TABLE \"Fish\" ADD COLUMN \"clonedFrom\" TEXT\`;
+    } else {
+      console.log('✅ clonedFrom column already exists');
+    }
+    
+    if (!existingColumns.includes('clonedAt')) {
+      console.log('🔄 Adding clonedAt column...');
+      await prisma.\$executeRaw\`ALTER TABLE \"Fish\" ADD COLUMN \"clonedAt\" DATETIME\`;
+    } else {
+      console.log('✅ clonedAt column already exists');
+    }
     
     console.log('🔄 Creating indexes...');
-    await prisma.\$executeRaw\`CREATE INDEX IF NOT EXISTS \"Fish_isCloned_idx\" ON \"Fish\"(\"isCloned\")\`;
-    await prisma.\$executeRaw\`CREATE INDEX IF NOT EXISTS \"Fish_clonedFrom_idx\" ON \"Fish\"(\"clonedFrom\")\`;
+    try {
+      await prisma.\$executeRaw\`CREATE INDEX \"Fish_isCloned_idx\" ON \"Fish\"(\"isCloned\")\`;
+      console.log('✅ Fish_isCloned_idx created');
+    } catch (e) {
+      console.log('ℹ️ Fish_isCloned_idx already exists');
+    }
+    
+    try {
+      await prisma.\$executeRaw\`CREATE INDEX \"Fish_clonedFrom_idx\" ON \"Fish\"(\"clonedFrom\")\`;
+      console.log('✅ Fish_clonedFrom_idx created');
+    } catch (e) {
+      console.log('ℹ️ Fish_clonedFrom_idx already exists');
+    }
     
     console.log('✅ All cloning columns and indexes added successfully!');
   } catch (error) {
