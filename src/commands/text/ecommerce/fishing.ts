@@ -479,6 +479,10 @@ async function fishWithAnimation(message: Message) {
                     generation: 1,
                     specialTraits: JSON.stringify(['Caught']),
                     status: 'growing',
+                    // Cloning fields (default values for new fish)
+                    isCloned: false,
+                    clonedFrom: null,
+                    clonedAt: null,
                 };
                 
                 const createdFish = await prisma.fish.create({ data: fishData });

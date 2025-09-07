@@ -162,7 +162,11 @@ export default Bot.createCommand({
                             generation: 1,
                             status: 'growing',
                             stats: JSON.stringify({ strength: 10, agility: 10, intelligence: 10, defense: 10, luck: 10 }),
-                            specialTraits: JSON.stringify(['Simulated Test'])
+                            specialTraits: JSON.stringify(['Simulated Test']),
+                            // Cloning fields (default values for new fish)
+                            isCloned: false,
+                            clonedFrom: null,
+                            clonedAt: null,
                         }
                     });
                     

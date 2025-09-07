@@ -68,6 +68,10 @@ export class FishBreedingService {
                   status: 'growing',
                   // Thêm stats mặc định cho cá mới
                   stats: JSON.stringify(this.generateEmptyStats()), // Cá thế hệ 1 không có stats
+                  // Cloning fields (default values for new fish)
+                  isCloned: false,
+                  clonedFrom: null,
+                  clonedAt: null,
                   createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 giờ trước
                   updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 giờ trước để có thể cho ăn ngay
                 };
@@ -493,6 +497,10 @@ export class FishBreedingService {
         specialTraits: JSON.stringify(inheritedTraits),
         stats: JSON.stringify(inheritedStats),
         status: 'growing',
+        // Cloning fields (default values for new fish)
+        isCloned: false,
+        clonedFrom: null,
+        clonedAt: null,
       }
     });
     
