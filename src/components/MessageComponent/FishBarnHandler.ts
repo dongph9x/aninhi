@@ -1035,6 +1035,7 @@ export class FishBarnHandler {
   private static async levelUpFishToMax(fishId: string): Promise<{ success: boolean; newValue?: number; error?: string }> {
     try {
       const prisma = (await import('@/utils/prisma')).default;
+      const { FishBreedingService } = await import('../../utils/fish-breeding');
       
       // Lấy thông tin cá hiện tại
       const currentFish = await prisma.fish.findUnique({
@@ -1055,6 +1056,20 @@ export class FishBarnHandler {
       const levelBonus = (10 - currentFish.level) * 0.02;
       const newValue = Math.floor(Number(currentFish.value) * (1 + levelBonus));
 
+      // Tăng stats cho cá gen 2+ từ level hiện tại lên level 10
+      let newStats = currentFish.stats;
+      if (currentFish.generation >= 2) {
+        let currentStats = JSON.parse(currentFish.stats || '{}');
+        
+        // Tăng stats cho mỗi level từ level hiện tại lên level 10
+        for (let level = currentFish.level; level < 10; level++) {
+          currentStats = FishBreedingService.increaseStatsOnLevelUp(currentStats);
+        }
+        
+        newStats = JSON.stringify(currentStats);
+        console.log(`🚀 Level up stats for fish ${currentFish.species} (Gen ${currentFish.generation}):`, currentStats);
+      }
+
       // Cập nhật cá lên level 10
       const updatedFish = await prisma.fish.update({
         where: { id: fishId },
@@ -1063,6 +1078,7 @@ export class FishBarnHandler {
           experience: 0, // Reset experience về 0 khi đạt max level
           value: BigInt(newValue),
           status: 'adult', // Tự động chuyển sang trạng thái trưởng thành
+          stats: newStats, // Cập nhật stats mới
           updatedAt: new Date()
         }
       });
