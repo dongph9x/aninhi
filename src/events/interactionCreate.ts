@@ -249,6 +249,13 @@ export default Bot.createEvent({
                 return;
             }
 
+            // Kiểm tra xem có phải battle invite buttons không
+            if (interaction.customId.startsWith('battle_invite_accept_') || interaction.customId.startsWith('battle_invite_decline_')) {
+                // Các buttons này được xử lý trực tiếp trong fishbattle.ts command
+                // Không cần xử lý ở đây vì chúng đã có collector riêng
+                return;
+            }
+
             // Kiểm tra xem có phải vote kick button không
             try {
                 const voteKickData = JSON.parse(interaction.customId);

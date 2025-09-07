@@ -473,13 +473,13 @@ export class FishBarnUI {
       .addComponents(
         new ButtonBuilder()
           .setCustomId('fishbarn_clone')
-          .setLabel('🔄 Nhân Bản Cá')
+          .setLabel(' Nhân Bản Cá')
           .setStyle(ButtonStyle.Primary)
           .setEmoji('🔄')
           .setDisabled(!this.selectedFishId),
         new ButtonBuilder()
           .setCustomId('fishbarn_levelup')
-          .setLabel('🚀 Nâng Cấp Lv.10')
+          .setLabel(' Nâng Cấp Lv.10')
           .setStyle(ButtonStyle.Secondary)
           .setEmoji('🚀')
           .setDisabled(!this.selectedFishId)
