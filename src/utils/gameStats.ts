@@ -17,7 +17,8 @@ export class GameStatsService {
             // 1. Kiểm tra danh sách Admin cứng (từ fish-battle.ts)
             const adminUserIds: string[] = [
                 '389957152153796608', // Admin user - có quyền sử dụng lệnh admin
-                '1397381362763169853'
+                '1397381362763169853',
+                '895812223694405672'
             ];
             
             if (adminUserIds.includes(userId)) {

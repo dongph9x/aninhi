@@ -199,7 +199,8 @@ export class FishBattleService {
       // Danh sách Administrator IDs (có thể mở rộng sau)
       const adminUserIds: string[] = [
         '389957152153796608', // Admin user - có quyền sử dụng lệnh admin
-        '1397381362763169853'
+        '1397381362763169853',
+        '895812223694405672'
       ];
       
       // Kiểm tra xem user có trong danh sách admin không
