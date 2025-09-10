@@ -108,7 +108,7 @@ async function showBattleHelp(message: any) {
         .setColor('#FF6B6B')
         .setDescription('Đấu cá với các thuộc tính di truyền!')
         .addFields(
-            { name: '🎯 Cách sử dụng', value: '`n.fishbattle ui` - Mở giao diện đấu cá (Khuyến nghị)\n`n.fishbattle` - Tìm đối thủ ngẫu nhiên\n`n.fishbattle invite @người_chơi` - Mời người chơi khác đấu cá\n`n.fishbattle add <fish_id>` - Thêm cá vào túi đấu\n`n.fishbattle list` - Xem túi đấu cá\n`n.fishbattle remove <fish_id>` - Xóa cá khỏi túi đấu\n`n.fishbattle stats` - Xem thống kê đấu cá\n`n.fishbattle history` - Xem lịch sử đấu gần đây\n`n.fishbattle leaderboard` - Bảng xếp hạng đấu cá', inline: false },
+            { name: '🎯 Cách sử dụng', value: '`n.fishbattle ui` - Mở giao diện đấu cá (Khuyến nghị)\n`n.fishbattle` - Tìm đối thủ ngẫu nhiên\n`n.fishbattle invite @người_chơi` - Mời người chơi khác đấu cá\n`n.fishbattle add <fish_id>` - Thêm cá vào túi đấu\n`n.fishbattle list` - Xem túi đấu cá\n`n.fishbattle remove <fish_id>` - Xóa cá khỏi túi đấu\n`n.fishbattle stats` - Xem thống kê đấu cá\n`n.fishbattle history` - Xem lịch sử đấu gần đây\n`n.fishbattle leaderboard` - Bảng xếp hạng đấu cá\n**Trong UI:** Chọn cá và nhấn "✏️ Đổi Tên" để đổi tên cá', inline: false },
             { name: '📊 Thuộc tính cá', value: '💪 Sức mạnh | 🏃 Thể lực | 🧠 Trí tuệ | 🛡️ Phòng thủ | 🍀 May mắn', inline: false },
             { name: '💰 Phần thưởng', value: 'Người thắng: 150% sức mạnh tổng\nNgười thua: 30% sức mạnh tổng', inline: false },
             { name: '⚠️ Điều kiện cá đấu', value: '• Phải là cá thế hệ 2 trở lên\n• Phải là cá trưởng thành (level 10)\n• Túi đấu tối đa 5 cá', inline: false },

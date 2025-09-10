@@ -370,6 +370,22 @@ export default Bot.createEvent({
                 return;
             }
 
+            // Kiểm tra xem có phải battle fish rename modal không
+            if (interaction.customId.startsWith('rename_fish_modal_')) {
+                console.log("Battle fish rename modal submitted");
+                
+                try {
+                    const { BattleFishHandler } = await import("../components/MessageComponent/BattleFishHandler");
+                    await BattleFishHandler.handleInteraction(interaction);
+                } catch (error) {
+                    console.error("Error handling Battle fish rename modal:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý modal đổi tên cá!`);
+                    }
+                }
+                return;
+            }
+
             try {
                 const payload: CustomIdData = JSON.parse(interaction.customId);
                 const component = client.components.modalSubmit.get(payload.n);

@@ -162,7 +162,7 @@ export class BattleFishUI {
         // Thông tin hướng dẫn
         embed.addFields({
             name: '🎯 Cách Sử Dụng',
-            value: '1. **Chọn cá** từ dropdown bên dưới để xem chi tiết\n2. **Thêm cá** vào túi đấu\n3. **Tìm đối thủ** để đấu\n4. **Xóa cá** khỏi túi đấu nếu cần',
+            value: '1. **Chọn cá** từ dropdown bên dưới để xem chi tiết\n2. **Thêm cá** vào túi đấu\n3. **Tìm đối thủ** để đấu\n4. **Xóa cá** khỏi túi đấu nếu cần\n5. **Đổi tên cá** trong túi đấu',
             inline: false
         });
 
@@ -256,7 +256,14 @@ export class BattleFishUI {
             .setLabel('📊 Thống Kê')
             .setStyle(ButtonStyle.Secondary);
 
-        buttonRow.addComponents(addButton, battleButton, removeButton, statsButton);
+        // Nút đổi tên cá
+        const renameButton = new ButtonBuilder()
+            .setCustomId('battle_fish_rename')
+            .setLabel('✏️ Đổi Tên')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(!this.selectedFishId || !this.selectedFishId.startsWith('battle_'));
+
+        buttonRow.addComponents(addButton, battleButton, removeButton, statsButton, renameButton);
         rows.push(buttonRow);
 
         // Row 3: Các nút phụ
@@ -315,6 +322,11 @@ export class BattleFishUI {
 
     // Kiểm tra xem có thể xóa cá được chọn không
     canRemoveSelectedFish(): boolean {
+        return this.selectedFishId !== undefined && this.selectedFishId.startsWith('battle_');
+    }
+
+    // Kiểm tra xem có thể đổi tên cá được chọn không
+    canRenameSelectedFish(): boolean {
         return this.selectedFishId !== undefined && this.selectedFishId.startsWith('battle_');
     }
 

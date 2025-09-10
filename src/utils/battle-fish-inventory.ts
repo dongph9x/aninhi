@@ -277,4 +277,77 @@ export class BattleFishInventoryService {
         canBreed: fish.status === 'adult',
       }));
   }
+
+  /**
+   * Đổi tên cá trong battle inventory
+   */
+  static async renameFish(userId: string, guildId: string, fishId: string, newName: string) {
+    try {
+      // Kiểm tra xem cá có tồn tại và thuộc về user không
+      const fish = await prisma.fish.findFirst({
+        where: {
+          id: fishId,
+          userId,
+          guildId
+        }
+      });
+
+      if (!fish) {
+        return {
+          success: false,
+          error: 'Không tìm thấy cá hoặc bạn không sở hữu cá này!'
+        };
+      }
+
+      // Kiểm tra xem cá có trong battle inventory không
+      const battleInventory = await this.getBattleFishInventory(userId, guildId);
+      const isInBattleInventory = battleInventory.items.some((item: any) => item.fish.id === fishId);
+
+      if (!isInBattleInventory) {
+        return {
+          success: false,
+          error: 'Cá này không có trong túi đấu!'
+        };
+      }
+
+      // Kiểm tra độ dài tên mới
+      if (newName.length < 1 || newName.length > 50) {
+        return {
+          success: false,
+          error: 'Tên cá phải từ 1 đến 50 ký tự!'
+        };
+      }
+
+      // Kiểm tra ký tự đặc biệt
+      const allowedPattern = /^[a-zA-Z0-9\s\u00C0-\u1EF9\u1EA0-\u1EFF\u0102\u0103\u00C2\u00E2\u00CA\u00EA\u00D4\u00F4\u01A0\u01A1\u01AF\u01B0\u0110\u0111]+$/;
+      if (!allowedPattern.test(newName)) {
+        return {
+          success: false,
+          error: 'Tên cá chỉ được chứa chữ cái, số và khoảng trắng!'
+        };
+      }
+
+      // Cập nhật tên cá
+      const updatedFish = await prisma.fish.update({
+        where: { id: fishId },
+        data: { species: newName.trim() }
+      });
+
+      return {
+        success: true,
+        fish: {
+          ...updatedFish,
+          name: updatedFish.species,
+          stats: JSON.parse(updatedFish.stats || '{}'),
+          traits: JSON.parse(updatedFish.specialTraits || '[]')
+        }
+      };
+    } catch (error) {
+      console.error('Error renaming fish:', error);
+      return {
+        success: false,
+        error: 'Có lỗi xảy ra khi đổi tên cá!'
+      };
+    }
+  }
 } 

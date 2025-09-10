@@ -1,6 +1,7 @@
 import { 
     ButtonInteraction, 
     StringSelectMenuInteraction, 
+    ModalSubmitInteraction,
     EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
@@ -23,33 +24,47 @@ export class BattleFishHandler {
         currentUserFish?: any;
     }>();
 
-    static async handleInteraction(interaction: ButtonInteraction | StringSelectMenuInteraction) {
+    static async handleInteraction(interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction) {
         const customId = interaction.customId;
-        const messageId = interaction.message.id;
         const userId = interaction.user.id;
         const guildId = interaction.guildId!;
 
         console.log(`🔍 [DEBUG] handleInteraction called:`);
         console.log(`  - customId: ${customId}`);
-        console.log(`  - messageId: ${messageId}`);
         console.log(`  - userId: ${userId}`);
         console.log(`  - guildId: ${guildId}`);
         console.log(`  - Cache size: ${this.battleFishMessages.size}`);
 
-        // Lấy thông tin message từ cache
-        let messageData = this.battleFishMessages.get(messageId);
+        // Đối với modal submit, không có messageId, tìm bằng userId và guildId
+        let messageData: any = null;
         
-        // Fallback: Tìm data bằng user ID và guild ID nếu không tìm thấy bằng message ID
-        if (!messageData) {
-            console.log(`  - ❌ No messageData found for messageId: ${messageId}`);
-            console.log(`  - Available keys: ${Array.from(this.battleFishMessages.keys()).join(', ')}`);
-            
-            // Tìm data bằng user ID và guild ID
+        if (interaction.isModalSubmit()) {
+            // Tìm data bằng user ID và guild ID cho modal submit
             for (const [key, data] of this.battleFishMessages.entries()) {
                 if (data.userId === userId && data.guildId === guildId) {
                     messageData = data;
-                    console.log(`  - ✅ Found messageData using fallback key: ${key}`);
+                    console.log(`  - ✅ Found messageData for modal using key: ${key}`);
                     break;
+                }
+            }
+        } else {
+            // Đối với button và select menu, sử dụng messageId
+            const messageId = interaction.message.id;
+            console.log(`  - messageId: ${messageId}`);
+            messageData = this.battleFishMessages.get(messageId);
+            
+            // Fallback: Tìm data bằng user ID và guild ID nếu không tìm thấy bằng message ID
+            if (!messageData) {
+                console.log(`  - ❌ No messageData found for messageId: ${messageId}`);
+                console.log(`  - Available keys: ${Array.from(this.battleFishMessages.keys()).join(', ')}`);
+                
+                // Tìm data bằng user ID và guild ID
+                for (const [key, data] of this.battleFishMessages.entries()) {
+                    if (data.userId === userId && data.guildId === guildId) {
+                        messageData = data;
+                        console.log(`  - ✅ Found messageData using fallback key: ${key}`);
+                        break;
+                    }
                 }
             }
         }
@@ -57,7 +72,7 @@ export class BattleFishHandler {
         console.log(`  - Found messageData: ${!!messageData}`);
         
         if (!messageData) {
-            console.log(`  - ❌ No messageData found for messageId: ${messageId}`);
+            console.log(`  - ❌ No messageData found`);
             console.log(`  - Available keys: ${Array.from(this.battleFishMessages.keys()).join(', ')}`);
             return interaction.reply({ 
                 content: '❌ Không tìm thấy dữ liệu hoặc bạn không phải chủ sở hữu!', 
@@ -82,6 +97,8 @@ export class BattleFishHandler {
                 await this.handleSelectMenu(interaction, messageData);
             } else if (interaction.isButton()) {
                 await this.handleButton(interaction, messageData);
+            } else if (interaction.isModalSubmit()) {
+                await this.handleModalSubmit(interaction, messageData);
             }
         } catch (error) {
             console.error('Error handling battle fish interaction:', error);
@@ -150,6 +167,9 @@ export class BattleFishHandler {
                 break;
             case 'battle_fish_help':
                 await this.handleShowHelp(interaction, messageData);
+                break;
+            case 'battle_fish_rename':
+                await this.handleRenameFish(interaction, messageData);
                 break;
             default:
                 await interaction.reply({ 
@@ -684,7 +704,7 @@ export class BattleFishHandler {
             .setColor('#FF6B6B')
             .setDescription('Hướng dẫn sử dụng hệ thống đấu cá!')
             .addFields(
-                { name: '🎯 Cách sử dụng', value: '1. **Chọn cá** từ dropdown\n2. **Thêm cá** vào túi đấu\n3. **Tìm đối thủ** để đấu\n4. **Xóa cá** khỏi túi đấu nếu cần', inline: false },
+                { name: '🎯 Cách sử dụng', value: '1. **Chọn cá** từ dropdown\n2. **Thêm cá** vào túi đấu\n3. **Tìm đối thủ** để đấu\n4. **Xóa cá** khỏi túi đấu nếu cần\n5. **Đổi tên cá** trong túi đấu', inline: false },
                 { name: '📊 Thuộc tính cá', value: '💪 Sức mạnh | 🏃 Thể lực | 🧠 Trí tuệ | 🛡️ Phòng thủ | 🍀 May mắn', inline: false },
                 { name: '💰 Phần thưởng', value: 'Người thắng: 150% sức mạnh tổng\nNgười thua: 30% sức mạnh tổng', inline: false },
                 { name: '⚠️ Điều kiện cá đấu', value: '• Phải là cá thế hệ 2 trở lên\n• Phải là cá trưởng thành (level 10)\n• Túi đấu tối đa 5 cá', inline: false }
@@ -692,6 +712,84 @@ export class BattleFishHandler {
             .setTimestamp();
 
         await interaction.reply({ embeds: [embed], ephemeral: true });
+    }
+
+    private static async handleRenameFish(interaction: ButtonInteraction, messageData: any) {
+        const actualFishId = messageData.selectedFishId?.replace('battle_', '');
+        
+        if (!actualFishId) {
+            await interaction.reply({ 
+                content: '❌ Vui lòng chọn cá trong túi đấu để đổi tên!', 
+                ephemeral: true 
+            });
+            return;
+        }
+
+        // Tìm cá được chọn để lấy tên hiện tại
+        const selectedItem = messageData.inventory.items.find((item: any) => item.fish.id === actualFishId);
+        if (!selectedItem) {
+            await interaction.reply({ 
+                content: '❌ Không tìm thấy cá được chọn!', 
+                ephemeral: true 
+            });
+            return;
+        }
+
+        const currentName = selectedItem.fish.name || selectedItem.fish.species;
+
+        // Tạo modal để nhập tên mới
+        const { ModalBuilder, TextInputBuilder, TextInputStyle } = await import('discord.js');
+        
+        const modal = new ModalBuilder()
+            .setCustomId(`rename_fish_modal_${actualFishId}`)
+            .setTitle('✏️ Đổi Tên Cá');
+
+        const nameInput = new TextInputBuilder()
+            .setCustomId('new_fish_name')
+            .setLabel('Tên mới cho cá')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder(`Nhập tên mới cho cá (hiện tại: ${currentName})`)
+            .setValue(currentName)
+            .setRequired(true)
+            .setMaxLength(50)
+            .setMinLength(1);
+
+        const actionRow = new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput);
+        modal.addComponents(actionRow);
+
+        await interaction.showModal(modal);
+    }
+
+    private static async handleModalSubmit(interaction: ModalSubmitInteraction, messageData: any) {
+        const customId = interaction.customId;
+        
+        if (customId.startsWith('rename_fish_modal_')) {
+            const fishId = customId.replace('rename_fish_modal_', '');
+            const newName = interaction.fields.getTextInputValue('new_fish_name');
+            
+            // Đổi tên cá
+            const result = await BattleFishInventoryService.renameFish(
+                messageData.userId,
+                messageData.guildId,
+                fishId,
+                newName
+            );
+
+            if (result.success) {
+                // Cập nhật dữ liệu
+                await this.updateMessageData(messageData);
+                
+                await interaction.reply({ 
+                    content: `✅ Đã đổi tên cá thành **${newName}**!\n💡 Sử dụng \`n.fishbattle ui\` để xem giao diện đã cập nhật.`, 
+                    ephemeral: true 
+                });
+            } else {
+                await interaction.reply({ 
+                    content: `❌ Không thể đổi tên cá: ${result.error}`, 
+                    ephemeral: true 
+                });
+            }
+        }
     }
 
     private static async updateMessageData(messageData: any) {
@@ -712,7 +810,12 @@ export class BattleFishHandler {
         );
     }
 
-    private static async refreshUI(interaction: ButtonInteraction | StringSelectMenuInteraction, messageData: any) {
+    private static async refreshUI(interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction, messageData: any) {
+        // Đối với modal submit, không thể refresh UI vì không có message
+        if (interaction.isModalSubmit()) {
+            return;
+        }
+
         // Sử dụng daily battle info từ messageData nếu có, nếu không thì lấy mới
         const dailyBattleInfo = messageData.dailyBattleInfo || await FishBattleService.checkAndResetDailyBattleCount(
             messageData.userId, 
