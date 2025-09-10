@@ -90,6 +90,68 @@ export default Bot.createEvent({
                 return;
             }
 
+            // Kiểm tra xem có phải fish skill interaction không
+            if (interaction.customId.startsWith("fish_skill_") || 
+                interaction.customId.startsWith("view_skills_") ||
+                interaction.customId.startsWith("view_fish_") ||
+                interaction.customId.startsWith("view_skill_")) {
+                console.log("FishSkill interaction:", interaction.customId);
+                
+                try {
+                    const { FishSkillHandler } = await import("../components/MessageComponent/FishSkillHandler");
+                    if (interaction.isButton() || interaction.isStringSelectMenu()) {
+                        await FishSkillHandler.handleInteraction(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling FishSkill interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác skill!`);
+                    }
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải skill shop interaction không
+            if (interaction.customId.startsWith("skill_shop_") || 
+                interaction.customId.startsWith("skill_inventory") ||
+                interaction.customId.startsWith("skill_shop_back_to_main")) {
+                console.log("SkillShop interaction:", interaction.customId);
+                
+                try {
+                    const { SkillShopHandler } = await import("../components/MessageComponent/SkillShopHandler");
+                    if (interaction.isButton() || interaction.isStringSelectMenu()) {
+                        await SkillShopHandler.handleInteraction(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling SkillShop interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác skill shop!`);
+                    }
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải fish skill interaction không
+            if (interaction.customId === "select_skill_element" || 
+                interaction.customId === "back_to_all_skills" || 
+                interaction.customId === "refresh_skills_view" ||
+                interaction.customId === "view_fish_skills") {
+                console.log("FishSkill interaction:", interaction.customId);
+                
+                try {
+                    const { FishSkillHandler } = await import("../components/MessageComponent/FishSkillHandler");
+                    if (interaction.isButton() || interaction.isStringSelectMenu()) {
+                        await FishSkillHandler.handleInteraction(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling FishSkill interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác fish skill!`);
+                    }
+                }
+                return;
+            }
+
             // Kiểm tra xem có phải battle fish interaction không
             if (interaction.customId.startsWith("battle_fish_")) {
                 console.log("BattleFish interaction:", interaction.customId);
@@ -287,7 +349,15 @@ export default Bot.createEvent({
             }
 
             try {
-                const payload: CustomIdData = JSON.parse(interaction.customId);
+                // Kiểm tra xem customId có phải JSON không
+                let payload: CustomIdData;
+                try {
+                    payload = JSON.parse(interaction.customId);
+                } catch (parseError) {
+                    // Không phải JSON, bỏ qua
+                    return;
+                }
+
                 const component = client.components.message.get(payload.n);
 
                 if (!component) {
@@ -381,6 +451,22 @@ export default Bot.createEvent({
                     console.error("Error handling Battle fish rename modal:", error);
                     if (!interaction.replied && !interaction.deferred) {
                         interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý modal đổi tên cá!`);
+                    }
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải fish skill modal không
+            if (interaction.customId.startsWith('forget_skill_modal_')) {
+                console.log("Fish skill forget modal submitted");
+                
+                try {
+                    const { FishSkillHandler } = await import("../components/MessageComponent/FishSkillHandler");
+                    await FishSkillHandler.handleModalSubmit(interaction);
+                } catch (error) {
+                    console.error("Error handling Fish skill forget modal:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý modal quên skill!`);
                     }
                 }
                 return;

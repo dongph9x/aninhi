@@ -5,6 +5,7 @@ import { BattleFishInventoryService } from "@/utils/battle-fish-inventory";
 import { FishBreedingService } from "@/utils/fish-breeding";
 import { BattleFishUI } from "@/components/MessageComponent/BattleFishUI";
 import { BattleFishHandler } from "@/components/MessageComponent/BattleFishHandler";
+import prisma from "@/utils/prisma";
 
 // Lưu trữ lời mời battle tạm thời
 interface BattleInvite {
@@ -62,6 +63,8 @@ export default Bot.createCommand({
                 return await showBattleLeaderboard(message, guildId);
             case "invite":
                 return await invitePlayerToBattle(message, userId, guildId, args.slice(1));
+            case "skills":
+                return await showFishSkills(message, userId, guildId, args.slice(1));
             default:
                 return await findRandomBattle(message, userId, guildId);
         }
@@ -108,7 +111,7 @@ async function showBattleHelp(message: any) {
         .setColor('#FF6B6B')
         .setDescription('Đấu cá với các thuộc tính di truyền!')
         .addFields(
-            { name: '🎯 Cách sử dụng', value: '`n.fishbattle ui` - Mở giao diện đấu cá (Khuyến nghị)\n`n.fishbattle` - Tìm đối thủ ngẫu nhiên\n`n.fishbattle invite @người_chơi` - Mời người chơi khác đấu cá\n`n.fishbattle add <fish_id>` - Thêm cá vào túi đấu\n`n.fishbattle list` - Xem túi đấu cá\n`n.fishbattle remove <fish_id>` - Xóa cá khỏi túi đấu\n`n.fishbattle stats` - Xem thống kê đấu cá\n`n.fishbattle history` - Xem lịch sử đấu gần đây\n`n.fishbattle leaderboard` - Bảng xếp hạng đấu cá\n**Trong UI:** Chọn cá và nhấn "✏️ Đổi Tên" để đổi tên cá', inline: false },
+            { name: '🎯 Cách sử dụng', value: '`n.fishbattle ui` - Mở giao diện đấu cá (Khuyến nghị)\n`n.fishbattle` - Tìm đối thủ ngẫu nhiên\n`n.fishbattle invite @người_chơi` - Mời người chơi khác đấu cá\n`n.fishbattle add <fish_id>` - Thêm cá vào túi đấu\n`n.fishbattle list` - Xem túi đấu cá\n`n.fishbattle remove <fish_id>` - Xóa cá khỏi túi đấu\n`n.fishbattle stats` - Xem thống kê đấu cá\n`n.fishbattle history` - Xem lịch sử đấu gần đây\n`n.fishbattle leaderboard` - Bảng xếp hạng đấu cá\n`n.fishbattle skills` - Xem tất cả skills có sẵn\n`n.fishbattle skills <fish_id>` - Quản lý skills cho cá\n**Trong UI:** Chọn cá và nhấn "✏️ Đổi Tên" để đổi tên cá', inline: false },
             { name: '📊 Thuộc tính cá', value: '💪 Sức mạnh | 🏃 Thể lực | 🧠 Trí tuệ | 🛡️ Phòng thủ | 🍀 May mắn', inline: false },
             { name: '💰 Phần thưởng', value: 'Người thắng: 150% sức mạnh tổng\nNgười thua: 30% sức mạnh tổng', inline: false },
             { name: '⚠️ Điều kiện cá đấu', value: '• Phải là cá thế hệ 2 trở lên\n• Phải là cá trưởng thành (level 10)\n• Túi đấu tối đa 5 cá', inline: false },
@@ -1135,4 +1138,210 @@ async function invitePlayerToBattle(message: any, userId: string, guildId: strin
             battleInvites.delete(inviteId);
         }
     });
+}
+
+async function showFishSkills(message: any, userId: string, guildId: string, args: string[]) {
+    try {
+        // Nếu không có tham số, hiển thị tất cả skills
+        if (args.length === 0) {
+            return await showAllSkillsSystem(message, userId, guildId);
+        }
+
+        const fishId = args[0];
+
+        // Kiểm tra cá có tồn tại và thuộc về user không
+        const fish = await prisma.fish.findFirst({
+            where: { id: fishId, userId, guildId }
+        });
+
+        if (!fish) {
+            const embed = new EmbedBuilder()
+                .setTitle('❌ Không tìm thấy cá!')
+                .setColor('#FF0000')
+                .setDescription('Không tìm thấy cá hoặc bạn không sở hữu cá này!')
+                .setTimestamp();
+
+            return message.reply({ embeds: [embed] });
+        }
+
+        // Lấy dữ liệu skills
+        const { FishSkillService } = await import("@/utils/fish-skills");
+        const fishSkills = await FishSkillService.getFishSkills(fishId);
+        const availableSkills = await FishSkillService.getAvailableSkills(fishId, userId, guildId);
+
+        // Lấy user balance
+        const user = await prisma.user.findUnique({
+            where: { userId_guildId: { userId, guildId } }
+        });
+        const userBalance = Number(user?.fishBalance || 0);
+
+        // Tạo UI
+        const { FishSkillUI } = await import("@/components/MessageComponent/FishSkillUI");
+        const ui = new FishSkillUI(
+            fish,
+            fishSkills,
+            availableSkills,
+            userId,
+            guildId,
+            userBalance
+        );
+        
+        const embed = ui.createEmbed();
+        const components = ui.createComponents();
+
+        // Gửi message
+        const sentMessage = await message.reply({
+            embeds: [embed],
+            components: components
+        });
+
+        // Lưu message data để xử lý interaction
+        const { FishSkillHandler } = await import("@/components/MessageComponent/FishSkillHandler");
+        FishSkillHandler.setMessageData(sentMessage.id, {
+            userId,
+            guildId,
+            fish,
+            fishSkills,
+            availableSkills,
+            userBalance,
+            selectedSkillId: undefined
+        });
+
+    } catch (error) {
+        console.error('Error showing fish skills:', error);
+        message.reply('❌ Có lỗi xảy ra khi mở hệ thống skills!');
+    }
+}
+
+export async function showAllSkillsSystem(message: any, userId: string, guildId: string) {
+    try {
+        // Lấy tất cả skill definitions
+        const { FishSkillService } = await import("@/utils/fish-skills");
+        const allSkills = await FishSkillService.getAllSkillDefinitions();
+
+        // Nhóm skills theo element
+        const skillsByElement = allSkills.reduce((acc: Record<string, any[]>, skill: any) => {
+            if (!acc[skill.element]) acc[skill.element] = [];
+            acc[skill.element].push(skill);
+            return acc;
+        }, {} as Record<string, any[]>);
+
+        // Tạo embed chính
+        const mainEmbed = new EmbedBuilder()
+            .setTitle('🎯 Hệ Thống Skills - Tất Cả Skills')
+            .setColor('#FF6B6B')
+            .setDescription('Danh sách tất cả skills có sẵn trong hệ thống!')
+            .setTimestamp();
+
+        // Thêm thông tin tổng quan
+        const totalSkills = allSkills.length;
+        const elements = Object.keys(skillsByElement);
+        
+        mainEmbed.addFields({
+            name: '📊 Thống Kê Tổng Quan',
+            value: `**${totalSkills}** skills tổng cộng\n**${elements.length}** hệ elements\n**${allSkills.filter((s: any) => (s.requirements?.rarity || 'common') === 'common').length}** skills Common\n**${allSkills.filter((s: any) => (s.requirements?.rarity || 'common') === 'rare').length}** skills Rare\n**${allSkills.filter((s: any) => (s.requirements?.rarity || 'common') === 'epic').length}** skills Epic\n**${allSkills.filter((s: any) => (s.requirements?.rarity || 'common') === 'legendary').length}** skills Legendary`,
+            inline: false
+        });
+
+        // Thêm từng hệ element
+        const elementEmojis = {
+            fire: '🔥',
+            water: '💧',
+            earth: '🪨',
+            air: '💨',
+            light: '✨',
+            dark: '🌑'
+        };
+
+        // Chỉ hiển thị skill đầu tiên của mỗi element
+        Object.entries(skillsByElement).forEach(([element, skills]: [string, any[]]) => {
+            const elementEmoji = elementEmojis[element as keyof typeof elementEmojis] || '❓';
+            const firstSkill = skills[0]; // Chỉ lấy skill đầu tiên
+            
+            const damage = firstSkill.baseDamage > 0 ? firstSkill.baseDamage : 'Support';
+            const cost = firstSkill.baseCost.toLocaleString();
+            const rarity = firstSkill.requirements?.rarity || 'common';
+            const rarityFormatted = rarity.charAt(0).toUpperCase() + rarity.slice(1);
+            const level = firstSkill.requirements?.level || 1;
+            const successRate = Math.round((firstSkill.baseSuccessRate || 0.5) * 100);
+            
+            const skillsText = `**${firstSkill.emoji}** **${firstSkill.name}**\n` +
+                              `💰 ${cost} FishCoin | 💥 ${damage} damage | 🎯 ${successRate}% thành công\n` +
+                              `📋 Level ${level} | ${rarityFormatted} | ${firstSkill.element}` +
+                              (skills.length > 1 ? `\n\n*+ ${skills.length - 1} skills khác (chọn từ dropdown)*` : '');
+
+            mainEmbed.addFields({
+                name: `${elementEmoji} ${element.toUpperCase()} Skills (${skills.length})`,
+                value: skillsText,
+                inline: false
+            });
+        });
+
+        // Thêm hướng dẫn sử dụng
+        mainEmbed.addFields({
+            name: '🎯 Cách Sử Dụng',
+            value: '• `n.fishbattle skills` - Xem tất cả skills (lệnh này)\n• `n.fishbattle skills <fish_id>` - Quản lý skills cho cá cụ thể\n• Skills được học bằng FishCoin\n• Mỗi skill có requirements về level, stats, rarity',
+            inline: false
+        });
+
+        // Tạo dropdown để chọn skill theo element
+        const { StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = await import("discord.js");
+        
+        const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>();
+        const skillSelectMenu = new StringSelectMenuBuilder()
+            .setCustomId('select_skill_element')
+            .setPlaceholder('🎯 Chọn element để xem tất cả skills')
+            .setMinValues(1)
+            .setMaxValues(1);
+
+        // Thêm options cho mỗi element
+        Object.entries(skillsByElement).forEach(([element, skills]: [string, any[]]) => {
+            const elementEmoji = elementEmojis[element as keyof typeof elementEmojis] || '❓';
+            skillSelectMenu.addOptions(
+                new StringSelectMenuOptionBuilder()
+                    .setLabel(`${elementEmoji} ${element.toUpperCase()} Skills`)
+                    .setDescription(`${skills.length} skills | Chọn để xem chi tiết`)
+                    .setValue(element)
+                    .setEmoji(elementEmoji)
+            );
+        });
+
+        selectRow.addComponents(skillSelectMenu);
+
+        // Tạo components để điều hướng
+        const buttonRow = new ActionRowBuilder<ButtonBuilder>();
+        
+        const fishSkillsButton = new ButtonBuilder()
+            .setCustomId('view_fish_skills')
+            .setLabel('🐟 Skills Của Cá')
+            .setStyle(ButtonStyle.Primary);
+
+        const refreshButton = new ButtonBuilder()
+            .setCustomId('refresh_skills_view')
+            .setLabel('🔄 Làm Mới')
+            .setStyle(ButtonStyle.Secondary);
+
+        buttonRow.addComponents(fishSkillsButton, refreshButton);
+
+        // Gửi message
+        const sentMessage = await message.reply({
+            embeds: [mainEmbed],
+            components: [selectRow, buttonRow]
+        });
+
+        // Lưu message data để xử lý interaction
+        const { FishSkillHandler } = await import("@/components/MessageComponent/FishSkillHandler");
+        FishSkillHandler.setMessageData(sentMessage.id, {
+            userId,
+            guildId,
+            allSkills,
+            skillsByElement,
+            elementEmojis,
+            messageType: 'all_skills'
+        });
+
+    } catch (error) {
+        console.error('Error showing all skills system:', error);
+        message.reply('❌ Có lỗi xảy ra khi hiển thị hệ thống skills!');
+    }
 } 

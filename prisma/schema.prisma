@@ -381,6 +381,7 @@ model Fish {
   inventoryItem         FishInventoryItem?
   battleInventoryItem   BattleFishInventoryItem?
   marketListing         FishMarket?
+  fishSkills            FishSkill[]
 
   @@index([userId])
   @@index([guildId])
@@ -561,4 +562,42 @@ model Achievement {
   @@index([target])
   @@index([type])
   @@index([active])
+}
+
+model FishSkillDefinition {
+  id                String      @id @default(cuid())
+  name              String
+  element           String      // fire, water, earth, air, light, dark
+  emoji             String
+  description       String
+  baseCost          BigInt      // Giá FishCoin cơ bản
+  baseDamage        Int         // Damage cơ bản
+  damageMultiplier  Decimal     @default(1.00) // Hệ số damage cơ bản
+  damagePerLevel    Decimal     @default(0.10) // Hệ số tăng damage mỗi cấp
+  maxLevel          Int         @default(5)
+  baseSuccessRate   Decimal     @default(0.50) // Tỷ lệ thành công cơ bản (0-1)
+  successRatePerLevel Decimal   @default(0.05) // Tỷ lệ thành công tăng mỗi level
+  cooldown          Int         @default(3) // Cooldown (rounds)
+  requirements      String?     // JSON: {level: 10, strength: 50, rarity: "legendary"}
+  effects           String?     // JSON: {burn: 0.1, stun: 0.05}
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  fishSkills        FishSkill[]
+
+  @@index([element])
+}
+
+model FishSkill {
+  id                String              @id @default(cuid())
+  fishId            String
+  skillId           String
+  level             Int                 @default(1)
+  learnedAt         DateTime            @default(now())
+  lastUsed          DateTime?
+  fish              Fish                @relation(fields: [fishId], references: [id], onDelete: Cascade)
+  skillDefinition   FishSkillDefinition @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([fishId, skillId])
+  @@index([fishId])
+  @@index([skillId])
 }
