@@ -847,7 +847,7 @@ export class BattleFishHandler {
     }
 
     private static calculateMaxHP(fish: any): number {
-        const baseHP = 100;
+        const baseHP = 1000;
         const levelBonus = (fish.level || 1) * 10;
         const defenseBonus = (fish.stats?.defense || 0) * 5;
         return baseHP + levelBonus + defenseBonus;

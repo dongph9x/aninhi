@@ -680,7 +680,7 @@ async function showBattleLeaderboard(message: any, guildId: string) {
 // Helper function để tính max HP
 function calculateMaxHP(fish: any): number {
     try {
-        const baseHP = 100;
+        const baseHP = 1000;
         const levelBonus = (fish.level || 1) * 10;
         const defenseBonus = (fish.stats?.defense || 0) * 5;
         return baseHP + levelBonus + defenseBonus;
