@@ -3,6 +3,7 @@ import { FishBreedingService, getMaxLevelForGeneration } from './fish-breeding';
 import { BattleFishInventoryService } from './battle-fish-inventory';
 import { fishCoinDB } from './fish-coin';
 import { WeaponService } from './weapon';
+import { SkillBattleService } from './skill-battle';
 import type { FishStats } from './fish-breeding';
 
 export interface BattleResult {
@@ -281,12 +282,42 @@ export class FishBattleService {
     // Chọn ngẫu nhiên 1 đối thủ
     const randomOpponent = opponents[Math.floor(Math.random() * opponents.length)];
 
+    // Parse stats đúng cách cho đối thủ thực tế
+    let opponentStats = {};
+    if (randomOpponent.stats) {
+      try {
+        const parsedStats = JSON.parse(randomOpponent.stats);
+        // Kiểm tra nếu stats có giá trị null, tạo stats dựa trên level và generation
+        if (parsedStats && Object.values(parsedStats).every(value => value === null)) {
+          console.log(`⚠️ Opponent ${randomOpponent.species} has null stats, creating balanced stats based on level and generation`);
+          // Tạo stats với variation rộng - có thể lớn hơn hoặc nhỏ hơn user
+          const baseStats = Math.floor(randomOpponent.level * 5) + (randomOpponent.generation * 20);
+          const variation = 0.8; // ±80% variation để có thể lớn hơn hoặc nhỏ hơn user
+          const randomVariation = () => 0.2 + (Math.random() * variation * 2); // 0.2 - 1.8
+          
+          opponentStats = {
+            strength: Math.floor(baseStats * randomVariation()),
+            agility: Math.floor(baseStats * randomVariation()),
+            intelligence: Math.floor(baseStats * randomVariation()),
+            defense: Math.floor(baseStats * randomVariation()),
+            luck: Math.floor(baseStats * randomVariation()),
+            accuracy: Math.floor(baseStats * randomVariation())
+          };
+        } else {
+          opponentStats = parsedStats;
+        }
+      } catch (error) {
+        console.error('Error parsing opponent stats:', error);
+        opponentStats = {};
+      }
+    }
+
     return {
       success: true,
       opponent: {
         ...randomOpponent,
         name: randomOpponent.species,
-        stats: JSON.parse((randomOpponent as any).stats || '{}'),
+        stats: opponentStats,
         traits: JSON.parse(randomOpponent.specialTraits || '[]'),
       },
       isBot: false // Đánh dấu đây là đối thủ thực tế
@@ -316,23 +347,21 @@ export class FishBattleService {
     const maxBotPower = userBasePower * 1.3;
     const finalBotPower = Math.max(minBotPower, Math.min(botBasePower, maxBotPower));
     
-    // Trừ đi level bonus vì BOT sẽ có max level (thêm power tương ứng)
-    // Chúng ta muốn stats cơ bản của BOT cân bằng với user
-    const userMaxLevel = getMaxLevelForGeneration(userFish.generation);
-    const levelBonus = (userMaxLevel - 1) * 10; // (maxLevel-1) * 10
-    const statsOnlyPower = finalBotPower - levelBonus;
-
-    // Tạo stats cân bằng cho BOT (chỉ dựa trên stats, không tính level bonus)
+    // Tạo stats BOT dựa trên stats người chơi với variation
+    const variation = 0.2; // ±20% variation
+    const randomVariation = () => 0.8 + (Math.random() * variation * 2); // 0.8 - 1.2
+    
     const botStats = {
-      strength: Math.floor(statsOnlyPower * 0.25),
-      agility: Math.floor(statsOnlyPower * 0.2),
-      intelligence: Math.floor(statsOnlyPower * 0.2),
-      defense: Math.floor(statsOnlyPower * 0.2),
-      luck: Math.floor(statsOnlyPower * 0.1),
-      accuracy: Math.floor(statsOnlyPower * 0.05)
+      strength: Math.floor((userStats.strength || 50) * randomVariation()),
+      agility: Math.floor((userStats.agility || 50) * randomVariation()),
+      intelligence: Math.floor((userStats.intelligence || 50) * randomVariation()),
+      defense: Math.floor((userStats.defense || 50) * randomVariation()),
+      luck: Math.floor((userStats.luck || 50) * randomVariation()),
+      accuracy: Math.floor((userStats.accuracy || 50) * randomVariation())
     };
 
     // Tạo BOT opponent
+    const userMaxLevel = getMaxLevelForGeneration(userFish.generation);
     const botOpponent = {
       id: `bot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       userId: 'BOT_OPPONENT',
@@ -511,6 +540,12 @@ export class FishBattleService {
     // Parse stats
     const userStats: FishStats = JSON.parse(userFish.stats || '{}');
     
+    // Khởi tạo skills cho battle
+    const userBattleSkills = await SkillBattleService.initializeBattleSkills(fishId);
+    const opponentBattleSkills = isBotOpponent ? 
+      { skills: [], cooldowns: new Map() } : 
+      await SkillBattleService.initializeBattleSkills(opponentId);
+    
     // Xử lý stats của opponent (có thể là BOT hoặc thực tế)
     let opponentStats: FishStats;
     let opponentBasePower: number;
@@ -523,8 +558,36 @@ export class FishBattleService {
         stats: opponentStats
       });
     } else {
-      // Đối thủ thực tế - parse từ database
-      opponentStats = JSON.parse(opponentFish.stats || '{}');
+      // Đối thủ thực tế - parse từ database và xử lý null stats
+      let parsedStats = {};
+      if (opponentFish.stats) {
+        try {
+          const tempStats = JSON.parse(opponentFish.stats);
+          // Kiểm tra nếu stats có giá trị null, tạo stats dựa trên level và generation
+          if (tempStats && Object.values(tempStats).every(value => value === null)) {
+            console.log(`⚠️ Opponent ${opponentFish.species} has null stats in battle, creating balanced stats based on level and generation`);
+            // Tạo stats với variation rộng - có thể lớn hơn hoặc nhỏ hơn user
+            const baseStats = Math.floor(opponentFish.level * 5) + (opponentFish.generation * 20);
+            const variation = 0.8; // ±80% variation để có thể lớn hơn hoặc nhỏ hơn user
+            const randomVariation = () => 0.2 + (Math.random() * variation * 2); // 0.2 - 1.8
+            
+            parsedStats = {
+              strength: Math.floor(baseStats * randomVariation()),
+              agility: Math.floor(baseStats * randomVariation()),
+              intelligence: Math.floor(baseStats * randomVariation()),
+              defense: Math.floor(baseStats * randomVariation()),
+              luck: Math.floor(baseStats * randomVariation()),
+              accuracy: Math.floor(baseStats * randomVariation())
+            };
+          } else {
+            parsedStats = tempStats;
+          }
+        } catch (error) {
+          console.error('Error parsing opponent stats in battle:', error);
+          parsedStats = {};
+        }
+      }
+      opponentStats = parsedStats;
       opponentBasePower = FishBreedingService.calculateTotalPowerWithLevel({
         ...opponentFish,
         stats: opponentStats
@@ -770,9 +833,49 @@ export class FishBattleService {
       roundCount++;
       battleLog.push(`\n🥊 **Hiệp ${roundCount}**`);
       
+      // Giảm cooldown của skills
+      SkillBattleService.reduceCooldowns(userBattleSkills);
+      SkillBattleService.reduceCooldowns(opponentBattleSkills);
+      
+      // Chọn skill để sử dụng (nếu có)
+      const userSkill = SkillBattleService.selectSkillForBattle(userBattleSkills);
+      const opponentSkill = SkillBattleService.selectSkillForBattle(opponentBattleSkills);
+      
       // Tính damage dựa trên sức mạnh và random factor (điều chỉnh để battle kết thúc khi HP về 0)
-      const userBaseDamage = Math.floor((userTotalPower / 8) * (0.8 + Math.random() * 0.4)); // 80-120% của base damage
-      const opponentBaseDamage = Math.floor((opponentTotalPower / 8) * (0.8 + Math.random() * 0.4));
+      let userBaseDamage = Math.floor((userTotalPower / 8) * (0.8 + Math.random() * 0.4)); // 80-120% của base damage
+      let opponentBaseDamage = Math.floor((opponentTotalPower / 8) * (0.8 + Math.random() * 0.4));
+      
+      // Sử dụng skill nếu có
+      let userSkillMessage = '';
+      let opponentSkillMessage = '';
+      
+      if (userSkill) {
+        const skillResult = await SkillBattleService.useSkillInBattle(fishId, userSkill, userBattleSkills);
+        if (skillResult.success) {
+          userBaseDamage = skillResult.damage;
+          userSkillMessage = `\n🎯 **${userFish.species}:** ${skillResult.message}`;
+        } else {
+          userSkillMessage = `\n🎯 **${userFish.species}:** ${skillResult.message}`;
+        }
+      }
+      
+      if (opponentSkill && !isBotOpponent) {
+        const skillResult = await SkillBattleService.useSkillInBattle(opponentId, opponentSkill, opponentBattleSkills);
+        if (skillResult.success) {
+          opponentBaseDamage = skillResult.damage;
+          opponentSkillMessage = `\n🎯 **${opponentName}:** ${skillResult.message}`;
+        } else {
+          opponentSkillMessage = `\n🎯 **${opponentName}:** ${skillResult.message}`;
+        }
+      }
+      
+      // Log skill messages
+      if (userSkillMessage) {
+        battleLog.push(userSkillMessage);
+      }
+      if (opponentSkillMessage) {
+        battleLog.push(opponentSkillMessage);
+      }
       
       // Lưu base damage để hiển thị trong log
       const userOriginalDamage = userBaseDamage;
@@ -807,6 +910,14 @@ export class FishBattleService {
       // Tính damage thực tế (chỉ tính nếu không miss)
       let userDamage = userHits ? userBaseDamage : 0;
       let opponentDamage = opponentHits ? opponentBaseDamage : 0;
+      
+      // Nếu sử dụng skill thành công, bỏ qua miss check
+      if (userSkill && userSkillMessage.includes('gây')) {
+        userDamage = userBaseDamage; // Skill damage không bị miss
+      }
+      if (opponentSkill && opponentSkillMessage.includes('gây')) {
+        opponentDamage = opponentBaseDamage; // Skill damage không bị miss
+      }
       
       // Tính khả năng critical hit dựa trên Luck (chỉ nếu hit)
       const userLuck = userStats.luck || 0;
@@ -878,20 +989,24 @@ export class FishBattleService {
       if (userAttacksFirst) {
         // User tấn công trước
         opponentHP = Math.max(0, opponentHP - userDamage);
-        battleLog.push(`💥 ${userFish.species} gây ${userDamage} sát thương!${userDamageComparison}${userCritText}${userMissText}${opponentDodgeText}${opponentDefenseText} ${opponentName} còn ${opponentHP}/${opponentMaxHP} HP`);
+        const userDamageEmoji = userSkill && userSkillMessage.includes('gây') ? '⚡' : '💥';
+        battleLog.push(`${userDamageEmoji} **${userFish.species}** gây **${userDamage}** sát thương!${userDamageComparison}${userCritText}${userMissText}${opponentDodgeText}${opponentDefenseText} ${opponentName} còn ${opponentHP}/${opponentMaxHP} HP`);
         
         if (opponentHP > 0) {
           userHP = Math.max(0, userHP - opponentDamage);
-          battleLog.push(`💥 ${opponentName} gây ${opponentDamage} sát thương!${opponentDamageComparison}${opponentCritText}${opponentMissText}${userDodgeText}${userDefenseText} ${userFish.species} còn ${userHP}/${userMaxHP} HP`);
+          const opponentDamageEmoji = opponentSkill && opponentSkillMessage.includes('gây') ? '⚡' : '💥';
+          battleLog.push(`${opponentDamageEmoji} **${opponentName}** gây **${opponentDamage}** sát thương!${opponentDamageComparison}${opponentCritText}${opponentMissText}${userDodgeText}${userDefenseText} ${userFish.species} còn ${userHP}/${userMaxHP} HP`);
         }
       } else {
         // Opponent tấn công trước
         userHP = Math.max(0, userHP - opponentDamage);
-        battleLog.push(`💥 ${opponentName} gây ${opponentDamage} sát thương!${opponentDamageComparison}${opponentCritText}${opponentMissText}${userDodgeText}${userDefenseText} ${userFish.species} còn ${userHP}/${userMaxHP} HP`);
+        const opponentDamageEmoji = opponentSkill && opponentSkillMessage.includes('gây') ? '⚡' : '💥';
+        battleLog.push(`${opponentDamageEmoji} **${opponentName}** gây **${opponentDamage}** sát thương!${opponentDamageComparison}${opponentCritText}${opponentMissText}${userDodgeText}${userDefenseText} ${userFish.species} còn ${userHP}/${userMaxHP} HP`);
         
         if (userHP > 0) {
           opponentHP = Math.max(0, opponentHP - userDamage);
-          battleLog.push(`💥 ${userFish.species} gây ${userDamage} sát thương!${userDamageComparison}${userCritText}${userMissText}${opponentDodgeText}${opponentDefenseText} ${opponentName} còn ${opponentHP}/${opponentMaxHP} HP`);
+          const userDamageEmoji = userSkill && userSkillMessage.includes('gây') ? '⚡' : '💥';
+          battleLog.push(`${userDamageEmoji} **${userFish.species}** gây **${userDamage}** sát thương!${userDamageComparison}${userCritText}${userMissText}${opponentDodgeText}${opponentDefenseText} ${opponentName} còn ${opponentHP}/${opponentMaxHP} HP`);
         }
       }
       

@@ -269,7 +269,17 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
 
     // Hiển thị thông tin trước khi đấu
     const stats = selectedFish.stats || {};
-    const opponentStats = opponentResult.opponent.stats || {};
+    
+    // Parse opponent stats đúng cách
+    let opponentStats = {};
+    if (opponentResult.opponent.stats) {
+      if (typeof opponentResult.opponent.stats === 'string') {
+        opponentStats = JSON.parse(opponentResult.opponent.stats);
+      } else {
+        opponentStats = opponentResult.opponent.stats;
+      }
+    }
+    
     const userPower = FishBreedingService.calculateTotalPowerWithLevel(selectedFish);
     const opponentPower = FishBreedingService.calculateTotalPowerWithLevel(opponentResult.opponent);
 
