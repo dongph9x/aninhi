@@ -3,6 +3,8 @@
  * Hệ thống hiển thị trực quan cho fishbattle với thanh HP, ảnh cá và stats
  */
 
+import { getMaxLevelForGeneration } from './fish-breeding';
+
 export class BattleVisualSystem {
     /**
      * Tạo thanh HP với Unicode characters
@@ -216,7 +218,7 @@ export class BattleVisualSystem {
         try {
             const statusEmoji = fish.status === 'adult' ? '🐟' : '🐠';
             const rarityEmoji = this.getRarityEmoji(fish.rarity || 'common');
-            const levelEmoji = this.getLevelEmoji(fish.level || 1);
+            const levelEmoji = this.getLevelEmoji(fish.level || 1, fish.generation || 1);
             const fishEmoji = this.getFishEmoji(fish.name || 'Unknown');
             
             let display = `${fishEmoji} ${rarityEmoji} **${fish.name || 'Unknown'}** ${levelEmoji}\n`;
@@ -239,7 +241,7 @@ export class BattleVisualSystem {
     static createDetailedFishDisplay(fish: any, isSelected: boolean = false): string {
         const fishEmoji = this.getFishEmoji(fish.name);
         const rarityEmoji = this.getRarityEmoji(fish.rarity);
-        const levelEmoji = this.getLevelEmoji(fish.level);
+        const levelEmoji = this.getLevelEmoji(fish.level, fish.generation || 1);
         const statusEmoji = fish.status === 'adult' ? '🐟' : '🐠';
         
         let display = `  ${fishEmoji} ${fish.name} ${rarityEmoji}                    \n`;
@@ -558,11 +560,12 @@ ${winnerEmoji} BATTLE RESULT ${winnerEmoji}
         return fishEmojiMap[fishName] || '🐟';
     }
 
-    private static getLevelEmoji(level: number): string {
-        if (level >= 50) return '🌟';
-        if (level >= 30) return '⭐';
-        if (level >= 20) return '✨';
-        if (level >= 10) return '💫';
+    private static getLevelEmoji(level: number, generation: number = 1): string {
+        const maxLevel = getMaxLevelForGeneration(generation);
+        if (level >= maxLevel * 0.8) return '🌟'; // 80% of max level
+        if (level >= maxLevel * 0.6) return '⭐'; // 60% of max level
+        if (level >= maxLevel * 0.4) return '✨'; // 40% of max level
+        if (level >= maxLevel * 0.2) return '💫'; // 20% of max level
         return '🔸';
     }
 

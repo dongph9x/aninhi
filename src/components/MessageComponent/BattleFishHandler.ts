@@ -114,7 +114,7 @@ export class BattleFishHandler {
         
         if (selectedValue === 'no_fish') {
             await interaction.reply({ 
-                content: '❌ Không có cá nào để chọn! Hãy tạo cá thế hệ 2+ và nuôi lên level 10.', 
+                content: '❌ Không có cá nào để chọn! Hãy tạo cá thế hệ 2+ và nuôi lên max level.', 
                 ephemeral: true 
             });
             return;
@@ -707,7 +707,7 @@ export class BattleFishHandler {
                 { name: '🎯 Cách sử dụng', value: '1. **Chọn cá** từ dropdown\n2. **Thêm cá** vào túi đấu\n3. **Tìm đối thủ** để đấu\n4. **Xóa cá** khỏi túi đấu nếu cần\n5. **Đổi tên cá** trong túi đấu', inline: false },
                 { name: '📊 Thuộc tính cá', value: '💪 Sức mạnh | 🏃 Thể lực | 🧠 Trí tuệ | 🛡️ Phòng thủ | 🍀 May mắn', inline: false },
                 { name: '💰 Phần thưởng', value: 'Người thắng: 150% sức mạnh tổng\nNgười thua: 30% sức mạnh tổng', inline: false },
-                { name: '⚠️ Điều kiện cá đấu', value: '• Phải là cá thế hệ 2 trở lên\n• Phải là cá trưởng thành (level 10)\n• Túi đấu tối đa 5 cá', inline: false }
+                { name: '⚠️ Điều kiện cá đấu', value: '• Phải là cá thế hệ 2 trở lên\n• Phải là cá trưởng thành (đạt max level)\n• Túi đấu tối đa 5 cá', inline: false }
             )
             .setTimestamp();
 

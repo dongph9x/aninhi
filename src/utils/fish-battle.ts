@@ -1,5 +1,5 @@
 import prisma from './prisma';
-import { FishBreedingService } from './fish-breeding';
+import { FishBreedingService, getMaxLevelForGeneration } from './fish-breeding';
 import { BattleFishInventoryService } from './battle-fish-inventory';
 import { fishCoinDB } from './fish-coin';
 import { WeaponService } from './weapon';
@@ -316,9 +316,10 @@ export class FishBattleService {
     const maxBotPower = userBasePower * 1.3;
     const finalBotPower = Math.max(minBotPower, Math.min(botBasePower, maxBotPower));
     
-    // Trừ đi level bonus vì BOT sẽ có level 10 (thêm 90 power)
+    // Trừ đi level bonus vì BOT sẽ có max level (thêm power tương ứng)
     // Chúng ta muốn stats cơ bản của BOT cân bằng với user
-    const levelBonus = 90; // (10-1) * 10
+    const userMaxLevel = getMaxLevelForGeneration(userFish.generation);
+    const levelBonus = (userMaxLevel - 1) * 10; // (maxLevel-1) * 10
     const statsOnlyPower = finalBotPower - levelBonus;
 
     // Tạo stats cân bằng cho BOT (chỉ dựa trên stats, không tính level bonus)
@@ -337,7 +338,7 @@ export class FishBattleService {
       userId: 'BOT_OPPONENT',
       guildId: userFish.guildId,
       species: this.getRandomBotSpecies(),
-      level: 10,
+      level: userMaxLevel,
       experience: 0,
       rarity: this.getRandomBotRarity(),
       value: BigInt(Math.floor(finalBotPower * 100)), // Giá trị dựa trên sức mạnh

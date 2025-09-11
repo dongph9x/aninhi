@@ -29,24 +29,42 @@ export interface FishSkillDefinition {
     };
 }
 
-export const FISH_SKILLS: FishSkillDefinition[] = [
-    {
-        id: 'absolute_darkness',
-        name: 'Hắc Ám Tuyệt Đối',
-        element: 'dark',
-        emoji: '<a:pixel_skill_bong_ma:1415338985873735804>',
-        description: 'Triệu hồi bóng tối tuyệt đối',
-        baseCost: 32000,
-        baseDamage: 21,
-        damageMultiplier: 2.0,
-        damagePerLevel: 0.3,
-        maxLevel: 5,
-        baseSuccessRate: 0.4, // 40% thành công
-        successRatePerLevel: 0.12, // +12% mỗi level
-        requirements: { level: 27, luck: 120, rarity: 'legendary' },
-        effects: {}
+// Import skills data from JSON file
+import fs from 'fs';
+import path from 'path';
+
+// Load skills data from JSON file
+function loadSkillsData(): FishSkillDefinition[] {
+    try {
+        const dataPath = path.join(__dirname, '../../data/fish-skills-data.json');
+        const dataContent = fs.readFileSync(dataPath, 'utf-8');
+        const skillsData = JSON.parse(dataContent);
+        return skillsData.skills;
+    } catch (error) {
+        console.error('Error loading skills data:', error);
+        // Fallback to basic skills if file not found
+        return [
+            {
+                id: 'absolute_darkness',
+                name: 'Hắc Ám Tuyệt Đối',
+                element: 'dark',
+                emoji: '<a:pixel_skill_bong_ma:1415338985873735804>',
+                description: 'Triệu hồi bóng tối tuyệt đối',
+                baseCost: 32000,
+                baseDamage: 21,
+                damageMultiplier: 2.0,
+                damagePerLevel: 0.3,
+                maxLevel: 5,
+                baseSuccessRate: 0.4,
+                successRatePerLevel: 0.12,
+                requirements: { level: 27, luck: 120, rarity: 'legendary' },
+                effects: {}
+            }
+        ];
     }
-];
+}
+
+export const FISH_SKILLS: FishSkillDefinition[] = loadSkillsData();
 
 // Helper functions
 export class FishSkillHelper {

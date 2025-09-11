@@ -154,7 +154,7 @@ export class BattleFishUI {
         } else {
             embed.addFields({
                 name: '📋 Cá Có Thể Thêm Vào Túi Đấu',
-                value: '❌ Không có cá nào đủ điều kiện!\n\n**Điều kiện:**\n• Thế hệ 2 trở lên\n• Level 10 (trưởng thành)',
+                value: '❌ Không có cá nào đủ điều kiện!\n\n**Điều kiện:**\n• Thế hệ 2 trở lên\n• Đạt max level (trưởng thành)',
                 inline: false
             });
         }
@@ -217,7 +217,7 @@ export class BattleFishUI {
             selectMenu.addOptions(
                 new StringSelectMenuOptionBuilder()
                     .setLabel('Không có cá nào')
-                    .setDescription('Tạo cá thế hệ 2+ và nuôi lên level 10')
+                    .setDescription('Tạo cá thế hệ 2+ và nuôi lên max level')
                     .setValue('no_fish')
                     .setEmoji('❌')
             );

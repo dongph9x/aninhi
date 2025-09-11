@@ -1,5 +1,5 @@
 import { ButtonInteraction, StringSelectMenuInteraction, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { FishBreedingService } from '../../utils/fish-breeding';
+import { FishBreedingService, getMaxLevelForGeneration } from '../../utils/fish-breeding';
 import { FishInventoryService } from '../../utils/fish-inventory';
 import { FishBarnUI } from './FishBarnUI';
 import { FishFeedService } from '../../utils/fish-feed';
@@ -30,7 +30,10 @@ export class FishBarnHandler {
     // Tự động chọn cá đầu tiên có thể cho ăn nếu không có cá nào được chọn và không ở chế độ lai tạo
     let finalSelectedFishId = selectedFishId;
     if (!selectedFishId && !breedingMode) {
-      const feedableFish = inventory.items.filter((item: any) => item.fish.level < 10);
+      const feedableFish = inventory.items.filter((item: any) => {
+        const maxLevel = getMaxLevelForGeneration(item.fish.generation);
+        return item.fish.level < maxLevel;
+      });
       if (feedableFish.length > 0) {
         finalSelectedFishId = feedableFish[0].fish.id;
         if (finalSelectedFishId) {
@@ -932,15 +935,16 @@ export class FishBarnHandler {
 
       const fish = selectedFish.fish;
 
-      // Kiểm tra xem cá đã đạt level 10 chưa
-      if (fish.level >= 10) {
+      // Kiểm tra xem cá đã đạt max level chưa
+      const maxLevel = getMaxLevelForGeneration(fish.generation);
+      if (fish.level >= maxLevel) {
         return interaction.reply({ 
-          content: '❌ Cá này đã đạt level tối đa (10)!', 
+          content: `❌ Cá này đã đạt level tối đa (${maxLevel})!`, 
           ephemeral: true 
         });
       }
 
-      // Nâng cấp cá lên level 10
+      // Nâng cấp cá lên max level
       const levelUpResult = await this.levelUpFishToMax(fish.id);
       
       if (!levelUpResult.success) {
@@ -957,7 +961,7 @@ export class FishBarnHandler {
         .addFields(
           { name: '🐟 Cá được nâng cấp', value: fish.species, inline: true },
           { name: '📊 Level cũ', value: `${fish.level}`, inline: true },
-          { name: '📈 Level mới', value: '10', inline: true },
+          { name: '📈 Level mới', value: `${maxLevel}`, inline: true },
           { name: '⭐ Độ hiếm', value: fish.rarity, inline: true },
           { name: '💰 Giá trị cũ', value: Number(fish.value).toLocaleString(), inline: true },
           { name: '💰 Giá trị mới', value: Number(levelUpResult.newValue).toLocaleString(), inline: true }
@@ -1046,23 +1050,24 @@ export class FishBarnHandler {
         return { success: false, error: 'Không tìm thấy cá' };
       }
 
-      // Kiểm tra xem cá đã đạt level 10 chưa
-      if (currentFish.level >= 10) {
-        return { success: false, error: 'Cá đã đạt level tối đa' };
+      // Kiểm tra xem cá đã đạt max level chưa
+      const maxLevel = getMaxLevelForGeneration(currentFish.generation);
+      if (currentFish.level >= maxLevel) {
+        return { success: false, error: `Cá đã đạt level tối đa (${maxLevel})` };
       }
 
-      // Tính toán giá trị mới dựa trên level 10
+      // Tính toán giá trị mới dựa trên max level
       // Mỗi level tăng 2% giá trị
-      const levelBonus = (10 - currentFish.level) * 0.02;
+      const levelBonus = (maxLevel - currentFish.level) * 0.02;
       const newValue = Math.floor(Number(currentFish.value) * (1 + levelBonus));
 
-      // Tăng stats cho cá gen 2+ từ level hiện tại lên level 10
+      // Tăng stats cho cá gen 2+ từ level hiện tại lên max level
       let newStats = currentFish.stats;
       if (currentFish.generation >= 2) {
         let currentStats = JSON.parse(currentFish.stats || '{}');
         
-        // Tăng stats cho mỗi level từ level hiện tại lên level 10
-        for (let level = currentFish.level; level < 10; level++) {
+        // Tăng stats cho mỗi level từ level hiện tại lên max level
+        for (let level = currentFish.level; level < maxLevel; level++) {
           currentStats = FishBreedingService.increaseStatsOnLevelUp(currentStats);
         }
         
@@ -1070,11 +1075,11 @@ export class FishBarnHandler {
         console.log(`🚀 Level up stats for fish ${currentFish.species} (Gen ${currentFish.generation}):`, currentStats);
       }
 
-      // Cập nhật cá lên level 10
+      // Cập nhật cá lên max level
       const updatedFish = await prisma.fish.update({
         where: { id: fishId },
         data: {
-          level: 10,
+          level: maxLevel,
           experience: 0, // Reset experience về 0 khi đạt max level
           value: BigInt(newValue),
           status: 'adult', // Tự động chuyển sang trạng thái trưởng thành

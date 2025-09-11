@@ -1,6 +1,17 @@
 import prisma from './prisma';
 import { fishCoinDB } from './fish-coin';
 
+/**
+ * Tính max level dựa trên generation của cá
+ * Gen 1: max level 10
+ * Gen 2: max level 20
+ * Gen 3: max level 30
+ * Và tăng dần theo generation
+ */
+export function getMaxLevelForGeneration(generation: number): number {
+  return generation * 10;
+}
+
 // Định nghĩa các thuộc tính di truyền cho đấu cá
 export interface FishStats {
   strength: number;      // Sức mạnh (1-100)
@@ -209,9 +220,9 @@ export class FishBreedingService {
     const fish = await prisma.fish.findFirst({ where: { id: fishId, userId } });
     if (!fish) return { success: false, error: 'Không tìm thấy cá!' };
     
-    const MAX_LEVEL = 10; // Cấp tối đa là 10
+    const MAX_LEVEL = getMaxLevelForGeneration(fish.generation);
     if (fish.level >= MAX_LEVEL && fish.status === 'adult') {
-      return { success: false, error: 'Cá đã trưởng thành và đạt cấp tối đa (10)!' };
+      return { success: false, error: `Cá đã trưởng thành và đạt cấp tối đa (${MAX_LEVEL})!` };
     }
     
     // Kiểm tra có thức ăn không
@@ -268,7 +279,7 @@ export class FishBreedingService {
     
     // Cập nhật trạng thái
     let newStatus = fish.status;
-    if (newLevel >= 10) {
+    if (newLevel >= MAX_LEVEL) {
       newStatus = 'adult';
       becameAdult = true;
     }
@@ -307,7 +318,7 @@ export class FishBreedingService {
    * Cho cá ăn theo yêu cầu mới: 
    * - Normal user: random 1-5 exp, cooldown 1 giờ
    * - Admin: luôn 100 exp, bypass cooldown
-   * - Max level 10
+   * - Max level depends on generation (Gen 1: 10, Gen 2: 20, Gen 3: 30, etc.)
    * - Nếu exp = 0 thì bỏ qua cooldown
    */
   static async feedFish(userId: string, fishId: string, isAdmin: boolean = false) {
@@ -315,9 +326,9 @@ export class FishBreedingService {
     if (!fish) return { success: false, error: 'Không tìm thấy cá!' };
     if (fish.rarity !== 'legendary') return { success: false, error: 'Chỉ cá huyền thoại mới được nuôi!' };
     
-    const MAX_LEVEL = 10; // Cấp tối đa là 10
+    const MAX_LEVEL = getMaxLevelForGeneration(fish.generation);
     if (fish.level >= MAX_LEVEL && fish.status === 'adult') {
-      return { success: false, error: 'Cá đã trưởng thành và đạt cấp tối đa (10)!' };
+      return { success: false, error: `Cá đã trưởng thành và đạt cấp tối đa (${MAX_LEVEL})!` };
     }
     
     // Kiểm tra cooldown 1 giờ - chỉ áp dụng khi exp > 0 và không phải admin
@@ -379,7 +390,7 @@ export class FishBreedingService {
     
     // Cập nhật trạng thái
     let newStatus = fish.status;
-    if (newLevel >= 10) {
+    if (newLevel >= MAX_LEVEL) {
       newStatus = 'adult';
       becameAdult = true;
     }
@@ -430,10 +441,11 @@ export class FishBreedingService {
       return (level + 1) * 10; // Level 1 cần 20, Level 2 cần 30, Level 3 cần 40, v.v.
     }
     
+    const maxLevel = getMaxLevelForGeneration(fish.generation);
     return {
       ...fish,
       name: fish.species,
-      experienceToNext: fish.level >= 10 ? 0 : getExpForLevel(fish.level),
+      experienceToNext: fish.level >= maxLevel ? 0 : getExpForLevel(fish.level),
       traits: JSON.parse(fish.specialTraits || '[]'),
       stats: JSON.parse(fish.stats || '{}'),
       canBreed: fish.status === 'adult',
@@ -723,17 +735,20 @@ export class FishBreedingService {
       ],
     });
     
-    return marketFish.map(item => ({
-      ...item,
-      fish: {
-        ...item.fish,
-        name: item.fish.species,
-        experienceToNext: (item.fish.level + 1) * 10,
-        traits: JSON.parse(item.fish.specialTraits || '[]'),
-        stats: JSON.parse(item.fish.stats || '{}'),
-        canBreed: item.fish.status === 'adult',
-      }
-    }));
+    return marketFish.map(item => {
+      const maxLevel = getMaxLevelForGeneration(item.fish.generation);
+      return {
+        ...item,
+        fish: {
+          ...item.fish,
+          name: item.fish.species,
+          experienceToNext: item.fish.level >= maxLevel ? 0 : (item.fish.level + 1) * 10,
+          traits: JSON.parse(item.fish.specialTraits || '[]'),
+          stats: JSON.parse(item.fish.stats || '{}'),
+          canBreed: item.fish.status === 'adult',
+        }
+      };
+    });
   }
 
   /**

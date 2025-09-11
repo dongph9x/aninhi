@@ -1,8 +1,8 @@
-import { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } from "discord.js";
+import { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, StringSelectMenuBuilder } from "discord.js";
 import { Bot } from "@/classes";
 import { FishBattleService } from "@/utils/fish-battle";
 import { BattleFishInventoryService } from "@/utils/battle-fish-inventory";
-import { FishBreedingService } from "@/utils/fish-breeding";
+import { FishBreedingService, getMaxLevelForGeneration } from "@/utils/fish-breeding";
 import { BattleFishUI } from "@/components/MessageComponent/BattleFishUI";
 import { BattleFishHandler } from "@/components/MessageComponent/BattleFishHandler";
 import prisma from "@/utils/prisma";
@@ -114,7 +114,7 @@ async function showBattleHelp(message: any) {
             { name: '🎯 Cách sử dụng', value: '`n.fishbattle ui` - Mở giao diện đấu cá (Khuyến nghị)\n`n.fishbattle` - Tìm đối thủ ngẫu nhiên\n`n.fishbattle invite @người_chơi` - Mời người chơi khác đấu cá\n`n.fishbattle add <fish_id>` - Thêm cá vào túi đấu\n`n.fishbattle list` - Xem túi đấu cá\n`n.fishbattle remove <fish_id>` - Xóa cá khỏi túi đấu\n`n.fishbattle stats` - Xem thống kê đấu cá\n`n.fishbattle history` - Xem lịch sử đấu gần đây\n`n.fishbattle leaderboard` - Bảng xếp hạng đấu cá\n`n.fishbattle skills` - Xem tất cả skills có sẵn\n`n.fishbattle skills <fish_id>` - Quản lý skills cho cá\n**Trong UI:** Chọn cá và nhấn "✏️ Đổi Tên" để đổi tên cá', inline: false },
             { name: '📊 Thuộc tính cá', value: '💪 Sức mạnh | 🏃 Thể lực | 🧠 Trí tuệ | 🛡️ Phòng thủ | 🍀 May mắn', inline: false },
             { name: '💰 Phần thưởng', value: 'Người thắng: 150% sức mạnh tổng\nNgười thua: 30% sức mạnh tổng', inline: false },
-            { name: '⚠️ Điều kiện cá đấu', value: '• Phải là cá thế hệ 2 trở lên\n• Phải là cá trưởng thành (level 10)\n• Túi đấu tối đa 5 cá', inline: false },
+            { name: '⚠️ Điều kiện cá đấu', value: '• Phải là cá thế hệ 2 trở lên\n• Phải là cá trưởng thành (đạt max level)\n• Túi đấu tối đa 5 cá', inline: false },
             { name: '⏰ Giới hạn đấu cá', value: '• Tối đa 20 lần đấu cá mỗi ngày\n• Reset vào 00:00 ngày mai\n• Cooldown 1 phút giữa các lần đấu', inline: false },
             { name: '🤝 Mời đấu cá', value: '• Sử dụng `n.fishbattle invite @người_chơi` để mời\n• Người được mời có 5 phút để chấp nhận/từ chối\n• Cả hai người phải có cá trong túi đấu\n• Không thể mời chính mình', inline: false }
         )
@@ -231,7 +231,7 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
         const embed = new EmbedBuilder()
             .setTitle('❌ Không có cá để đấu!')
             .setColor('#FF0000')
-            .setDescription('Bạn cần có ít nhất 1 cá trong túi đấu để đấu.\n\n**Điều kiện cá đấu:**\n• Phải là cá thế hệ 2 trở lên\n• Phải là cá trưởng thành (level 10)\n\nSử dụng `n.fishbattle add <fish_id>` để thêm cá vào túi đấu!')
+            .setDescription('Bạn cần có ít nhất 1 cá trong túi đấu để đấu.\n\n**Điều kiện cá đấu:**\n• Phải là cá thế hệ 2 trở lên\n• Phải là cá trưởng thành (đạt max level)\n\nSử dụng `n.fishbattle add <fish_id>` để thêm cá vào túi đấu!')
             .setTimestamp();
 
         return message.reply({ embeds: [embed] });
@@ -1285,7 +1285,7 @@ export async function showAllSkillsSystem(message: any, userId: string, guildId:
         });
 
         // Tạo dropdown để chọn skill theo element
-        const { StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = await import("discord.js");
+        const { StringSelectMenuOptionBuilder } = await import("discord.js");
         
         const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>();
         const skillSelectMenu = new StringSelectMenuBuilder()
@@ -1321,7 +1321,12 @@ export async function showAllSkillsSystem(message: any, userId: string, guildId:
             .setLabel('🔄 Làm Mới')
             .setStyle(ButtonStyle.Secondary);
 
-        buttonRow.addComponents(fishSkillsButton, refreshButton);
+        const syncSkillsButton = new ButtonBuilder()
+            .setCustomId('sync_skills_data')
+            .setLabel('⚡ Sync Skills')
+            .setStyle(ButtonStyle.Success);
+
+        buttonRow.addComponents(fishSkillsButton, refreshButton, syncSkillsButton);
 
         // Gửi message
         const sentMessage = await message.reply({

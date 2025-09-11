@@ -1,6 +1,7 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } from 'discord.js';
 import prisma from '../../utils/prisma';
 import { FishFeedService } from '../../utils/fish-feed';
+import { getMaxLevelForGeneration } from '../../utils/fish-breeding';
 
 export class FishBarnUI {
   private inventory: any;
@@ -117,8 +118,11 @@ export class FishBarnUI {
         }
       }
 
-      // Hiển thị danh sách cá có thể chọn (nhóm theo thế hệ) - loại bỏ cá level 10
-      const breedableFish = this.inventory.items.filter((item: any) => item.fish.status === 'adult' && item.fish.level < 10);
+      // Hiển thị danh sách cá có thể chọn (nhóm theo thế hệ) - loại bỏ cá đã đạt max level
+      const breedableFish = this.inventory.items.filter((item: any) => {
+        const maxLevel = getMaxLevelForGeneration(item.fish.generation);
+        return item.fish.status === 'adult' && item.fish.level < maxLevel;
+      });
       if (breedableFish.length > 0) {
         // Nhóm cá theo thế hệ
         const fishByGeneration: { [generation: number]: any[] } = {};
@@ -163,7 +167,7 @@ export class FishBarnUI {
         const stats = this.parseStats(fish.stats);
         const totalPower = this.calculateTotalPower(fish);
         const statusEmoji = fish.status === 'adult' ? '🐟' : '🐠';
-        const levelBar = this.createLevelBar(fish.level, fish.experience, fish.experienceToNext);
+        const levelBar = this.createLevelBar(fish.level, fish.experience, fish.experienceToNext, fish.generation);
         const levelBonus = fish.level > 1 ? (fish.level - 1) * 0.02 : 0;
         const finalValue = Math.floor(Number(fish.value) * (1 + levelBonus));
         
@@ -188,16 +192,19 @@ export class FishBarnUI {
         }
       } else {
         console.log(`❌ Selected fish not found, falling back to show all fish`);
-        // Fallback: show all fish if selected fish not found (excluding level 10 fish)
+        // Fallback: show all fish if selected fish not found (excluding max level fish)
         const displayItems = this.inventory.items
-          .filter((item: any) => item.fish.level < 10) // Lọc bỏ cá level 10
+          .filter((item: any) => {
+            const maxLevel = getMaxLevelForGeneration(item.fish.generation);
+            return item.fish.level < maxLevel;
+          }) // Lọc bỏ cá đã đạt max level
           .slice(0, 5);
         for (const item of displayItems) {
           const fish = item.fish;
           const stats = this.parseStats(fish.stats);
           const totalPower = this.calculateTotalPower(fish);
           const statusEmoji = fish.status === 'adult' ? '🐟' : '🐠';
-          const levelBar = this.createLevelBar(fish.level, fish.experience, fish.experienceToNext);
+          const levelBar = this.createLevelBar(fish.level, fish.experience, fish.experienceToNext, fish.generation);
           const levelBonus = fish.level > 1 ? (fish.level - 1) * 0.02 : 0;
           const finalValue = Math.floor(Number(fish.value) * (1 + levelBonus));
           
@@ -209,7 +216,10 @@ export class FishBarnUI {
           });
         }
       }
-      const nonMaxLevelFish = this.inventory.items.filter((item: any) => item.fish.level < 10);
+      const nonMaxLevelFish = this.inventory.items.filter((item: any) => {
+        const maxLevel = getMaxLevelForGeneration(item.fish.generation);
+        return item.fish.level < maxLevel;
+      });
       if (nonMaxLevelFish.length > 5) {
         embed.addFields({
           name: '📄 Còn lại',
@@ -331,7 +341,10 @@ export class FishBarnUI {
 
       // Row 2: Select menu để chọn cá
       const availableFish = this.inventory.items
-        .filter((item: any) => item.fish.level < 10) // Lọc bỏ cá level 10
+        .filter((item: any) => {
+          const maxLevel = getMaxLevelForGeneration(item.fish.generation);
+          return item.fish.level < maxLevel;
+        }) // Lọc bỏ cá đã đạt max level
         .slice(0, 25); // Giới hạn tối đa 25 options
       
       if (availableFish.length > 0) {
@@ -366,7 +379,7 @@ export class FishBarnUI {
           components.push(actionRow1, selectRow);
         }
       } else {
-        // Nếu không có cá nào dưới level 10, chỉ hiển thị buttons
+        // Nếu không có cá nào dưới max level, chỉ hiển thị buttons
         const cloneRow = this.createCloneRow();
         if (cloneRow) {
           components.push(actionRow1, cloneRow);
@@ -427,8 +440,8 @@ export class FishBarnUI {
     return components;
   }
 
-  private createLevelBar(level: number, exp: number | BigInt, expNeeded: number | BigInt): string {
-    const maxLevel = 10;
+  private createLevelBar(level: number, exp: number | BigInt, expNeeded: number | BigInt, generation: number = 1): string {
+    const maxLevel = getMaxLevelForGeneration(generation);
     if (level >= maxLevel) {
       return '🟢 MAX';
     }

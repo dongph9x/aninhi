@@ -3,6 +3,7 @@ import { ExtendedClient } from '@/classes/ExtendedClient';
 import { FishInventoryService } from '@/utils/fish-inventory';
 import { FishBarnUI } from '@/components/MessageComponent/FishBarnUI';
 import { FishFeedService } from '@/utils/fish-feed';
+import { getMaxLevelForGeneration } from '@/utils/fish-breeding';
 
 export default {
   structure: {
@@ -24,8 +25,11 @@ export default {
       // Lấy fish inventory
       const inventory = await FishInventoryService.getFishInventory(userId, guildId);
       
-      // Tự động chọn cá đầu tiên có thể cho ăn (không phải level 10)
-      const feedableFish = inventory.items.filter((item: any) => item.fish.level < 10);
+      // Tự động chọn cá đầu tiên có thể cho ăn (không phải max level)
+      const feedableFish = inventory.items.filter((item: any) => {
+        const maxLevel = getMaxLevelForGeneration(item.fish.generation);
+        return item.fish.level < maxLevel;
+      });
       const selectedFishId = feedableFish.length > 0 ? feedableFish[0].fish.id : undefined;
       
       // Lấy thông tin daily feed limit

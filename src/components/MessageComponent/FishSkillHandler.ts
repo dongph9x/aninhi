@@ -15,12 +15,25 @@ export class FishSkillHandler {
     private static fishSkillMessages = new Map<string, {
         userId: string;
         guildId: string;
-        fish: any;
-        fishSkills: FishSkillData[];
-        availableSkills: FishSkillDefinition[];
-        userBalance: number;
+        fish?: any;
+        fishSkills?: FishSkillData[];
+        availableSkills?: FishSkillDefinition[];
+        userBalance?: number;
         selectedSkillId?: string;
+        allSkills?: FishSkillDefinition[];
+        skillsByElement?: Record<string, any[]>;
+        elementEmojis?: Record<string, string>;
+        messageType?: string;
+        selectedElement?: string;
     }>();
+
+    static setMessageData(messageId: string, data: any): void {
+        this.fishSkillMessages.set(messageId, data);
+    }
+
+    static getMessageData(messageId: string): any {
+        return this.fishSkillMessages.get(messageId);
+    }
 
     static async handleInteraction(interaction: ButtonInteraction | StringSelectMenuInteraction) {
         const customId = interaction.customId;
@@ -35,31 +48,48 @@ export class FishSkillHandler {
         // Lấy thông tin message từ cache
         let messageData = this.fishSkillMessages.get(interaction.message.id);
         
+        console.log(`🔍 [DEBUG] Message data lookup:`);
+        console.log(`  - Message ID: ${interaction.message.id}`);
+        console.log(`  - Found message data: ${!!messageData}`);
+        console.log(`  - Message data keys: ${messageData ? Object.keys(messageData).join(', ') : 'none'}`);
+        
         if (!messageData) {
+            console.log(`❌ No message data found for message ID: ${interaction.message.id}`);
+            console.log(`📊 Current cache size: ${this.fishSkillMessages.size}`);
+            console.log(`📋 Cached message IDs: ${Array.from(this.fishSkillMessages.keys()).join(', ')}`);
             return interaction.reply({ 
                 content: '❌ Không tìm thấy dữ liệu hoặc bạn không phải chủ sở hữu!', 
-                ephemeral: true 
+                flags: 64 // MessageFlags.Ephemeral
             });
         }
 
         if (messageData.userId !== userId) {
+            console.log(`❌ User ID mismatch: expected ${userId}, got ${messageData.userId}`);
             return interaction.reply({ 
                 content: '❌ Không tìm thấy dữ liệu hoặc bạn không phải chủ sở hữu!', 
-                ephemeral: true 
+                flags: 64 // MessageFlags.Ephemeral
             });
         }
 
         try {
+            console.log(`🔍 [DEBUG] Processing interaction:`);
+            console.log(`  - Message type: ${messageData.messageType}`);
+            console.log(`  - Interaction type: ${interaction.isButton() ? 'button' : interaction.isStringSelectMenu() ? 'select menu' : 'other'}`);
+            
             // Xử lý message type 'all_skills'
             if (messageData.messageType === 'all_skills') {
+                console.log(`✅ Processing all_skills message type`);
                 if (interaction.isButton()) {
+                    console.log(`🔘 Handling button interaction: ${interaction.customId}`);
                     await this.handleAllSkillsButton(interaction, messageData);
                 } else if (interaction.isStringSelectMenu()) {
+                    console.log(`📋 Handling select menu interaction: ${interaction.customId}`);
                     await this.handleAllSkillsSelectMenu(interaction, messageData);
                 } else {
+                    console.log(`❌ Unsupported interaction type`);
                     await interaction.reply({ 
                         content: '❌ Chỉ hỗ trợ button và select menu interactions cho all skills view!', 
-                        ephemeral: true 
+                        flags: 64
                     });
                 }
                 return;
@@ -75,6 +105,257 @@ export class FishSkillHandler {
             console.error('Error handling fish skill interaction:', error);
             await interaction.reply({ 
                 content: '❌ Có lỗi xảy ra khi xử lý tương tác!', 
+                ephemeral: true 
+            });
+        }
+    }
+
+    private static async handleAllSkillsButton(interaction: ButtonInteraction, messageData: any) {
+        const customId = interaction.customId;
+        console.log(`🔍 [DEBUG] handleAllSkillsButton called with customId: ${customId}`);
+        console.log(`🔍 [DEBUG] About to enter switch statement...`);
+
+        switch (customId) {
+            case 'view_fish_skills':
+                console.log(`🔘 Handling view_fish_skills`);
+                await this.handleViewFishSkills(interaction, messageData);
+                break;
+            case 'refresh_skills_view':
+                console.log(`🔘 Handling refresh_skills_view`);
+                await this.handleRefreshSkillsView(interaction, messageData);
+                break;
+            case 'sync_skills_data':
+                console.log(`🔘 Handling sync_skills_data`);
+                console.log(`🔍 [DEBUG] About to call handleSyncSkillsData...`);
+                try {
+                    console.log(`🔍 [DEBUG] Calling handleSyncSkillsData now...`);
+                    await this.handleSyncSkillsData(interaction, messageData);
+                    console.log(`✅ handleSyncSkillsData completed successfully`);
+                } catch (error) {
+                    console.error(`❌ Error in handleSyncSkillsData:`, error);
+                    console.error(`❌ Error stack:`, error.stack);
+                    if (!interaction.replied && !interaction.deferred) {
+                        await interaction.reply({ 
+                            content: '❌ Có lỗi xảy ra khi sync skills data!', 
+                            flags: 64
+                        });
+                    }
+                }
+                break;
+            case 'back_to_all_skills':
+                console.log(`🔘 Handling back_to_all_skills`);
+                await this.handleBackToAllSkills(interaction, messageData);
+                break;
+            default:
+                console.log(`❌ Unknown customId in handleAllSkillsButton: ${customId}`);
+                await interaction.reply({ 
+                    content: '❌ Hành động không hợp lệ!', 
+                    flags: 64
+                });
+        }
+    }
+
+    private static async handleAllSkillsSelectMenu(interaction: StringSelectMenuInteraction, messageData: any) {
+        const selectedElement = interaction.values[0];
+        
+        try {
+            await interaction.deferUpdate();
+
+            const skills = messageData.skillsByElement[selectedElement] || [];
+            const elementEmojis = messageData.elementEmojis || {};
+            const elementEmoji = elementEmojis[selectedElement] || '❓';
+
+            // Tạo embed cho element được chọn
+            const embed = new EmbedBuilder()
+                .setTitle(`${elementEmoji} ${selectedElement.toUpperCase()} Skills`)
+                .setDescription(`Tất cả skills thuộc element ${selectedElement}`)
+                .setColor(0x00ff00)
+                .setTimestamp();
+
+            // Thêm thông tin tổng quan
+            embed.addFields({
+                name: '📊 **Thống Kê**',
+                value: `• **Tổng số skills**: ${skills.length}\n• **Element**: ${selectedElement}\n• **Cập nhật**: ${new Date().toLocaleString('vi-VN')}`,
+                inline: false
+            });
+
+            // Thêm từng skill
+            skills.forEach((skill: any, index: number) => {
+                const rarity = skill.requirements?.rarity || 'common';
+                const rarityFormatted = rarity === 'legendary' ? '🌟' : 
+                                      rarity === 'epic' ? '💜' : 
+                                      rarity === 'rare' ? '🔵' : '⚪';
+                
+                const skillInfo = `**${skill.name}** ${rarityFormatted}\n` +
+                                 `💰 ${skill.baseCost.toLocaleString()} FishCoin\n` +
+                                 `⚔️ ${skill.baseDamage} damage | 📋 Level ${skill.maxLevel}\n` +
+                                 `🎯 Success: ${(skill.baseSuccessRate * 100).toFixed(0)}% | ⏱️ Cooldown: ${skill.cooldown}s\n` +
+                                 `📝 ${skill.description}`;
+
+                embed.addFields({
+                    name: `${skill.emoji} ${skill.name}`,
+                    value: skillInfo,
+                    inline: true
+                });
+            });
+
+            // Tạo nút quay lại
+            const buttonRow = new ActionRowBuilder<ButtonBuilder>();
+            const backButton = new ButtonBuilder()
+                .setCustomId('back_to_all_skills')
+                .setLabel('🔙 Quay Lại')
+                .setStyle(ButtonStyle.Secondary);
+
+            buttonRow.addComponents(backButton);
+
+            // Cập nhật message
+            await interaction.editReply({
+                embeds: [embed],
+                components: [buttonRow]
+            });
+
+            // Lưu message data
+            messageData.selectedElement = selectedElement;
+            this.setMessageData(interaction.message.id, messageData);
+
+        } catch (error) {
+            console.error('Error handling all skills select menu:', error);
+            await interaction.followUp({ 
+                content: '❌ Có lỗi xảy ra khi xem skills!', 
+                ephemeral: true 
+            });
+        }
+    }
+
+    private static async handleBackToAllSkills(interaction: ButtonInteraction, messageData: any) {
+        try {
+            await interaction.deferUpdate();
+
+            // Reload skills từ database
+            const allSkills = await FishSkillService.getAllSkillDefinitions();
+            
+            // Group skills theo element
+            const skillsByElement: Record<string, any[]> = {};
+            allSkills.forEach(skill => {
+                if (!skillsByElement[skill.element]) {
+                    skillsByElement[skill.element] = [];
+                }
+                skillsByElement[skill.element].push(skill);
+            });
+
+            // Element emojis
+            const elementEmojis = {
+                fire: '🔥',
+                water: '💧',
+                earth: '🪨',
+                air: '💨',
+                light: '✨',
+                dark: '🌑'
+            };
+
+            // Tạo embed mới
+            const mainEmbed = new EmbedBuilder()
+                .setTitle('🎯 **Hệ Thống Skills**')
+                .setDescription('Chọn element để xem tất cả skills có sẵn')
+                .setColor(0x00ff00)
+                .setTimestamp();
+
+            // Thêm thông tin tổng quan
+            mainEmbed.addFields({
+                name: '📊 **Thống Kê Tổng Quan**',
+                value: `• **Tổng số skills**: ${allSkills.length}\n• **Elements**: ${Object.keys(skillsByElement).length}\n• **Cập nhật**: ${new Date().toLocaleString('vi-VN')}`,
+                inline: false
+            });
+
+            // Thêm skills theo element
+            Object.entries(skillsByElement).forEach(([element, skills]: [string, any[]]) => {
+                const elementEmoji = elementEmojis[element as keyof typeof elementEmojis] || '❓';
+                const skillsText = skills.slice(0, 3).map(skill => {
+                    const level = skill.maxLevel;
+                    const rarity = skill.requirements?.rarity || 'common';
+                    const rarityFormatted = rarity === 'legendary' ? '🌟' : 
+                                          rarity === 'epic' ? '💜' : 
+                                          rarity === 'rare' ? '🔵' : '⚪';
+                    return `**${skill.name}** ${rarityFormatted}\n` +
+                           `💰 ${skill.baseCost.toLocaleString()} FishCoin | ` +
+                           `⚔️ ${skill.baseDamage} damage | ` +
+                           `📋 Level ${level} | ${rarityFormatted} | ${skill.element}`;
+                }).join('\n\n');
+
+                mainEmbed.addFields({
+                    name: `${elementEmoji} ${element.toUpperCase()} Skills (${skills.length})`,
+                    value: skillsText + (skills.length > 3 ? `\n\n*+ ${skills.length - 3} skills khác*` : ''),
+                    inline: false
+                });
+            });
+
+            // Thêm hướng dẫn sử dụng
+            mainEmbed.addFields({
+                name: '🎯 Cách Sử Dụng',
+                value: '• `n.fishbattle skills` - Xem tất cả skills (lệnh này)\n• `n.fishbattle skills <fish_id>` - Quản lý skills cho cá cụ thể\n• Skills được học bằng FishCoin\n• Mỗi skill có requirements về level, stats, rarity',
+                inline: false
+            });
+
+            // Tạo dropdown để chọn skill theo element
+            const { StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = await import("discord.js");
+            
+            const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>();
+            const skillSelectMenu = new StringSelectMenuBuilder()
+                .setCustomId('select_skill_element')
+                .setPlaceholder('🎯 Chọn element để xem tất cả skills')
+                .setMinValues(1)
+                .setMaxValues(1);
+
+            // Thêm options cho mỗi element
+            Object.entries(skillsByElement).forEach(([element, skills]: [string, any[]]) => {
+                const elementEmoji = elementEmojis[element as keyof typeof elementEmojis] || '❓';
+                skillSelectMenu.addOptions(
+                    new StringSelectMenuOptionBuilder()
+                        .setLabel(`${elementEmoji} ${element.toUpperCase()} Skills`)
+                        .setDescription(`${skills.length} skills | Chọn để xem chi tiết`)
+                        .setValue(element)
+                        .setEmoji(elementEmoji)
+                );
+            });
+
+            selectRow.addComponents(skillSelectMenu);
+
+            // Tạo components để điều hướng
+            const buttonRow = new ActionRowBuilder<ButtonBuilder>();
+            
+            const fishSkillsButton = new ButtonBuilder()
+                .setCustomId('view_fish_skills')
+                .setLabel('🐟 Skills Của Cá')
+                .setStyle(ButtonStyle.Primary);
+
+            const refreshButton = new ButtonBuilder()
+                .setCustomId('refresh_skills_view')
+                .setLabel('🔄 Làm Mới')
+                .setStyle(ButtonStyle.Secondary);
+
+            const syncSkillsButton = new ButtonBuilder()
+                .setCustomId('sync_skills_data')
+                .setLabel('⚡ Sync Skills')
+                .setStyle(ButtonStyle.Success);
+
+            buttonRow.addComponents(fishSkillsButton, refreshButton, syncSkillsButton);
+
+            // Cập nhật message
+            await interaction.editReply({
+                embeds: [mainEmbed],
+                components: [selectRow, buttonRow]
+            });
+
+            // Cập nhật message data
+            messageData.allSkills = allSkills;
+            messageData.skillsByElement = skillsByElement;
+            messageData.elementEmojis = elementEmojis;
+            this.setMessageData(interaction.message.id, messageData);
+
+        } catch (error) {
+            console.error('Error handling back to all skills:', error);
+            await interaction.followUp({ 
+                content: '❌ Có lỗi xảy ra khi quay lại!', 
                 ephemeral: true 
             });
         }
@@ -135,6 +416,12 @@ export class FishSkillHandler {
                 break;
             case 'view_skill_requirements':
                 await this.handleViewSkillRequirements(interaction, messageData);
+                break;
+            case 'sync_skills_data':
+                await this.handleSyncSkillsData(interaction, messageData);
+                break;
+            case 'refresh_skills_view':
+                await this.handleRefreshSkillsView(interaction, messageData);
                 break;
             default:
                 await interaction.reply({ 
@@ -461,32 +748,6 @@ export class FishSkillHandler {
         await interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
-    private static async handleAllSkillsButton(interaction: ButtonInteraction, messageData: any) {
-        const customId = interaction.customId;
-
-        switch (customId) {
-            case 'view_fish_skills':
-                await this.handleViewFishSkills(interaction, messageData);
-                break;
-            case 'view_skills_by_element':
-                await this.handleViewSkillsByElement(interaction, messageData);
-                break;
-            case 'view_skill_requirements':
-                await this.handleViewSkillRequirements(interaction, messageData);
-                break;
-            case 'back_to_all_skills':
-                await this.handleBackToAllSkills(interaction, messageData);
-                break;
-            case 'refresh_skills_view':
-                await this.handleRefreshSkillsView(interaction, messageData);
-                break;
-            default:
-                await interaction.reply({ 
-                    content: '❌ Hành động không hợp lệ!', 
-                    ephemeral: true 
-                });
-        }
-    }
 
     private static async updateMessageData(messageData: any) {
         // Cập nhật fish skills
@@ -742,6 +1003,241 @@ export class FishSkillHandler {
             console.error('Error handling all skills select menu:', error);
             await interaction.followUp({ 
                 content: '❌ Có lỗi xảy ra khi xem skills!', 
+                ephemeral: true 
+            });
+        }
+    }
+
+    private static async handleSyncSkillsData(interaction: ButtonInteraction, messageData: any) {
+        console.log(`🔍 [DEBUG] handleSyncSkillsData called`);
+        console.log(`🔍 [DEBUG] Interaction replied: ${interaction.replied}`);
+        console.log(`🔍 [DEBUG] Interaction deferred: ${interaction.deferred}`);
+        
+        try {
+            if (!interaction.replied && !interaction.deferred) {
+                console.log(`🔍 [DEBUG] Deferring reply...`);
+                await interaction.deferReply({ flags: 64 });
+                console.log(`✅ Reply deferred successfully`);
+            } else {
+                console.log(`⚠️ Interaction already replied/deferred, skipping defer`);
+            }
+
+            // Kiểm tra quyền admin
+            console.log(`🔍 [DEBUG] Checking admin permissions for user: ${interaction.user.id}`);
+            const member = await interaction.guild?.members.fetch(interaction.user.id);
+            console.log(`🔍 [DEBUG] Member found: ${!!member}`);
+            if (member) {
+                console.log(`🔍 [DEBUG] Member permissions: ${member.permissions.toArray().join(', ')}`);
+                console.log(`🔍 [DEBUG] Has Administrator: ${member.permissions.has('Administrator')}`);
+            }
+            
+            if (!member?.permissions.has('Administrator')) {
+                console.log(`❌ User does not have Administrator permission`);
+                await interaction.followUp({ 
+                    content: '❌ Chỉ admin mới có thể sync skills data!', 
+                    flags: 64
+                });
+                return;
+            }
+            
+            console.log(`✅ User has Administrator permission, proceeding with sync`);
+
+            // Import script để sync skills
+            const { exec } = require('child_process');
+            const path = require('path');
+            const scriptPath = path.join(__dirname, '../../../scripts/clear-and-import-skills.ts');
+
+            await interaction.followUp({ 
+                content: '⚡ Đang sync skills data... Vui lòng đợi!', 
+                flags: 64
+            });
+
+            // Chạy script sync
+            exec(`npx tsx ${scriptPath}`, async (error: any, stdout: string, stderr: string) => {
+                if (error) {
+                    console.error('Error running sync script:', error);
+                    await interaction.followUp({ 
+                        content: '❌ Lỗi khi sync skills data!', 
+                        flags: 64
+                    });
+                    return;
+                }
+
+                // Parse output để lấy thông tin
+                const lines = stdout.split('\n');
+                const successLine = lines.find(line => line.includes('Thành công:'));
+                const totalLine = lines.find(line => line.includes('Tổng số skills trong database:'));
+
+                let resultMessage = '✅ **Sync Skills Data hoàn thành!**\n\n';
+                
+                if (successLine) {
+                    resultMessage += `${successLine}\n`;
+                }
+                if (totalLine) {
+                    resultMessage += `${totalLine}\n`;
+                }
+
+                resultMessage += '\n🔄 Skills đã được cập nhật từ file data!';
+
+                await interaction.followUp({ 
+                    content: resultMessage, 
+                    flags: 64
+                });
+
+                // Refresh view để hiển thị skills mới
+                await this.handleRefreshSkillsView(interaction, messageData);
+            });
+
+        } catch (error) {
+            console.error('Error handling sync skills data:', error);
+            await interaction.followUp({ 
+                content: '❌ Có lỗi xảy ra khi sync skills data!', 
+                flags: 64
+            });
+        }
+    }
+
+    private static async handleRefreshSkillsView(interaction: ButtonInteraction, messageData: any) {
+        try {
+            // Chỉ defer nếu interaction chưa được reply
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.deferUpdate();
+            }
+
+            // Reload skills từ database
+            const allSkills = await FishSkillService.getAllSkillDefinitions();
+            
+            // Group skills theo element
+            const skillsByElement: Record<string, any[]> = {};
+            allSkills.forEach(skill => {
+                if (!skillsByElement[skill.element]) {
+                    skillsByElement[skill.element] = [];
+                }
+                skillsByElement[skill.element].push(skill);
+            });
+
+            // Element emojis
+            const elementEmojis = {
+                fire: '🔥',
+                water: '💧',
+                earth: '🪨',
+                air: '💨',
+                light: '✨',
+                dark: '🌑'
+            };
+
+            // Tạo embed mới
+            const mainEmbed = new EmbedBuilder()
+                .setTitle('🎯 **Hệ Thống Skills**')
+                .setDescription('Chọn element để xem tất cả skills có sẵn')
+                .setColor(0x00ff00)
+                .setTimestamp();
+
+            // Thêm thông tin tổng quan
+            mainEmbed.addFields({
+                name: '📊 **Thống Kê Tổng Quan**',
+                value: `• **Tổng số skills**: ${allSkills.length}\n• **Elements**: ${Object.keys(skillsByElement).length}\n• **Cập nhật**: ${new Date().toLocaleString('vi-VN')}`,
+                inline: false
+            });
+
+            // Thêm skills theo element
+            Object.entries(skillsByElement).forEach(([element, skills]: [string, any[]]) => {
+                const elementEmoji = elementEmojis[element as keyof typeof elementEmojis] || '❓';
+                const skillsText = skills.slice(0, 3).map(skill => {
+                    const level = skill.maxLevel;
+                    const rarity = skill.requirements?.rarity || 'common';
+                    const rarityFormatted = rarity === 'legendary' ? '🌟' : 
+                                          rarity === 'epic' ? '💜' : 
+                                          rarity === 'rare' ? '🔵' : '⚪';
+                    return `**${skill.name}** ${rarityFormatted}\n` +
+                           `💰 ${skill.baseCost.toLocaleString()} FishCoin | ` +
+                           `⚔️ ${skill.baseDamage} damage | ` +
+                           `📋 Level ${level} | ${rarityFormatted} | ${skill.element}`;
+                }).join('\n\n');
+
+                mainEmbed.addFields({
+                    name: `${elementEmoji} ${element.toUpperCase()} Skills (${skills.length})`,
+                    value: skillsText + (skills.length > 3 ? `\n\n*+ ${skills.length - 3} skills khác*` : ''),
+                    inline: false
+                });
+            });
+
+            // Thêm hướng dẫn sử dụng
+            mainEmbed.addFields({
+                name: '🎯 Cách Sử Dụng',
+                value: '• `n.fishbattle skills` - Xem tất cả skills (lệnh này)\n• `n.fishbattle skills <fish_id>` - Quản lý skills cho cá cụ thể\n• Skills được học bằng FishCoin\n• Mỗi skill có requirements về level, stats, rarity',
+                inline: false
+            });
+
+            // Tạo dropdown để chọn skill theo element
+            const { StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = await import("discord.js");
+            
+            const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>();
+            const skillSelectMenu = new StringSelectMenuBuilder()
+                .setCustomId('select_skill_element')
+                .setPlaceholder('🎯 Chọn element để xem tất cả skills')
+                .setMinValues(1)
+                .setMaxValues(1);
+
+            // Thêm options cho mỗi element
+            Object.entries(skillsByElement).forEach(([element, skills]: [string, any[]]) => {
+                const elementEmoji = elementEmojis[element as keyof typeof elementEmojis] || '❓';
+                skillSelectMenu.addOptions(
+                    new StringSelectMenuOptionBuilder()
+                        .setLabel(`${elementEmoji} ${element.toUpperCase()} Skills`)
+                        .setDescription(`${skills.length} skills | Chọn để xem chi tiết`)
+                        .setValue(element)
+                        .setEmoji(elementEmoji)
+                );
+            });
+
+            selectRow.addComponents(skillSelectMenu);
+
+            // Tạo components để điều hướng
+            const buttonRow = new ActionRowBuilder<ButtonBuilder>();
+            
+            const fishSkillsButton = new ButtonBuilder()
+                .setCustomId('view_fish_skills')
+                .setLabel('🐟 Skills Của Cá')
+                .setStyle(ButtonStyle.Primary);
+
+            const refreshButton = new ButtonBuilder()
+                .setCustomId('refresh_skills_view')
+                .setLabel('🔄 Làm Mới')
+                .setStyle(ButtonStyle.Secondary);
+
+            const syncSkillsButton = new ButtonBuilder()
+                .setCustomId('sync_skills_data')
+                .setLabel('⚡ Sync Skills')
+                .setStyle(ButtonStyle.Success);
+
+            buttonRow.addComponents(fishSkillsButton, refreshButton, syncSkillsButton);
+
+            // Cập nhật message
+            if (interaction.replied || interaction.deferred) {
+                // Nếu interaction đã được reply, edit message trực tiếp
+                await interaction.message.edit({
+                    embeds: [mainEmbed],
+                    components: [selectRow, buttonRow]
+                });
+            } else {
+                // Nếu interaction chưa được reply, sử dụng editReply
+                await interaction.editReply({
+                    embeds: [mainEmbed],
+                    components: [selectRow, buttonRow]
+                });
+            }
+
+            // Cập nhật message data
+            messageData.allSkills = allSkills;
+            messageData.skillsByElement = skillsByElement;
+            messageData.elementEmojis = elementEmojis;
+            this.setMessageData(interaction.message.id, messageData);
+
+        } catch (error) {
+            console.error('Error handling refresh skills view:', error);
+            await interaction.followUp({ 
+                content: '❌ Có lỗi xảy ra khi làm mới view!', 
                 ephemeral: true 
             });
         }

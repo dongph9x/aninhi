@@ -90,11 +90,8 @@ export default Bot.createEvent({
                 return;
             }
 
-            // Kiểm tra xem có phải fish skill interaction không
-            if (interaction.customId.startsWith("fish_skill_") || 
-                interaction.customId.startsWith("view_skills_") ||
-                interaction.customId.startsWith("view_fish_") ||
-                interaction.customId.startsWith("view_skill_")) {
+            // Kiểm tra xem có phải fish skill interaction không (chỉ cho fish_skill_ prefix)
+            if (interaction.customId.startsWith("fish_skill_")) {
                 console.log("FishSkill interaction:", interaction.customId);
                 
                 try {
@@ -131,12 +128,16 @@ export default Bot.createEvent({
                 return;
             }
 
-            // Kiểm tra xem có phải fish skill interaction không
+            // Kiểm tra xem có phải fish skill interaction không (all skills view)
             if (interaction.customId === "select_skill_element" || 
                 interaction.customId === "back_to_all_skills" || 
                 interaction.customId === "refresh_skills_view" ||
-                interaction.customId === "view_fish_skills") {
-                console.log("FishSkill interaction:", interaction.customId);
+                interaction.customId === "view_fish_skills" ||
+                interaction.customId === "sync_skills_data" ||
+                interaction.customId.startsWith("view_skills_") ||
+                interaction.customId.startsWith("view_fish_") ||
+                interaction.customId.startsWith("view_skill_")) {
+                console.log("FishSkill all skills interaction:", interaction.customId);
                 
                 try {
                     const { FishSkillHandler } = await import("../components/MessageComponent/FishSkillHandler");
@@ -144,7 +145,7 @@ export default Bot.createEvent({
                         await FishSkillHandler.handleInteraction(interaction);
                     }
                 } catch (error) {
-                    console.error("Error handling FishSkill interaction:", error);
+                    console.error("Error handling FishSkill all skills interaction:", error);
                     if (!interaction.replied && !interaction.deferred) {
                         interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác fish skill!`);
                     }

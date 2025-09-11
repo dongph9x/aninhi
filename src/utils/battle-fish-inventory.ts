@@ -1,4 +1,5 @@
 import prisma from './prisma';
+import { getMaxLevelForGeneration } from './fish-breeding';
 
 export class BattleFishInventoryService {
   /**
@@ -115,7 +116,7 @@ export class BattleFishInventoryService {
         fish: {
           ...inventoryItem.fish,
           name: inventoryItem.fish.species,
-          experienceToNext: inventoryItem.fish.level >= 10 ? 0 : (inventoryItem.fish.level + 1) * 10,
+          experienceToNext: inventoryItem.fish.level >= getMaxLevelForGeneration(inventoryItem.fish.generation) ? 0 : (inventoryItem.fish.level + 1) * 10,
           traits: JSON.parse(inventoryItem.fish.specialTraits || '[]'),
           stats: JSON.parse(inventoryItem.fish.stats || '{}'),
           canBreed: inventoryItem.fish.status === 'adult',
@@ -137,7 +138,7 @@ export class BattleFishInventoryService {
         fish: {
           ...item.fish,
           name: item.fish.species,
-          experienceToNext: item.fish.level >= 10 ? 0 : (item.fish.level + 1) * 10,
+          experienceToNext: item.fish.level >= getMaxLevelForGeneration(item.fish.generation) ? 0 : (item.fish.level + 1) * 10,
           traits: JSON.parse(item.fish.specialTraits || '[]'),
           stats: JSON.parse(item.fish.stats || '{}'),
           canBreed: item.fish.status === 'adult',
@@ -271,7 +272,7 @@ export class BattleFishInventoryService {
       .map(fish => ({
         ...fish,
         name: fish.species,
-        experienceToNext: fish.level >= 10 ? 0 : (fish.level + 1) * 10,
+        experienceToNext: fish.level >= getMaxLevelForGeneration(fish.generation) ? 0 : (fish.level + 1) * 10,
         traits: JSON.parse(fish.specialTraits || '[]'),
         stats: JSON.parse(fish.stats || '{}'),
         canBreed: fish.status === 'adult',
