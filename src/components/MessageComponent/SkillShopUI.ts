@@ -188,10 +188,14 @@ export class SkillShopUI {
             dark: '🌑'
         };
 
+        console.log('🔍 DEBUG: Creating skill options...');
+        let optionCount = 0;
+
         Object.entries(skillsByElement).forEach(([element, skills]) => {
             const elementEmoji = elementEmojis[element as keyof typeof elementEmojis] || '❓';
             
             skills.forEach(skill => {
+                optionCount++;
                 const isSelected = skill.id === this.selectedSkillId;
                 const canAfford = this.userBalance >= skill.baseCost;
                 const rarity = skill.requirements?.rarity || 'common';
@@ -200,6 +204,15 @@ export class SkillShopUI {
                 // Rút ngắn tên skill nếu quá dài (Discord giới hạn 25 ký tự cho label)
                 const skillName = skill.name.length > 20 ? skill.name.substring(0, 17) + '...' : skill.name;
                 const label = `${isSelected ? '🎯 ' : ''}${skillName}`;
+                
+                console.log(`🔍 DEBUG: Option ${optionCount} - ${skill.name}`);
+                console.log(`  - Original name: "${skill.name}" (${skill.name.length} chars)`);
+                console.log(`  - Truncated name: "${skillName}" (${skillName.length} chars)`);
+                console.log(`  - Final label: "${label}" (${label.length} chars)`);
+                
+                if (label.length > 25) {
+                    console.log(`  ❌ LABEL TOO LONG: ${label.length} > 25`);
+                }
                 
                 skillSelectMenu.addOptions(
                     new StringSelectMenuOptionBuilder()
@@ -225,8 +238,12 @@ export class SkillShopUI {
             .setMinValues(1)
             .setMaxValues(1);
 
+        console.log('🔍 DEBUG: Creating fish options...');
+        let fishOptionCount = 0;
+
         if (this.battleFish.length > 0) {
             this.battleFish.forEach(fish => {
+                fishOptionCount++;
                 const isSelected = fish.id === this.selectedFishId;
                 const stats = fish.stats || {};
                 const hasSkills = fish.fishSkills && fish.fishSkills.length > 0;
@@ -238,6 +255,16 @@ export class SkillShopUI {
                 const maxNameLength = 25 - 3 - 7; // 15 ký tự cho tên
                 const fishName = fish.name.length > maxNameLength ? fish.name.substring(0, maxNameLength - 6) + '...' : fish.name;
                 const fishLabel = `${isSelected ? '🎯 ' : ''}${fishName} (Lv.${fish.level})`;
+                
+                console.log(`🔍 DEBUG: Fish Option ${fishOptionCount} - ${fish.name}`);
+                console.log(`  - Original name: "${fish.name}" (${fish.name.length} chars)`);
+                console.log(`  - Max name length: ${maxNameLength}`);
+                console.log(`  - Truncated name: "${fishName}" (${fishName.length} chars)`);
+                console.log(`  - Final label: "${fishLabel}" (${fishLabel.length} chars)`);
+                
+                if (fishLabel.length > 25) {
+                    console.log(`  ❌ FISH LABEL TOO LONG: ${fishLabel.length} > 25`);
+                }
                 
                 fishSelectMenu.addOptions(
                     new StringSelectMenuOptionBuilder()
@@ -317,6 +344,25 @@ export class SkillShopUI {
 
         utilityRow.addComponents(allSkillsButton, elementButton, battleFishButton);
         rows.push(utilityRow);
+
+        console.log('🔍 DEBUG: Final components created:');
+        console.log(`  - Total rows: ${rows.length}`);
+        rows.forEach((row, index) => {
+            console.log(`  - Row ${index + 1}: ${row.components.length} components`);
+            row.components.forEach((component, compIndex) => {
+                if (component.data.type === 3) { // StringSelectMenu
+                    console.log(`    - Component ${compIndex + 1}: StringSelectMenu with ${component.data.options?.length || 0} options`);
+                    if (component.data.options) {
+                        component.data.options.forEach((option, optIndex) => {
+                            console.log(`      - Option ${optIndex + 1}: "${option.label}" (${option.label?.length || 0} chars)`);
+                            if (option.label && option.label.length > 25) {
+                                console.log(`        ❌ OPTION LABEL TOO LONG: ${option.label.length} > 25`);
+                            }
+                        });
+                    }
+                }
+            });
+        });
 
         return rows;
     }
