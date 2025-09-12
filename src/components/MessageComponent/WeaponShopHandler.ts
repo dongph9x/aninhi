@@ -1,6 +1,6 @@
 import { ButtonInteraction, StringSelectMenuInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } from "discord.js";
 import { WeaponService } from "../../utils/weapon";
-import { EcommerceService } from "../../utils/ecommerce-db";
+import { FishCoinService } from "../../utils/fish-coin";
 
 export class WeaponShopHandler {
     static async handleButton(interaction: ButtonInteraction) {
@@ -68,14 +68,14 @@ export class WeaponShopHandler {
             .setThumbnail("https://media.discordapp.net/attachments/1396335030216822875/1398676895524192358/3516.png?ex=68863ade&is=6884e95e&hm=a6b593878a7a2af5807cf6c5b35a9d007a6939e9fdc72ea3f6889800331e5b15&=&format=webp&quality=lossless&width=664&height=592")
             .setTimestamp();
 
-        const balance = await EcommerceService.getBalance(userId, guildId);
-        embed.addFields({ name: "💰 Balance", value: `${balance.toLocaleString()} AniCoin`, inline: false });
+        const balance = await FishCoinService.getFishBalance(userId, guildId);
+        embed.addFields({ name: "🐟 FishCoin Balance", value: `${balance.toLocaleString()} FishCoin`, inline: false });
 
         const options = weapons.map(weapon => {
             const canAfford = balance >= weapon.price;
-            const emoji = this.getWeaponEmoji(weapon.type);
+            const emoji = this.getWeaponEmoji(weapon.type, weapon.id);
             return new StringSelectMenuOptionBuilder()
-                .setLabel(`${weapon.name} - ${weapon.price.toLocaleString()} AniCoin`)
+                .setLabel(`${weapon.name} - ${weapon.price.toLocaleString()} FishCoin`)
                 .setDescription(`${emoji} ${weapon.description} ${canAfford ? '✅' : '❌'}`)
                 .setValue(weapon.id)
                 .setEmoji(emoji);
@@ -107,13 +107,13 @@ export class WeaponShopHandler {
             return interaction.reply({ embeds: [embed], ephemeral: true });
         }
 
-        let inventoryText = "🎒 **Kho vũ khí của bạn:**\n\n";
+        let inventoryText = "**Vũ khí của bạn:**\n\n";
         
         inventory.forEach((item, index) => {
             const weapon = WeaponService.getWeaponById(item.weaponId);
             if (!weapon) return;
 
-            const emoji = this.getWeaponEmoji(weapon.type);
+            const emoji = this.getWeaponEmoji(weapon.type, weapon.id);
             const equippedStatus = item.isEquipped ? " ⚔️ **ĐANG TRANG BỊ**" : "";
             
             inventoryText += `${index + 1}. ${emoji} **${weapon.name}**${equippedStatus}\n`;
@@ -128,7 +128,7 @@ export class WeaponShopHandler {
             const equippedWeaponInfo = WeaponService.getWeaponById(equippedWeapon.weaponId);
             if (equippedWeaponInfo) {
                 inventoryText += "⚔️ **Vũ khí đang trang bị:**\n";
-                inventoryText += `${this.getWeaponEmoji(equippedWeaponInfo.type)} **${equippedWeaponInfo.name}**\n`;
+                inventoryText += `${this.getWeaponEmoji(equippedWeaponInfo.type, equippedWeaponInfo.id)} **${equippedWeaponInfo.name}**\n`;
                 inventoryText += `   ⚔️ +${equippedWeaponInfo.power} ATK | 🛡️ +${equippedWeaponInfo.defense} DEF | 🎯 +${equippedWeaponInfo.accuracy}\n\n`;
             }
         }
@@ -168,7 +168,7 @@ export class WeaponShopHandler {
             const weapon = WeaponService.getWeaponById(item.weaponId);
             if (!weapon) return null;
 
-            const emoji = this.getWeaponEmoji(weapon.type);
+            const emoji = this.getWeaponEmoji(weapon.type, weapon.id);
             const equippedStatus = item.isEquipped ? " ⚔️ ĐANG TRANG BỊ" : "";
             
             return new StringSelectMenuOptionBuilder()
@@ -221,12 +221,12 @@ export class WeaponShopHandler {
             return interaction.reply({ content: "❌ Không tìm thấy vũ khí!", ephemeral: true });
         }
 
-        const balance = await EcommerceService.getBalance(userId, guildId);
+        const balance = await FishCoinService.getFishBalance(userId, guildId);
         if (balance < weapon.price) {
             const embed = new EmbedBuilder()
                 .setTitle("❌ Không đủ tiền")
                 .setColor("#ff0000")
-                .setDescription(`Bạn cần ${weapon.price.toLocaleString()} AniCoin để mua ${weapon.name}\nHiện tại: ${balance.toLocaleString()} AniCoin`)
+                .setDescription(`Bạn cần ${weapon.price.toLocaleString()} FishCoin để mua ${weapon.name}\nHiện tại: ${balance.toLocaleString()} FishCoin`)
                 .setTimestamp();
             
             return interaction.reply({ embeds: [embed], ephemeral: true });
@@ -234,13 +234,13 @@ export class WeaponShopHandler {
 
         try {
             // Thực hiện mua
-            await EcommerceService.subtractMoney(userId, guildId, Number(weapon.price), `Mua ${weapon.name}`);
+            await FishCoinService.subtractFishCoin(userId, guildId, weapon.price, `Mua ${weapon.name}`);
             await WeaponService.addWeaponToInventory(userId, guildId, weaponId, 1);
 
             const embed = new EmbedBuilder()
                 .setTitle("✅ Mua thành công!")
                 .setColor("#00ff00")
-                .setDescription(`🎉 Đã mua thành công **${weapon.name}**\n💰 Chi phí: ${weapon.price.toLocaleString()} AniCoin\n💳 Balance còn lại: ${(balance - weapon.price).toLocaleString()} AniCoin`)
+                .setDescription(`🎉 Đã mua thành công **${weapon.name}**\n🐟 Chi phí: ${weapon.price.toLocaleString()} FishCoin\n💳 Balance còn lại: ${(balance - weapon.price).toLocaleString()} FishCoin`)
                 .addFields(
                     { name: "⚔️ Sức mạnh", value: `+${weapon.power} ATK`, inline: true },
                     { name: "🛡️ Phòng thủ", value: `+${weapon.defense} DEF`, inline: true },
@@ -288,8 +288,24 @@ export class WeaponShopHandler {
         await interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
-    static getWeaponEmoji(type: string): string {
-        const emojiMap: Record<string, string> = {
+    static getWeaponEmoji(type: string, weaponId?: string): string {
+        // Special case: Legendary Sword uses different emoji
+        if (weaponId === "legendary_sword") {
+            return "<a:than_kiem_sp:1415894929925865543>"; // Legendary sword emoji
+        }
+        
+        // Try custom emoji first, fallback to Unicode if not available
+        const customEmojiMap: Record<string, string> = {
+            sword: "<a:kiem_shop:1415891704023875756>", // Animated emoji format (Iron Sword)
+            shield: "<a:khien_shop:1415888932641701959>", // Animated shield emoji
+            spear: "<a:giao_shop:1415907542080553102>", // Animated spear emoji
+            bow: "<a:cung_shop:1415887183797157999>", // Animated bow emoji
+            axe: "<a:riu_shop:1415909549197496401>", // Animated axe emoji
+            staff: "<a:cau_phep_sp:1415899585464762368>", // Animated staff emoji
+            dagger: "<a:than_kiem_sp:1415894929925865543>" // Animated dagger emoji
+        };
+        
+        const unicodeEmojiMap: Record<string, string> = {
             sword: "⚔️",
             shield: "🛡️",
             spear: "🔱",
@@ -298,6 +314,8 @@ export class WeaponShopHandler {
             staff: "🔮",
             dagger: "🗡️"
         };
-        return emojiMap[type] || "⚔️";
+        
+        // Use custom animated emoji
+        return customEmojiMap[type] || unicodeEmojiMap[type] || "⚔️";
     }
 } 
