@@ -7,6 +7,50 @@ import { getMaxLevelForGeneration } from './fish-breeding';
 
 export class BattleVisualSystem {
     /**
+     * Xử lý emoji với fallback system thông minh
+     */
+    private static getSkillEmoji(emoji: string): string {
+        // Nếu emoji là custom emoji format, sử dụng fallback để đảm bảo hiển thị
+        if (emoji.includes('<a:') || emoji.includes('<:')) {
+            // Map các custom emoji phổ biến với fallback emoji
+            const emojiMap: { [key: string]: string } = {
+                'pixel_skill_bong_ma': '🌑', // Hắc Ám Tuyệt Đối
+                'water_wave': '💧',
+                'fire_blast': '🔥',
+                'earth_quake': '🌍',
+                'wind_gust': '💨',
+                'light_beam': '✨',
+                'ice_crystal': '❄️',
+                'shadow_bind': '🌑',
+                'fire_rage': '🔥',
+                'water_shield': '🛡️',
+                'earth_armor': '🏔️',
+                'wind_boost': '💨',
+                'divine_blessing': '✨',
+                'poison_dart': '☠️',
+                'regeneration_aura': '💚',
+                'berserk_fury': '😡',
+                'blinding_light': '☀️',
+                'petrify_stone': '🗿',
+                'confusion_wind': '🌀'
+            };
+
+            // Tìm emoji phù hợp trong custom emoji string
+            for (const [key, fallback] of Object.entries(emojiMap)) {
+                if (emoji.includes(key)) {
+                    return fallback;
+                }
+            }
+
+            // Default fallback cho custom emoji không xác định
+            return '⚡';
+        }
+
+        // Nếu là Unicode emoji, sử dụng trực tiếp
+        return emoji;
+    }
+
+    /**
      * Tạo thanh HP với Unicode characters
      */
     static createHPBar(currentHP: number, maxHP: number, barLength: number = 20): string {
@@ -595,10 +639,30 @@ ${winnerEmoji} BATTLE RESULT ${winnerEmoji}
     /**
      * Tạo khung cho cá của bạn (multi-round)
      */
-    static createUserFishFrameMultiRound(userFish: any, roundData: any, userHPBar: string, userHPPercent: number, userPower: number, userStats: any): string {
+    static createUserFishFrameMultiRound(userFish: any, roundData: any, userHPBar: string, userHPPercent: number, userPower: number, userStats: any, userSkills?: any[]): string {
+        let skillsDisplay = '';
+        
+        // Hiển thị skills nếu có
+        if (userSkills && userSkills.length > 0) {
+            skillsDisplay = `\n  🎯 **SKILLS:**                       \n`;
+            userSkills.slice(0, 3).forEach((skill, index) => {
+                const skillDef = skill.skillDefinition;
+                const cooldown = skill.cooldownRemaining || 0;
+                const cooldownText = cooldown > 0 ? ` (⏱️${cooldown}s)` : '';
+                const emoji = this.getSkillEmoji(skillDef.emoji);
+                skillsDisplay += `  ${emoji} ${skillDef.name} Lv.${skill.level}${cooldownText}\n`;
+            });
+            
+            if (userSkills.length > 3) {
+                skillsDisplay += `  ... và ${userSkills.length - 3} skill khác\n`;
+            }
+        } else {
+            skillsDisplay = `\n  🎯 **SKILLS:** Không có skill nào\n`;
+        }
+        
         return `
 ══════════════════════════════════════
-            🐟 CÁ CỦA BẠN              
+            🐟 CÁ CỦA BẠN 🐟              
                                       
   ${this.getFishEmoji(userFish.name)} ${userFish.name.padEnd(25)}  
   Lv.${userFish.level} Gen.${userFish.generation} Power:${userPower.toString().padEnd(3)}       
@@ -608,7 +672,7 @@ ${winnerEmoji} BATTLE RESULT ${winnerEmoji}
                                       
   📊 **STATS:**                       
   💪${(userStats.strength || 0).toString().padEnd(3)} 🏃${(userStats.agility || 0).toString().padEnd(3)} 🧠${(userStats.intelligence || 0).toString().padEnd(3)}    
-  🛡️${(userStats.defense || 0).toString().padEnd(3)} 🍀${(userStats.luck || 0).toString().padEnd(3)} 🎯${(userStats.accuracy || 0).toString().padEnd(3)}  
+  🛡️${(userStats.defense || 0).toString().padEnd(3)} 🍀${(userStats.luck || 0).toString().padEnd(3)} 🎯${(userStats.accuracy || 0).toString().padEnd(3)}  ${skillsDisplay}
                                     
 ══════════════════════════════════════`;
     }
@@ -616,7 +680,27 @@ ${winnerEmoji} BATTLE RESULT ${winnerEmoji}
     /**
      * Tạo khung cho cá đối thủ (multi-round)
      */
-    static createOpponentFishFrameMultiRound(opponentFish: any, roundData: any, opponentHPBar: string, opponentHPPercent: number, opponentPower: number, opponentStats: any): string {
+    static createOpponentFishFrameMultiRound(opponentFish: any, roundData: any, opponentHPBar: string, opponentHPPercent: number, opponentPower: number, opponentStats: any, opponentSkills?: any[]): string {
+        let skillsDisplay = '';
+        
+        // Hiển thị skills nếu có
+        if (opponentSkills && opponentSkills.length > 0) {
+            skillsDisplay = `\n  🎯 **SKILLS:**                       \n`;
+            opponentSkills.slice(0, 3).forEach((skill, index) => {
+                const skillDef = skill.skillDefinition;
+                const cooldown = skill.cooldownRemaining || 0;
+                const cooldownText = cooldown > 0 ? ` (⏱️${cooldown}s)` : '';
+                const emoji = this.getSkillEmoji(skillDef.emoji);
+                skillsDisplay += `  ${emoji} ${skillDef.name} Lv.${skill.level}${cooldownText}\n`;
+            });
+            
+            if (opponentSkills.length > 3) {
+                skillsDisplay += `  ... và ${opponentSkills.length - 3} skill khác\n`;
+            }
+        } else {
+            skillsDisplay = `\n  🎯 **SKILLS:** Không có skill nào\n`;
+        }
+        
         return `
             🐟 ĐỐI THỦ               
 ══════════════════════════════════════
@@ -629,7 +713,7 @@ ${winnerEmoji} BATTLE RESULT ${winnerEmoji}
                                       
   📊 **STATS:**                       
   💪${(opponentStats.strength || 0).toString().padEnd(3)} 🏃${(opponentStats.agility || 0).toString().padEnd(3)} 🧠${(opponentStats.intelligence || 0).toString().padEnd(3)}    
-  🛡️${(opponentStats.defense || 0).toString().padEnd(3)} 🍀${(opponentStats.luck || 0).toString().padEnd(3)} 🎯${(opponentStats.accuracy || 0).toString().padEnd(3)}  
+  🛡️${(opponentStats.defense || 0).toString().padEnd(3)} 🍀${(opponentStats.luck || 0).toString().padEnd(3)} 🎯${(opponentStats.accuracy || 0).toString().padEnd(3)}  ${skillsDisplay}
                                       
 ══════════════════════════════════════`;
     }
@@ -644,7 +728,7 @@ ${winnerEmoji} BATTLE RESULT ${winnerEmoji}
         userMaxHP: number;
         opponentMaxHP: number;
         action: string;
-    }>): string {
+    }>, userSkills?: any[], opponentSkills?: any[]): string {
         try {
             let display = '';
             
@@ -663,15 +747,15 @@ ${winnerEmoji} BATTLE RESULT ${winnerEmoji}
                 const opponentHPPercent = Math.floor((roundData.opponentHP / roundData.opponentMaxHP) * 100);
                 
                 // Tạo 2 khung riêng biệt cho mỗi hiệp
-                const userFrame = this.createUserFishFrameMultiRound(userFish, roundData, userHPBar, userHPPercent, userPower, userStats);
-                const opponentFrame = this.createOpponentFishFrameMultiRound(opponentFish, roundData, opponentHPBar, opponentHPPercent, opponentPower, opponentStats);
+                const userFrame = this.createUserFishFrameMultiRound(userFish, roundData, userHPBar, userHPPercent, userPower, userStats, userSkills);
+                const opponentFrame = this.createOpponentFishFrameMultiRound(opponentFish, roundData, opponentHPBar, opponentHPPercent, opponentPower, opponentStats, opponentSkills);
                 
                 // Ghép 2 khung lại với nhau
                 const combinedFrames = this.combineFrames(userFrame, opponentFrame);
                 
                 display += `
 ══════════════════════════════════════
-      ⚔️ HIỆP ${roundData.round} ⚔️               
+              ⚔️ HIỆP ${roundData.round} ⚔️               
 ${combinedFrames}
                                                              
   📝 **Hành động:** \n ${roundData.action.padEnd(50)}           
@@ -690,7 +774,7 @@ ${combinedFrames}
     /**
      * Tạo battle animation với logic HP thực tế (đồng bộ với battle system)
      */
-    static createBattleAnimation(userFish: any, opponentFish: any, userMaxHP: number, opponentMaxHP: number): Array<{
+    static createBattleAnimation(userFish: any, opponentFish: any, userMaxHP: number, opponentMaxHP: number, userSkills?: any[], opponentSkills?: any[]): Array<{
         round: number;
         userHP: number;
         opponentHP: number;

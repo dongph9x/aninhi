@@ -9,6 +9,7 @@ import {
 import { FishSkillService } from "@/utils/fish-skills";
 import { FISH_SKILLS, FishSkillHelper } from "@/config/fish-skills";
 import { SkillShopUI } from "./SkillShopUI";
+import { formatMultipleEffects } from "@/utils/effect-translator";
 import prisma from "@/utils/prisma";
 
 export class SkillShopHandler {
@@ -342,8 +343,39 @@ export class SkillShopHandler {
                             successRatePerLevel: Number(skillDef.successRatePerLevel)
                         }, fishSkill.level);
                         
-                        return `**${skillDef.emoji}** **${skillDef.name}** (Lv.${fishSkill.level})\n` +
-                               `💥 ${damage} damage | 🎯 ${Math.round(successRate * 100)}% thành công`;
+                        let skillText = `**${skillDef.emoji}** **${skillDef.name}** (Lv.${fishSkill.level})\n` +
+                                       `💥 ${damage} damage | 🎯 ${Math.round(successRate * 100)}% thành công`;
+                        
+                        // Add effects information
+                        if (skillDef.effects) {
+                            try {
+                                const effects = JSON.parse(skillDef.effects);
+                                
+                                if (effects.effectIds && effects.effectIds.length > 0) {
+                                    const effectDetails = formatMultipleEffects(
+                                        effects.effectIds,
+                                        effects.effectChances,
+                                        effects.effectIntensities
+                                    );
+                                    
+                                    skillText += `\n✨ **Effects:** ${effectDetails}`;
+                                } else {
+                                    // Legacy effects
+                                    const legacyEffects = Object.entries(effects)
+                                        .filter(([key]) => !['effectIds', 'effectChances', 'effectIntensities'].includes(key))
+                                        .map(([key, value]) => `${key}: ${(value * 100).toFixed(0)}%`)
+                                        .join(', ');
+                                    
+                                    if (legacyEffects) {
+                                        skillText += `\n✨ **Effects:** ${legacyEffects}`;
+                                    }
+                                }
+                            } catch (error) {
+                                // Ignore JSON parse errors
+                            }
+                        }
+                        
+                        return skillText;
                     }).join('\n\n');
 
                     embed.addFields({
@@ -583,9 +615,26 @@ export class SkillShopHandler {
                     const level = skill.requirements?.level || 1;
                     const successRate = Math.round((skill.baseSuccessRate || 0.5) * 100);
                     
-                    return `**${skill.emoji}** **${skill.name}**\n` +
-                           `💰 ${cost} FishCoin | 💥 ${damage} damage | 🎯 ${successRate}% thành công\n` +
-                           `📋 Level ${level} | ${rarityFormatted}`;
+                    let skillText = `**${skill.emoji}** **${skill.name}**\n` +
+                                   `💰 ${cost} FishCoin | 💥 ${damage} damage | 🎯 ${successRate}% thành công\n` +
+                                   `📋 Level ${level} | ${rarityFormatted}`;
+                    
+                    // Add effects information
+                    if (skill.effects) {
+                        if (skill.effects.effectIds && skill.effects.effectIds.length > 0) {
+                            const effectCount = skill.effects.effectIds.length;
+                            skillText += `\n✨ ${effectCount} effect(s)`;
+                        } else {
+                            const legacyEffectCount = Object.keys(skill.effects).filter(key => 
+                                !['effectIds', 'effectChances', 'effectIntensities'].includes(key)
+                            ).length;
+                            if (legacyEffectCount > 0) {
+                                skillText += `\n✨ ${legacyEffectCount} effect(s)`;
+                            }
+                        }
+                    }
+                    
+                    return skillText;
                 }).join('\n\n');
 
                 embed.addFields({

@@ -361,12 +361,21 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
             const userMaxHP = calculateMaxHP(selectedFish);
             const opponentMaxHP = calculateMaxHP(opponentResult.opponent);
             
+            // Lấy thông tin skills cho battle visual
+            const { SkillBattleService } = await import("@/utils/skill-battle");
+            const userBattleSkills = await SkillBattleService.initializeBattleSkills(selectedFish.id);
+            const opponentBattleSkills = opponentResult.opponent.isBot ? 
+                { skills: [], cooldowns: new Map() } : 
+                await SkillBattleService.initializeBattleSkills(opponentResult.opponent.id);
+            
             // Tạo animation data (kết thúc khi HP về 0)
             const battleRounds = BattleVisualSystem.createBattleAnimation(
                 selectedFish, 
                 opponentResult.opponent, 
                 userMaxHP, 
-                opponentMaxHP
+                opponentMaxHP,
+                userBattleSkills.skills,
+                opponentBattleSkills.skills
             );
             
             // Hiển thị từng hiệp với delay
@@ -375,7 +384,9 @@ async function findRandomBattle(message: any, userId: string, guildId: string) {
                 const roundDisplay = BattleVisualSystem.createMultiRoundBattle(
                     selectedFish, 
                     opponentResult.opponent, 
-                    [roundData]
+                    [roundData],
+                    userBattleSkills.skills,
+                    opponentBattleSkills.skills
                 );
                 
                 const battleEmbed = new EmbedBuilder()
@@ -955,12 +966,19 @@ async function invitePlayerToBattle(message: any, userId: string, guildId: strin
                 const userMaxHP = calculateMaxHP(selectedFish);
                 const targetMaxHP = calculateMaxHP(targetFish);
                 
+                // Lấy thông tin skills cho battle visual
+                const { SkillBattleService } = await import("@/utils/skill-battle");
+                const userBattleSkills = await SkillBattleService.initializeBattleSkills(selectedFish.id);
+                const targetBattleSkills = await SkillBattleService.initializeBattleSkills(targetFish.id);
+                
                 // Tạo animation data
                 const battleRounds = BattleVisualSystem.createBattleAnimation(
                     selectedFish, 
                     targetFish, 
                     userMaxHP, 
-                    targetMaxHP
+                    targetMaxHP,
+                    userBattleSkills.skills,
+                    targetBattleSkills.skills
                 );
                 
                 // Hiển thị từng hiệp với delay
@@ -969,7 +987,9 @@ async function invitePlayerToBattle(message: any, userId: string, guildId: strin
                     const roundDisplay = BattleVisualSystem.createMultiRoundBattle(
                         selectedFish, 
                         targetFish, 
-                        [roundData]
+                        [roundData],
+                        userBattleSkills.skills,
+                        targetBattleSkills.skills
                     );
                     
                     const battleEmbed = new EmbedBuilder()

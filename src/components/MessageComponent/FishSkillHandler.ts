@@ -9,6 +9,7 @@ import {
 import { FishSkillService, FishSkillData } from "@/utils/fish-skills";
 import { FISH_SKILLS, FishSkillDefinition } from "@/config/fish-skills";
 import { FishSkillUI } from "./FishSkillUI";
+import { formatMultipleEffects } from "@/utils/effect-translator";
 import prisma from "@/utils/prisma";
 
 export class FishSkillHandler {
@@ -186,11 +187,33 @@ export class FishSkillHandler {
                                       rarity === 'epic' ? '💜' : 
                                       rarity === 'rare' ? '🔵' : '⚪';
                 
-                const skillInfo = `**${skill.name}** ${rarityFormatted}\n` +
-                                 `💰 ${skill.baseCost.toLocaleString()} FishCoin\n` +
-                                 `⚔️ ${skill.baseDamage} damage | 📋 Level ${skill.maxLevel}\n` +
-                                 `🎯 Success: ${(skill.baseSuccessRate * 100).toFixed(0)}% | ⏱️ Cooldown: ${skill.cooldown}s\n` +
-                                 `📝 ${skill.description}`;
+                let skillInfo = `**${skill.name}** ${rarityFormatted}\n` +
+                               `💰 ${skill.baseCost.toLocaleString()} FishCoin\n` +
+                               `⚔️ ${skill.baseDamage} damage | 📋 Level ${skill.maxLevel}\n` +
+                               `🎯 Success: ${(skill.baseSuccessRate * 100).toFixed(0)}% | ⏱️ Cooldown: ${skill.cooldown}s\n` +
+                               `📝 ${skill.description}`;
+                
+                // Add effects information
+                if (skill.effects) {
+                    if (skill.effects.effectIds && skill.effects.effectIds.length > 0) {
+                        const effectDetails = formatMultipleEffects(
+                            skill.effects.effectIds,
+                            skill.effects.effectChances,
+                            skill.effects.effectIntensities
+                        );
+                        
+                        skillInfo += `\n✨ **Effects:** ${effectDetails}`;
+                    } else {
+                        const legacyEffects = Object.entries(skill.effects)
+                            .filter(([key]) => !['effectIds', 'effectChances', 'effectIntensities'].includes(key))
+                            .map(([key, value]) => `${key}: ${(value * 100).toFixed(0)}%`)
+                            .join(', ');
+                        
+                        if (legacyEffects) {
+                            skillInfo += `\n✨ **Effects:** ${legacyEffects}`;
+                        }
+                    }
+                }
 
                 embed.addFields({
                     name: `${skill.emoji} ${skill.name}`,

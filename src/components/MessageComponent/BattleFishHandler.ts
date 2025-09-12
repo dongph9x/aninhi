@@ -558,13 +558,22 @@ export class BattleFishHandler {
             
             console.log('Battle rounds created:', battleRounds.length);
             
+            // Lấy thông tin skills cho battle visual
+            const { SkillBattleService } = await import("@/utils/skill-battle");
+            const userBattleSkills = await SkillBattleService.initializeBattleSkills(selectedFish.id);
+            const opponentBattleSkills = opponent.isBot ? 
+                { skills: [], cooldowns: new Map() } : 
+                await SkillBattleService.initializeBattleSkills(opponent.id);
+            
             // Hiển thị từng hiệp với delay
             for (let i = 0; i < battleRounds.length; i++) {
                 const roundData = battleRounds[i];
                 const roundDisplay = BattleVisualSystem.createMultiRoundBattle(
                     selectedFish, 
                     opponent, 
-                    [roundData]
+                    [roundData],
+                    userBattleSkills.skills,
+                    opponentBattleSkills.skills
                 );
                 
                 const battleEmbed = new EmbedBuilder()

@@ -8,6 +8,7 @@ import {
 } from "discord.js";
 import { FishSkillService, FishSkillData } from "@/utils/fish-skills";
 import { FISH_SKILLS, FishSkillDefinition, FishSkillHelper } from "@/config/fish-skills";
+import { formatMultipleEffects } from "@/utils/effect-translator";
 
 export class FishSkillUI {
     private fish: any;
@@ -111,10 +112,33 @@ export class FishSkillUI {
                 skillInfo += `💰 Cost: ${selectedSkill.baseCost.toLocaleString()} FishCoin\n`;
                 
                 if (selectedSkill.effects) {
-                    const effects = Object.entries(selectedSkill.effects)
-                        .map(([key, value]) => `${key}: ${(value * 100).toFixed(0)}%`)
-                        .join(', ');
-                    skillInfo += `✨ Effects: ${effects}\n`;
+                    let effectsText = '';
+                    
+                    // New effect system
+                    if (selectedSkill.effects.effectIds && selectedSkill.effects.effectIds.length > 0) {
+                        const effectDetails = formatMultipleEffects(
+                            selectedSkill.effects.effectIds,
+                            selectedSkill.effects.effectChances,
+                            selectedSkill.effects.effectIntensities
+                        );
+                        
+                        effectsText = `✨ **Effects:** ${effectDetails}`;
+                    }
+                    // Legacy effect system (backward compatibility)
+                    else {
+                        const legacyEffects = Object.entries(selectedSkill.effects)
+                            .filter(([key]) => !['effectIds', 'effectChances', 'effectIntensities'].includes(key))
+                            .map(([key, value]) => `${key}: ${(value * 100).toFixed(0)}%`)
+                            .join(', ');
+                        
+                        if (legacyEffects) {
+                            effectsText = `✨ **Effects:** ${legacyEffects}`;
+                        }
+                    }
+                    
+                    if (effectsText) {
+                        skillInfo += `${effectsText}\n`;
+                    }
                 }
                 
                 if (selectedSkill.requirements) {
