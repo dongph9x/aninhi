@@ -21,11 +21,17 @@ export interface FishSkillDefinition {
         rarity?: string;
     };
     effects?: {
+        // Legacy effects (for backward compatibility)
         burn?: number; // Tỷ lệ burn
         freeze?: number; // Tỷ lệ freeze
         stun?: number; // Tỷ lệ stun
         heal?: number; // Lượng heal
         shield?: number; // Lượng shield
+        
+        // New effect system
+        effectIds?: string[]; // Danh sách effect IDs
+        effectChances?: { [effectId: string]: number }; // Tỷ lệ áp dụng effect
+        effectIntensities?: { [effectId: string]: number }; // Cường độ effect
     };
 }
 

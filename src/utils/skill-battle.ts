@@ -1,4 +1,5 @@
 import prisma from './prisma';
+import { BattleEffectsService, BattleEffectState, EffectResult } from './battle-effects';
 
 export interface FishSkillData {
   id: string;
@@ -26,6 +27,7 @@ export interface FishSkillData {
 export interface BattleSkillState {
   skills: FishSkillData[];
   cooldowns: Map<string, number>; // skillId -> rounds remaining
+  effectState: BattleEffectState; // Effects đang active
 }
 
 export class SkillBattleService {
@@ -83,6 +85,7 @@ export class SkillBattleService {
       });
 
       const cooldowns = new Map<string, number>();
+      const effectState = BattleEffectsService.createEffectState();
       
       // Khởi tạo cooldown cho tất cả skills
       skills.forEach(skill => {
@@ -112,11 +115,12 @@ export class SkillBattleService {
             effects: skill.skillDefinition.effects ? JSON.parse(skill.skillDefinition.effects) : undefined
           }
         })),
-        cooldowns
+        cooldowns,
+        effectState
       };
     } catch (error) {
       console.error('Error initializing battle skills:', error);
-      return { skills: [], cooldowns: new Map() };
+      return { skills: [], cooldowns: new Map(), effectState: BattleEffectsService.createEffectState() };
     }
   }
 
@@ -143,13 +147,15 @@ export class SkillBattleService {
   static async useSkillInBattle(
     fishId: string, 
     skill: FishSkillData, 
-    battleState: BattleSkillState
+    battleState: BattleSkillState,
+    targetEffectState?: BattleEffectState
   ): Promise<{
     success: boolean;
     skillUsed: FishSkillData;
     damage: number;
     message: string;
     cooldownRemaining: number;
+    effectsApplied: EffectResult[];
   }> {
     try {
       const skillDef = skill.skillDefinition;
@@ -185,12 +191,27 @@ export class SkillBattleService {
           skillUsed: skill,
           damage: 0,
           message: `💨 **${skillDef.name}** đã trượt! (Tỷ lệ: ${Math.round(successRate * 100)}%)`,
-          cooldownRemaining: skillDef.cooldown
+          cooldownRemaining: skillDef.cooldown,
+          effectsApplied: []
         };
       }
 
       // Skill thành công
       const finalDamage = Math.floor(skillDamage * (0.8 + Math.random() * 0.4)); // 80-120% damage
+      
+      // Áp dụng effects nếu có
+      const effectsApplied: EffectResult[] = [];
+      if (targetEffectState && skillDef.effects && skillDef.effects.effectIds) {
+        for (const effectId of skillDef.effects.effectIds) {
+          const effectChance = skillDef.effects.effectChances?.[effectId] || 0.5;
+          const effectIntensity = skillDef.effects.effectIntensities?.[effectId];
+          
+          if (Math.random() < effectChance) {
+            const effectResult = BattleEffectsService.applyEffect(effectId, targetEffectState, effectIntensity);
+            effectsApplied.push(effectResult);
+          }
+        }
+      }
       
       // Tạo message thành công
       const elementEmojis: { [key: string]: string } = {
@@ -205,12 +226,22 @@ export class SkillBattleService {
       
       const damageEmoji = finalDamage > skillDamage * 1.1 ? '💥' : '⚡';
       
+      // Tạo message với effects
+      let effectMessages = '';
+      if (effectsApplied.length > 0) {
+        effectMessages = '\n' + effectsApplied
+          .filter(effect => effect.success)
+          .map(effect => effect.message)
+          .join('\n');
+      }
+      
       return {
         success: true,
         skillUsed: skill,
         damage: finalDamage,
-        message: `${damageEmoji} **${skillDef.name}** (Lv.${skillLevel}) ${elementEmoji} gây **${finalDamage}** sát thương! (Tỷ lệ: ${Math.round(successRate * 100)}%)`,
-        cooldownRemaining: skillDef.cooldown
+        message: `${damageEmoji} **${skillDef.name}** (Lv.${skillLevel}) ${elementEmoji} gây **${finalDamage}** sát thương! (Tỷ lệ: ${Math.round(successRate * 100)}%)${effectMessages}`,
+        cooldownRemaining: skillDef.cooldown,
+        effectsApplied
       };
     } catch (error) {
       console.error('Error using skill in battle:', error);
@@ -219,7 +250,8 @@ export class SkillBattleService {
         skillUsed: skill,
         damage: 0,
         message: '❌ Lỗi khi sử dụng skill!',
-        cooldownRemaining: 0
+        cooldownRemaining: 0,
+        effectsApplied: []
       };
     }
   }
@@ -233,6 +265,31 @@ export class SkillBattleService {
         battleState.cooldowns.set(skillId, cooldown - 1);
       }
     }
+    
+    // Giảm duration của effects
+    BattleEffectsService.reduceEffectDurations(battleState.effectState);
+  }
+
+  /**
+   * Kiểm tra xem có thể sử dụng skill không (bị khóa bởi effect)
+   */
+  static canUseSkill(battleState: BattleSkillState): boolean {
+    return !BattleEffectsService.hasEffect(battleState.effectState, 'skill_lock');
+  }
+
+  /**
+   * Xử lý effects trong battle round
+   */
+  static processBattleEffects(
+    battleState: BattleSkillState,
+    targetStats: any,
+    targetHP: number
+  ): {
+    modifiedStats: any;
+    modifiedHP: number;
+    messages: string[];
+  } {
+    return BattleEffectsService.processEffects(battleState.effectState, targetStats, targetHP);
   }
 
   /**
