@@ -197,9 +197,13 @@ export class SkillShopUI {
                 const rarity = skill.requirements?.rarity || 'common';
                 const rarityFormatted = rarity.charAt(0).toUpperCase() + rarity.slice(1);
                 
+                // Rút ngắn tên skill nếu quá dài (Discord giới hạn 25 ký tự cho label)
+                const skillName = skill.name.length > 20 ? skill.name.substring(0, 17) + '...' : skill.name;
+                const label = `${isSelected ? '🎯 ' : ''}${skillName}`;
+                
                 skillSelectMenu.addOptions(
                     new StringSelectMenuOptionBuilder()
-                        .setLabel(`${isSelected ? '🎯 ' : ''}${skill.name}`)
+                        .setLabel(label)
                         .setDescription(`${skill.emoji} ${elementEmoji} ${element} | ${skill.baseCost.toLocaleString()} FishCoin | ${rarityFormatted}${isSelected ? ' | ✅ CHỌN' : ''}`)
                         .setValue(skill.id)
                         .setEmoji(isSelected ? '🎯' : '➕')
@@ -228,9 +232,13 @@ export class SkillShopUI {
                 const hasSkills = fish.fishSkills && fish.fishSkills.length > 0;
                 const skillStatus = hasSkills ? ' | ❌ ĐÃ CÓ SKILL' : ' | ✅ CHƯA CÓ SKILL';
                 
+                // Rút ngắn tên cá nếu quá dài (Discord giới hạn 25 ký tự cho label)
+                const fishName = fish.name.length > 18 ? fish.name.substring(0, 15) + '...' : fish.name;
+                const fishLabel = `${isSelected ? '🎯 ' : ''}${fishName} (Lv.${fish.level})`;
+                
                 fishSelectMenu.addOptions(
                     new StringSelectMenuOptionBuilder()
-                        .setLabel(`${isSelected ? '🎯 ' : ''}${fish.name} (Lv.${fish.level})`)
+                        .setLabel(fishLabel)
                         .setDescription(`Gen.${fish.generation} | 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0}${skillStatus}${isSelected ? ' | ✅ CHỌN' : ''}`)
                         .setValue(fish.id)
                         .setEmoji(isSelected ? '🎯' : (hasSkills ? '❌' : '🐟'))

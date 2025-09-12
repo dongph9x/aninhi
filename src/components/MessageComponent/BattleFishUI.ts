@@ -188,8 +188,11 @@ export class BattleFishUI {
                     const power = this.calculatePower(fish);
                     const isSelected = fish.id === this.selectedFishId;
                     
+                    // Rút ngắn tên cá nếu quá dài
+                    const fishName = fish.name.length > 15 ? fish.name.substring(0, 12) + '...' : fish.name;
+                    
                     return new StringSelectMenuOptionBuilder()
-                        .setLabel(`${fish.name} (Lv.${fish.level}, Gen.${fish.generation})`)
+                        .setLabel(`${fishName} (Lv.${fish.level}, Gen.${fish.generation})`)
                         .setDescription(`Power: ${power} | 🐟${fish.value.toLocaleString()} | ${isSelected ? 'Đã chọn' : 'Trong túi đấu'}`)
                         .setValue(`battle_${fish.id}`)
                         .setEmoji(isSelected ? '🎯' : '🐟');
@@ -203,8 +206,11 @@ export class BattleFishUI {
                 this.eligibleFish.slice(0, 5).map((fish: any, index: number) => {
                     const power = this.calculatePower(fish);
                     
+                    // Rút ngắn tên cá nếu quá dài
+                    const fishName = fish.name.length > 15 ? fish.name.substring(0, 12) + '...' : fish.name;
+                    
                     return new StringSelectMenuOptionBuilder()
-                        .setLabel(`${fish.name} (Lv.${fish.level}, Gen.${fish.generation})`)
+                        .setLabel(`${fishName} (Lv.${fish.level}, Gen.${fish.generation})`)
                         .setDescription(`Power: ${power} | 🐟${fish.value.toLocaleString()} | Có thể thêm`)
                         .setValue(`eligible_${fish.id}`)
                         .setEmoji('➕');
