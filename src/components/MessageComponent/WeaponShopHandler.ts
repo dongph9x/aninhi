@@ -120,7 +120,7 @@ export class WeaponShopHandler {
             inventoryText += `   📦 Số lượng: ${item.quantity}\n`;
             inventoryText += `   ⚔️ Sức mạnh: +${weapon.power} ATK\n`;
             inventoryText += `   🛡️ Phòng thủ: +${weapon.defense} DEF\n`;
-            inventoryText += `   🎯 Độ chính xác: +${weapon.accuracy}%\n`;
+            inventoryText += `   🎯 Độ chính xác: +${weapon.accuracy}\n`;
             inventoryText += `   ⭐ Hiếm: ${weapon.rarity}\n\n`;
         });
 
@@ -129,7 +129,7 @@ export class WeaponShopHandler {
             if (equippedWeaponInfo) {
                 inventoryText += "⚔️ **Vũ khí đang trang bị:**\n";
                 inventoryText += `${this.getWeaponEmoji(equippedWeaponInfo.type)} **${equippedWeaponInfo.name}**\n`;
-                inventoryText += `   ⚔️ +${equippedWeaponInfo.power} ATK | 🛡️ +${equippedWeaponInfo.defense} DEF | 🎯 +${equippedWeaponInfo.accuracy}%\n\n`;
+                inventoryText += `   ⚔️ +${equippedWeaponInfo.power} ATK | 🛡️ +${equippedWeaponInfo.defense} DEF | 🎯 +${equippedWeaponInfo.accuracy}\n\n`;
             }
         }
 
@@ -173,7 +173,7 @@ export class WeaponShopHandler {
             
             return new StringSelectMenuOptionBuilder()
                 .setLabel(`${weapon.name}${equippedStatus}`)
-                .setDescription(`${emoji} +${weapon.power} ATK | +${weapon.defense} DEF | +${weapon.accuracy}%`)
+                .setDescription(`${emoji} +${weapon.power} ATK | +${weapon.defense} DEF | +${weapon.accuracy}`)
                 .setValue(weapon.id)
                 .setEmoji(emoji);
         }).filter(Boolean);
@@ -244,7 +244,7 @@ export class WeaponShopHandler {
                 .addFields(
                     { name: "⚔️ Sức mạnh", value: `+${weapon.power} ATK`, inline: true },
                     { name: "🛡️ Phòng thủ", value: `+${weapon.defense} DEF`, inline: true },
-                    { name: "🎯 Độ chính xác", value: `+${weapon.accuracy}%`, inline: true }
+                    { name: "🎯 Độ chính xác", value: `+${weapon.accuracy}`, inline: true }
                 )
                 .setTimestamp();
 
@@ -281,7 +281,7 @@ export class WeaponShopHandler {
             .addFields(
                 { name: "⚔️ Sức mạnh", value: `+${weapon.power} ATK`, inline: true },
                 { name: "🛡️ Phòng thủ", value: `+${weapon.defense} DEF`, inline: true },
-                { name: "🎯 Độ chính xác", value: `+${weapon.accuracy}%`, inline: true }
+                { name: "🎯 Độ chính xác", value: `+${weapon.accuracy}`, inline: true }
             )
             .setTimestamp();
 

@@ -77,7 +77,7 @@ async function showWeaponShop(message: any, guildId: string, userId: string) {
         shopText += `   💰 Giá: ${weapon.price.toLocaleString()} AniCoin\n`;
         shopText += `   ⚔️ Sức mạnh: +${weapon.power} ATK\n`;
         shopText += `   🛡️ Phòng thủ: +${weapon.defense} DEF\n`;
-        shopText += `   🎯 Độ chính xác: +${weapon.accuracy}%\n`;
+        shopText += `   🎯 Độ chính xác: +${weapon.accuracy}\n`;
         shopText += `   📝 ${weapon.description}\n\n`;
     });
 
@@ -173,7 +173,7 @@ async function buyWeapon(message: any, guildId: string, userId: string, weaponId
             .addFields(
                 { name: "⚔️ Sức mạnh", value: `+${weapon.power} ATK`, inline: true },
                 { name: "🛡️ Phòng thủ", value: `+${weapon.defense} DEF`, inline: true },
-                { name: "🎯 Độ chính xác", value: `+${weapon.accuracy}%`, inline: true }
+                { name: "🎯 Độ chính xác", value: `+${weapon.accuracy}`, inline: true }
             )
             .setTimestamp();
 
@@ -218,7 +218,7 @@ async function showWeaponInventory(message: any, guildId: string, userId: string
         inventoryText += `   📦 Số lượng: ${item.quantity}\n`;
         inventoryText += `   ⚔️ Sức mạnh: +${weapon.power} ATK\n`;
         inventoryText += `   🛡️ Phòng thủ: +${weapon.defense} DEF\n`;
-        inventoryText += `   🎯 Độ chính xác: +${weapon.accuracy}%\n`;
+        inventoryText += `   🎯 Độ chính xác: +${weapon.accuracy}\n`;
         inventoryText += `   ⭐ Hiếm: ${weapon.rarity}\n\n`;
     });
 
@@ -227,7 +227,7 @@ async function showWeaponInventory(message: any, guildId: string, userId: string
         if (equippedWeaponInfo) {
             inventoryText += "⚔️ **Vũ khí đang trang bị:**\n";
             inventoryText += `${getWeaponEmoji(equippedWeaponInfo.type)} **${equippedWeaponInfo.name}**\n`;
-            inventoryText += `   ⚔️ +${equippedWeaponInfo.power} ATK | 🛡️ +${equippedWeaponInfo.defense} DEF | 🎯 +${equippedWeaponInfo.accuracy}%\n\n`;
+            inventoryText += `   ⚔️ +${equippedWeaponInfo.power} ATK | 🛡️ +${equippedWeaponInfo.defense} DEF | 🎯 +${equippedWeaponInfo.accuracy}\n\n`;
         }
     }
 
@@ -278,7 +278,7 @@ async function equipWeapon(message: any, guildId: string, userId: string, weapon
             .addFields(
                 { name: "⚔️ Sức mạnh", value: `+${weapon.power} ATK`, inline: true },
                 { name: "🛡️ Phòng thủ", value: `+${weapon.defense} DEF`, inline: true },
-                { name: "🎯 Độ chính xác", value: `+${weapon.accuracy}%`, inline: true }
+                { name: "🎯 Độ chính xác", value: `+${weapon.accuracy}`, inline: true }
             )
             .setTimestamp();
 
@@ -354,7 +354,7 @@ async function showWeaponInfo(message: any, guildId: string, userId: string, wea
             { name: "💰 Giá", value: `${weapon.price.toLocaleString()} AniCoin`, inline: true },
             { name: "⚔️ Sức mạnh", value: `+${weapon.power} ATK`, inline: true },
             { name: "🛡️ Phòng thủ", value: `+${weapon.defense} DEF`, inline: true },
-            { name: "🎯 Độ chính xác", value: `+${weapon.accuracy}%`, inline: true },
+            { name: "🎯 Độ chính xác", value: `+${weapon.accuracy}`, inline: true },
             { name: "🏷️ Loại", value: weapon.type, inline: true },
             { name: "⭐ Hiếm", value: weapon.rarity, inline: true }
         )

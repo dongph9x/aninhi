@@ -270,7 +270,8 @@ export class FishBattleService {
     if (opponents.length === 0) {
       // Nếu không tìm thấy đối thủ thực tế, tạo BOT đối thủ
       console.log(`🤖 No real opponents found, creating BOT opponent for user ${userId}`);
-      const botOpponent = this.createBotOpponent(userFish);
+      const botUserWeaponStats = await WeaponService.getTotalWeaponStats(userId, guildId);
+      const botOpponent = this.createBotOpponent(userFish, botUserWeaponStats);
       
       return {
         success: true,
@@ -327,17 +328,27 @@ export class FishBattleService {
   /**
    * Tạo BOT đối thủ với stats cân bằng
    */
-  private static createBotOpponent(userFish: any) {
+  private static createBotOpponent(userFish: any, userWeaponStats?: any) {
     // Parse stats của user fish
     const userStats = JSON.parse(userFish.stats || '{}');
     
-    // Tính toán sức mạnh cơ bản của user fish
+    // Cộng weapon stats vào user stats để tạo BOT cân bằng
+    const userStatsWithWeapon = {
+      strength: (userStats.strength || 0) + (userWeaponStats?.power || 0),
+      agility: userStats.agility || 0,
+      intelligence: userStats.intelligence || 0,
+      defense: (userStats.defense || 0) + (userWeaponStats?.defense || 0),
+      luck: userStats.luck || 0,
+      accuracy: (userStats.accuracy || 0) + (userWeaponStats?.accuracy || 0)
+    };
+    
+    // Tính toán sức mạnh cơ bản của user fish (đã bao gồm weapon)
     const userBasePower = FishBreedingService.calculateTotalPowerWithLevel({
       ...userFish,
-      stats: userStats
+      stats: userStatsWithWeapon
     });
 
-    // Tạo BOT đối thủ với sức mạnh cân bằng với user fish
+    // Tạo BOT đối thủ với sức mạnh cân bằng với user fish (đã có weapon)
     const powerVariation = 0.3; // ±30% variation
     const randomMultiplier = 0.7 + (Math.random() * powerVariation * 2); // 0.7 - 1.3 (BOT có thể mạnh hơn user)
     const botBasePower = userBasePower * randomMultiplier;
@@ -347,17 +358,17 @@ export class FishBattleService {
     const maxBotPower = userBasePower * 1.3;
     const finalBotPower = Math.max(minBotPower, Math.min(botBasePower, maxBotPower));
     
-    // Tạo stats BOT dựa trên stats người chơi với variation
+    // Tạo stats BOT dựa trên stats người chơi (đã có weapon) với variation
     const variation = 0.2; // ±20% variation
     const randomVariation = () => 0.8 + (Math.random() * variation * 2); // 0.8 - 1.2
     
     const botStats = {
-      strength: Math.floor((userStats.strength || 50) * randomVariation()),
-      agility: Math.floor((userStats.agility || 50) * randomVariation()),
-      intelligence: Math.floor((userStats.intelligence || 50) * randomVariation()),
-      defense: Math.floor((userStats.defense || 50) * randomVariation()),
-      luck: Math.floor((userStats.luck || 50) * randomVariation()),
-      accuracy: Math.floor((userStats.accuracy || 50) * randomVariation())
+      strength: Math.floor((userStatsWithWeapon.strength || 50) * randomVariation()),
+      agility: Math.floor((userStatsWithWeapon.agility || 50) * randomVariation()),
+      intelligence: Math.floor((userStatsWithWeapon.intelligence || 50) * randomVariation()),
+      defense: Math.floor((userStatsWithWeapon.defense || 50) * randomVariation()),
+      luck: Math.floor((userStatsWithWeapon.luck || 50) * randomVariation()),
+      accuracy: Math.floor((userStatsWithWeapon.accuracy || 50) * randomVariation())
     };
 
     // Tạo BOT opponent
@@ -508,7 +519,8 @@ export class FishBattleService {
           where: { id: fishId, userId }
         });
         if (userFish) {
-          const botOpponent = this.createBotOpponent(userFish);
+          const fallbackUserWeaponStats = await WeaponService.getTotalWeaponStats(userId, guildId);
+          const botOpponent = this.createBotOpponent(userFish, fallbackUserWeaponStats);
           opponentResult = { opponent: botOpponent, isBot: true };
           opponentFish = botOpponent;
         }
@@ -594,10 +606,24 @@ export class FishBattleService {
       });
     }
 
-    // Tính toán sức mạnh cơ bản của user
+    // Lấy weapon stats của user
+    const userWeaponStats = await WeaponService.getTotalWeaponStats(userId, guildId);
+    const userEquippedWeapon = await WeaponService.getEquippedWeapon(userId, guildId);
+    
+    // Cộng weapon stats trực tiếp vào fish stats
+    const userStatsWithWeapon = {
+      strength: (userStats.strength || 0) + userWeaponStats.power,
+      agility: userStats.agility || 0,
+      intelligence: userStats.intelligence || 0,
+      defense: (userStats.defense || 0) + userWeaponStats.defense,
+      luck: userStats.luck || 0,
+      accuracy: (userStats.accuracy || 0) + userWeaponStats.accuracy
+    };
+
+    // Tính toán sức mạnh cơ bản của user (sử dụng stats đã cộng vũ khí)
     const userBasePower = FishBreedingService.calculateTotalPowerWithLevel({
       ...userFish,
-      stats: userStats
+      stats: userStatsWithWeapon
     });
 
     // Tạo battle log
@@ -608,23 +634,16 @@ export class FishBattleService {
     const opponentName = isBotOpponent ? opponentResult.opponent.species : opponentFish.species;
     battleLog.push(`⚔️ **${userFish.species}** vs **${opponentName}**`);
     battleLog.push(`💪 Sức mạnh cơ bản: ${Math.floor(userBasePower)} vs ${Math.floor(opponentBasePower)}`);
-
-    // Lấy weapon stats của user
-    const userWeaponStats = await WeaponService.getTotalWeaponStats(userId, guildId);
-    const userEquippedWeapon = await WeaponService.getEquippedWeapon(userId, guildId);
     
-    // Tính toán sức mạnh sau khi cộng weapon stats
-    let userPowerWithWeapon = userBasePower;
-    let opponentPowerWithWeapon = opponentBasePower;
+    // Tính toán sức mạnh với stats đã được cộng vũ khí (sử dụng công thức từ FishBreedingService)
+    const userPowerWithWeapon = FishBreedingService.calculateTotalPowerWithLevel({
+      ...userFish,
+      stats: userStatsWithWeapon
+    });
+    const opponentPowerWithWeapon = opponentBasePower;
     
+    // Hiển thị thông tin vũ khí
     if (userWeaponStats.power > 0 || userWeaponStats.defense > 0 || userWeaponStats.accuracy > 0) {
-      // Cộng weapon stats vào sức mạnh
-      userPowerWithWeapon += userWeaponStats.power * 10; // 1 ATK = +10 power
-      userPowerWithWeapon += userWeaponStats.defense * 5; // 1 DEF = +5 power
-      
-      // Accuracy ảnh hưởng đến critical hit chance
-      const accuracyBonus = userWeaponStats.accuracy * 0.01; // 1% accuracy = +1% crit chance
-      
       battleLog.push(`\n⚔️ **Vũ khí trang bị của ${userFish.species}:**`);
       if (userEquippedWeapon) {
         const weapon = WeaponService.getWeaponById(userEquippedWeapon.weaponId);
@@ -632,15 +651,15 @@ export class FishBattleService {
           battleLog.push(`🗡️ ${weapon.name} (${weapon.rarity})`);
         }
       }
-      battleLog.push(`⚔️ ATK: +${userWeaponStats.power} | 🛡️ DEF: +${userWeaponStats.defense} | 🎯 Accuracy: +${userWeaponStats.accuracy}%`);
-      battleLog.push(`💪 Sức mạnh sau vũ khí: ${Math.floor(userPowerWithWeapon)}`);
+      battleLog.push(`⚔️ ATK: +${userWeaponStats.power} | 🛡️ DEF: +${userWeaponStats.defense} | 🎯 Accuracy: +${userWeaponStats.accuracy}`);
     } else {
       battleLog.push(`\n⚔️ **${userFish.species}** không có vũ khí trang bị`);
     }
 
-    // Thêm chi tiết stats
-    battleLog.push(`\n📊 **Stats ${userFish.species}:**`);
-            battleLog.push(`💪 Sức mạnh: ${userStats.strength || 0} | 🏃 Thể lực: ${userStats.agility || 0} | 🧠 Trí tuệ: ${userStats.intelligence || 0} | 🛡️ Phòng thủ: ${userStats.defense || 0} | 🍀 May mắn: ${userStats.luck || 0} | 🎯 Độ chính xác: ${userStats.accuracy || 0}`);
+    // Hiển thị stats sau khi cộng vũ khí
+    battleLog.push(`\n📊 **Stats ${userFish.species} (sau vũ khí):**`);
+    battleLog.push(`💪 Sức mạnh: ${userStatsWithWeapon.strength} | 🏃 Thể lực: ${userStatsWithWeapon.agility} | 🧠 Trí tuệ: ${userStatsWithWeapon.intelligence} | 🛡️ Phòng thủ: ${userStatsWithWeapon.defense} | 🍀 May mắn: ${userStatsWithWeapon.luck} | 🎯 Độ chính xác: ${userStatsWithWeapon.accuracy}`);
+    battleLog.push(`💪 Tổng sức mạnh: ${Math.floor(userPowerWithWeapon)} (đã bao gồm vũ khí)`);
 
     battleLog.push(`\n📊 **Stats ${opponentName}:**`);
             battleLog.push(`💪 Sức mạnh: ${opponentStats.strength || 0} | 🏃 Thể lực: ${opponentStats.agility || 0} | 🧠 Trí tuệ: ${opponentStats.intelligence || 0} | 🛡️ Phòng thủ: ${opponentStats.defense || 0} | 🍀 May mắn: ${opponentStats.luck || 0} | 🎯 Độ chính xác: ${opponentStats.accuracy || 0}`);
@@ -729,8 +748,8 @@ export class FishBattleService {
     // === PHASE 2: TÍNH TOÁN SỨC MẠNH THỰC TẾ ===
     battleLog.push(`\n⚡ **PHASE 2: Tính toán sức mạnh thực tế**`);
     
-    // Yếu tố may mắn (random)
-    const userLuckRoll = Math.random() * (userStats.luck || 0) / 100;
+    // Yếu tố may mắn (random) - sử dụng stats đã cộng vũ khí
+    const userLuckRoll = Math.random() * (userStatsWithWeapon.luck || 0) / 100;
     const opponentLuckRoll = Math.random() * (opponentStats.luck || 0) / 100;
     
     const userLuckBonus = userLuckRoll * 0.3; // +30% max từ luck
@@ -748,8 +767,8 @@ export class FishBattleService {
     // === PHASE 3: KIỂM TRA CRITICAL HIT ===
     battleLog.push(`\n🎯 **PHASE 3: Kiểm tra đòn đánh quan trọng**`);
     
-            // Critical hit chance = luck + fish accuracy + weapon accuracy
-        const userCritChance = (userStats.luck || 0) / 200 + (userStats.accuracy || 0) / 200 + (userWeaponStats.accuracy || 0) / 100; // 0.5% mỗi điểm luck + 0.5% mỗi điểm fish accuracy + 1% mỗi điểm weapon accuracy
+            // Critical hit chance = luck + accuracy (đã bao gồm weapon accuracy)
+        const userCritChance = (userStatsWithWeapon.luck || 0) / 200 + (userStatsWithWeapon.accuracy || 0) / 200; // 0.5% mỗi điểm luck + 0.5% mỗi điểm accuracy (bao gồm weapon points)
     const opponentCritChance = (opponentStats.luck || 0) / 200;
     
     const userCritRoll = Math.random();
@@ -769,14 +788,14 @@ export class FishBattleService {
     }
 
     // Hiển thị critical hit chance
-            battleLog.push(`🎯 ${userFish.species} Crit Chance: ${Math.round(userCritChance * 100)}% (Luck: ${userStats.luck || 0} + Fish Accuracy: ${userStats.accuracy || 0} + Weapon Accuracy: ${userWeaponStats.accuracy || 0}%)`);
+            battleLog.push(`🎯 ${userFish.species} Crit Chance: ${Math.round(userCritChance * 100)}% (Luck: ${userStatsWithWeapon.luck || 0} + Accuracy: ${userStatsWithWeapon.accuracy || 0})`);
     battleLog.push(`🎯 ${opponentName} Crit Chance: ${Math.round(opponentCritChance * 100)}% (Luck: ${opponentStats.luck || 0})`);
 
     // === PHASE 4: KIỂM TRA KHẢ NĂNG ĐẶC BIỆT ===
     battleLog.push(`\n✨ **PHASE 4: Kiểm tra khả năng đặc biệt**`);
     
-    // Khả năng dựa trên stats cao nhất
-    const userMaxStat = Math.max(userStats.strength || 0, userStats.agility || 0, userStats.intelligence || 0, userStats.defense || 0);
+    // Khả năng dựa trên stats cao nhất (sử dụng stats đã cộng vũ khí)
+    const userMaxStat = Math.max(userStatsWithWeapon.strength || 0, userStatsWithWeapon.agility || 0, userStatsWithWeapon.intelligence || 0, userStatsWithWeapon.defense || 0);
     const opponentMaxStat = Math.max(opponentStats.strength || 0, opponentStats.agility || 0, opponentStats.intelligence || 0, opponentStats.defense || 0);
     
     let userSpecialBonus = 0;
@@ -881,10 +900,10 @@ export class FishBattleService {
       const userOriginalDamage = userBaseDamage;
       const opponentOriginalDamage = opponentBaseDamage;
       
-      // Tính khả năng né tránh dựa trên Agility và Intelligence
-      const userAgility = userStats.agility || 0;
+      // Tính khả năng né tránh dựa trên Agility và Intelligence (sử dụng stats đã cộng vũ khí)
+      const userAgility = userStatsWithWeapon.agility || 0;
       const opponentAgility = opponentStats.agility || 0;
-      const userIntelligence = userStats.intelligence || 0;
+      const userIntelligence = userStatsWithWeapon.intelligence || 0;
       const opponentIntelligence = opponentStats.intelligence || 0;
       
       // Khả năng né tránh: 0-40% dựa trên Agility (70%) + Intelligence (30%)
@@ -895,8 +914,8 @@ export class FishBattleService {
       const userDodges = Math.random() < userDodgeChance;
       const opponentDodges = Math.random() < opponentDodgeChance;
       
-      // Tính khả năng hit dựa trên Accuracy (kiểm tra miss trước)
-      const userAccuracy = userStats.accuracy || 0;
+      // Tính khả năng hit dựa trên Accuracy (sử dụng stats đã cộng vũ khí)
+      const userAccuracy = userStatsWithWeapon.accuracy || 0;
       const opponentAccuracy = opponentStats.accuracy || 0;
       
       // Hit chance: 70-100% dựa trên Accuracy (tối thiểu 70% để không miss quá nhiều)
@@ -919,8 +938,8 @@ export class FishBattleService {
         opponentDamage = opponentBaseDamage; // Skill damage không bị miss
       }
       
-      // Tính khả năng critical hit dựa trên Luck (chỉ nếu hit)
-      const userLuck = userStats.luck || 0;
+      // Tính khả năng critical hit dựa trên Luck (sử dụng stats đã cộng vũ khí)
+      const userLuck = userStatsWithWeapon.luck || 0;
       const opponentLuck = opponentStats.luck || 0;
       
       // Critical hit chance: 0-20% dựa trên Luck
@@ -947,8 +966,8 @@ export class FishBattleService {
         opponentDamage = opponentDodges ? Math.floor(opponentDamage * 0.3) : opponentDamage;
       }
       
-      // Áp dụng Defense để giảm damage nhận vào (chỉ nếu có damage)
-      const userDefense = userStats.defense || 0;
+      // Áp dụng Defense để giảm damage nhận vào (sử dụng stats đã cộng vũ khí)
+      const userDefense = userStatsWithWeapon.defense || 0;
       const opponentDefense = opponentStats.defense || 0;
       
       // Defense giảm damage: 0-25% dựa trên Defense
