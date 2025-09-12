@@ -233,7 +233,10 @@ export class SkillShopUI {
                 const skillStatus = hasSkills ? ' | ❌ ĐÃ CÓ SKILL' : ' | ✅ CHƯA CÓ SKILL';
                 
                 // Rút ngắn tên cá nếu quá dài (Discord giới hạn 25 ký tự cho label)
-                const fishName = fish.name.length > 18 ? fish.name.substring(0, 15) + '...' : fish.name;
+                // Cần tính toán: emoji (3) + tên + " (Lv.X)" (7) = tối đa 25
+                // Nếu có "..." thì cần thêm 3 ký tự nữa
+                const maxNameLength = 25 - 3 - 7; // 15 ký tự cho tên
+                const fishName = fish.name.length > maxNameLength ? fish.name.substring(0, maxNameLength - 6) + '...' : fish.name;
                 const fishLabel = `${isSelected ? '🎯 ' : ''}${fishName} (Lv.${fish.level})`;
                 
                 fishSelectMenu.addOptions(

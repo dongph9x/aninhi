@@ -188,8 +188,10 @@ export class BattleFishUI {
                     const power = this.calculatePower(fish);
                     const isSelected = fish.id === this.selectedFishId;
                     
-                    // Rút ngắn tên cá nếu quá dài
-                    const fishName = fish.name.length > 15 ? fish.name.substring(0, 12) + '...' : fish.name;
+                    // Rút ngắn tên cá nếu quá dài (Discord giới hạn 25 ký tự cho label)
+                    // Cần tính toán: emoji (3) + tên + " (Lv.X, Gen.Y)" (12) = tối đa 25
+                    const maxNameLength = 25 - 3 - 12; // 10 ký tự cho tên
+                    const fishName = fish.name.length > maxNameLength ? fish.name.substring(0, maxNameLength - 6) + '...' : fish.name;
                     
                     return new StringSelectMenuOptionBuilder()
                         .setLabel(`${fishName} (Lv.${fish.level}, Gen.${fish.generation})`)
@@ -206,8 +208,10 @@ export class BattleFishUI {
                 this.eligibleFish.slice(0, 5).map((fish: any, index: number) => {
                     const power = this.calculatePower(fish);
                     
-                    // Rút ngắn tên cá nếu quá dài
-                    const fishName = fish.name.length > 15 ? fish.name.substring(0, 12) + '...' : fish.name;
+                    // Rút ngắn tên cá nếu quá dài (Discord giới hạn 25 ký tự cho label)
+                    // Cần tính toán: emoji (3) + tên + " (Lv.X, Gen.Y)" (12) = tối đa 25
+                    const maxNameLength = 25 - 3 - 12; // 10 ký tự cho tên
+                    const fishName = fish.name.length > maxNameLength ? fish.name.substring(0, maxNameLength - 6) + '...' : fish.name;
                     
                     return new StringSelectMenuOptionBuilder()
                         .setLabel(`${fishName} (Lv.${fish.level}, Gen.${fish.generation})`)
