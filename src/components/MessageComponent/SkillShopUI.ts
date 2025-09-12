@@ -227,8 +227,13 @@ export class SkillShopUI {
         // Note: Discord.js v14 không hỗ trợ setDefaultValues cho StringSelectMenuBuilder
         // Selection sẽ được hiển thị thông qua emoji và description
         
-        skillSelectRow.addComponents(skillSelectMenu);
-        rows.push(skillSelectRow);
+        // Chỉ thêm skillSelectRow nếu có options
+        if (skillSelectMenu.data.options && skillSelectMenu.data.options.length > 0) {
+            skillSelectRow.addComponents(skillSelectMenu);
+            rows.push(skillSelectRow);
+        } else {
+            console.log('⚠️  WARNING: No skill options available, skipping skill select menu');
+        }
 
         // Row 2: Dropdown chọn cá
         const fishSelectRow = new ActionRowBuilder<StringSelectMenuBuilder>();
@@ -287,8 +292,13 @@ export class SkillShopUI {
         // Note: Discord.js v14 không hỗ trợ setDefaultValues cho StringSelectMenuBuilder
         // Selection sẽ được hiển thị thông qua emoji và description
         
-        fishSelectRow.addComponents(fishSelectMenu);
-        rows.push(fishSelectRow);
+        // Chỉ thêm fishSelectRow nếu có options
+        if (fishSelectMenu.data.options && fishSelectMenu.data.options.length > 0) {
+            fishSelectRow.addComponents(fishSelectMenu);
+            rows.push(fishSelectRow);
+        } else {
+            console.log('⚠️  WARNING: No fish options available, skipping fish select menu');
+        }
 
         // Row 3: Các nút thao tác
         const buttonRow = new ActionRowBuilder<ButtonBuilder>();
