@@ -506,6 +506,7 @@ export class SkillShopHandler {
 
             // Lấy skills từ database
             const skills = await FishSkillService.getAllSkillDefinitions();
+            console.log(`🔍 DEBUG: Loaded ${skills.length} skills from database`);
             
             // Tạo UI
             const ui = new SkillShopUI(
@@ -515,6 +516,8 @@ export class SkillShopHandler {
                 messageData.guildId,
                 newBalance
             );
+            
+            console.log(`🔍 DEBUG: Created SkillShopUI with ${skills.length} skills and ${inventory.items.length} battle fish`);
 
             const embed = ui.createEmbed();
             const components = ui.createComponents();

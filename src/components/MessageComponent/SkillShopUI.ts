@@ -162,6 +162,7 @@ export class SkillShopUI {
     }
 
     createComponents(): ActionRowBuilder<any>[] {
+        console.log(`🔍 DEBUG: SkillShopUI.createComponents() called with ${this.skills.length} skills and ${this.battleFish.length} battle fish`);
         const rows: ActionRowBuilder<any>[] = [];
 
         // Row 1: Dropdown chọn skill
@@ -228,9 +229,19 @@ export class SkillShopUI {
         // Selection sẽ được hiển thị thông qua emoji và description
         
         // Chỉ thêm skillSelectRow nếu có options
-        if (skillSelectMenu.data.options && skillSelectMenu.data.options.length > 0) {
+        console.log(`🔍 DEBUG: skillSelectMenu.data.options:`, skillSelectMenu.data.options);
+        console.log(`🔍 DEBUG: skillSelectMenu.data.options.length:`, skillSelectMenu.data.options?.length);
+        console.log(`🔍 DEBUG: skillSelectMenu.options:`, skillSelectMenu.options);
+        console.log(`🔍 DEBUG: skillSelectMenu.options.length:`, skillSelectMenu.options?.length);
+        
+        // Kiểm tra cả data.options và options
+        const hasOptions = (skillSelectMenu.data.options && skillSelectMenu.data.options.length > 0) || 
+                          (skillSelectMenu.options && skillSelectMenu.options.length > 0);
+        
+        if (hasOptions) {
             skillSelectRow.addComponents(skillSelectMenu);
             rows.push(skillSelectRow);
+            console.log('✅ Added skill select menu to rows');
         } else {
             console.log('⚠️  WARNING: No skill options available, skipping skill select menu');
         }
@@ -293,9 +304,19 @@ export class SkillShopUI {
         // Selection sẽ được hiển thị thông qua emoji và description
         
         // Chỉ thêm fishSelectRow nếu có options
-        if (fishSelectMenu.data.options && fishSelectMenu.data.options.length > 0) {
+        console.log(`🔍 DEBUG: fishSelectMenu.data.options:`, fishSelectMenu.data.options);
+        console.log(`🔍 DEBUG: fishSelectMenu.data.options.length:`, fishSelectMenu.data.options?.length);
+        console.log(`🔍 DEBUG: fishSelectMenu.options:`, fishSelectMenu.options);
+        console.log(`🔍 DEBUG: fishSelectMenu.options.length:`, fishSelectMenu.options?.length);
+        
+        // Kiểm tra cả data.options và options
+        const hasFishOptions = (fishSelectMenu.data.options && fishSelectMenu.data.options.length > 0) || 
+                              (fishSelectMenu.options && fishSelectMenu.options.length > 0);
+        
+        if (hasFishOptions) {
             fishSelectRow.addComponents(fishSelectMenu);
             rows.push(fishSelectRow);
+            console.log('✅ Added fish select menu to rows');
         } else {
             console.log('⚠️  WARNING: No fish options available, skipping fish select menu');
         }
