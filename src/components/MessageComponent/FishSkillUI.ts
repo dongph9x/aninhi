@@ -195,9 +195,9 @@ export class FishSkillUI {
                     
                     return new StringSelectMenuOptionBuilder()
                         .setLabel(`${skillName} (Lv.${skill.level})`)
-                        .setDescription(`**${skill.skillDefinition.emoji}** ${skill.skillDefinition.element} | ${isSelected ? 'Đã chọn' : 'Đã học'} | ${canUpgrade ? 'Có thể nâng cấp' : 'Level tối đa'}`)
+                        .setDescription(`${skill.skillDefinition.element} | ${isSelected ? 'Đã chọn' : 'Đã học'} | ${canUpgrade ? 'Có thể nâng cấp' : 'Level tối đa'}`)
                         .setValue(`learned_${skill.skillId}`)
-                        .setEmoji(isSelected ? '🎯' : '✅');
+                        .setEmoji(skill.skillDefinition.emoji);
                 })
             );
         }
@@ -213,10 +213,10 @@ export class FishSkillUI {
                     const skillName = skill.name.length > 20 ? skill.name.substring(0, 17) + '...' : skill.name;
                     
                     return new StringSelectMenuOptionBuilder()
-                        .setLabel(`${skillName}`)
-                        .setDescription(`**${skill.emoji}** ${skill.element} | ${skill.baseCost.toLocaleString()} FishCoin | ${canLearn.canLearn ? 'Có thể học' : canLearn.reason}`)
+                        .setLabel(`${skillName} - ${skill.baseCost.toLocaleString()} FishCoin`)
+                        .setDescription(`${skill.element} | ${canLearn.canLearn ? 'Có thể học' : canLearn.reason}`)
                         .setValue(`available_${skill.id}`)
-                        .setEmoji(isSelected ? '🎯' : '➕');
+                        .setEmoji(skill.emoji);
                 })
             );
         }

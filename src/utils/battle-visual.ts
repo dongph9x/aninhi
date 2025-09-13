@@ -650,14 +650,15 @@ ${winnerEmoji} BATTLE RESULT ${winnerEmoji}
                 const cooldown = skill.cooldownRemaining || 0;
                 const cooldownText = cooldown > 0 ? ` (⏱️${cooldown}s)` : '';
                 const emoji = this.getSkillEmoji(skillDef.emoji);
-                skillsDisplay += `  ${emoji} ${skillDef.name} Lv.${skill.level}${cooldownText}\n`;
+                const statusIcon = cooldown > 0 ? '⏳' : '✅';
+                skillsDisplay += `  ${emoji} **${skillDef.name}** Lv.${skill.level} ${statusIcon}${cooldownText}\n`;
             });
             
             if (userSkills.length > 3) {
-                skillsDisplay += `  ... và ${userSkills.length - 3} skill khác\n`;
+                skillsDisplay += `  📋 ... và ${userSkills.length - 3} skill khác\n`;
             }
         } else {
-            skillsDisplay = `\n  🎯 **SKILLS:** Không có skill nào\n`;
+            skillsDisplay = `\n  🎯 **SKILLS:** ❌ Không có skill nào\n`;
         }
         
         return `
@@ -691,14 +692,15 @@ ${winnerEmoji} BATTLE RESULT ${winnerEmoji}
                 const cooldown = skill.cooldownRemaining || 0;
                 const cooldownText = cooldown > 0 ? ` (⏱️${cooldown}s)` : '';
                 const emoji = this.getSkillEmoji(skillDef.emoji);
-                skillsDisplay += `  ${emoji} ${skillDef.name} Lv.${skill.level}${cooldownText}\n`;
+                const statusIcon = cooldown > 0 ? '⏳' : '✅';
+                skillsDisplay += `  ${emoji} **${skillDef.name}** Lv.${skill.level} ${statusIcon}${cooldownText}\n`;
             });
             
             if (opponentSkills.length > 3) {
-                skillsDisplay += `  ... và ${opponentSkills.length - 3} skill khác\n`;
+                skillsDisplay += `  📋 ... và ${opponentSkills.length - 3} skill khác\n`;
             }
         } else {
-            skillsDisplay = `\n  🎯 **SKILLS:** Không có skill nào\n`;
+            skillsDisplay = `\n  🎯 **SKILLS:** ❌ Không có skill nào\n`;
         }
         
         return `

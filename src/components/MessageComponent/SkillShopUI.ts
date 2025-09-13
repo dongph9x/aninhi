@@ -217,10 +217,10 @@ export class SkillShopUI {
                 
                 skillSelectMenu.addOptions(
                     new StringSelectMenuOptionBuilder()
-                        .setLabel(label)
-                        .setDescription(`${skill.emoji} ${elementEmoji} ${element} | ${skill.baseCost.toLocaleString()} FishCoin | ${rarityFormatted}${isSelected ? ' | ✅ CHỌN' : ''}`)
+                        .setLabel(`${skillName} - ${skill.baseCost.toLocaleString()} FishCoin`)
+                        .setDescription(`${elementEmoji} ${element} | ${rarityFormatted}${isSelected ? ' | ✅ CHỌN' : ''}`)
                         .setValue(skill.id)
-                        .setEmoji(isSelected ? '🎯' : '➕')
+                        .setEmoji(skill.emoji)
                 );
             });
         });
