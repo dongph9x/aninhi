@@ -4,6 +4,7 @@ import { BattleFishInventoryService } from './battle-fish-inventory';
 import { fishCoinDB } from './fish-coin';
 import { WeaponService } from './weapon';
 import { SkillBattleService } from './skill-battle';
+import { BattleEffectsService } from './battle-effects';
 import type { FishStats } from './fish-breeding';
 
 export interface BattleResult {
@@ -555,7 +556,7 @@ export class FishBattleService {
     // Khởi tạo skills cho battle
     const userBattleSkills = await SkillBattleService.initializeBattleSkills(fishId);
     const opponentBattleSkills = isBotOpponent ? 
-      { skills: [], cooldowns: new Map() } : 
+      { skills: [], cooldowns: new Map(), effectState: BattleEffectsService.createEffectState() } : 
       await SkillBattleService.initializeBattleSkills(opponentId);
     
     // Xử lý stats của opponent (có thể là BOT hoặc thực tế)
@@ -828,7 +829,7 @@ export class FishBattleService {
 
     // Tính HP ban đầu
     const calculateMaxHP = (fish: any) => {
-      const baseHP = 100;
+      const baseHP = 1000;  // Đồng bộ với battle-visual.ts
       const levelBonus = (fish.level || 1) * 10;
       const defenseBonus = (fish.stats?.defense || 0) * 5;
       return baseHP + levelBonus + defenseBonus;
@@ -869,7 +870,7 @@ export class FishBattleService {
       let opponentSkillMessage = '';
       
       if (userSkill) {
-        const skillResult = await SkillBattleService.useSkillInBattle(fishId, userSkill, userBattleSkills);
+        const skillResult = await SkillBattleService.useSkillInBattle(fishId, userSkill, userBattleSkills, opponentBattleSkills.effectState);
         if (skillResult.success) {
           userBaseDamage = skillResult.damage;
           userSkillMessage = `\n🎯 **${userFish.species}:** ${skillResult.message}`;
@@ -879,7 +880,7 @@ export class FishBattleService {
       }
       
       if (opponentSkill && !isBotOpponent) {
-        const skillResult = await SkillBattleService.useSkillInBattle(opponentId, opponentSkill, opponentBattleSkills);
+        const skillResult = await SkillBattleService.useSkillInBattle(opponentId, opponentSkill, opponentBattleSkills, userBattleSkills.effectState);
         if (skillResult.success) {
           opponentBaseDamage = skillResult.damage;
           opponentSkillMessage = `\n🎯 **${opponentName}:** ${skillResult.message}`;
@@ -895,6 +896,26 @@ export class FishBattleService {
       if (opponentSkillMessage) {
         battleLog.push(opponentSkillMessage);
       }
+      
+      // Xử lý effects sau khi sử dụng skills
+      const userEffectResult = BattleEffectsService.processEffects(userBattleSkills.effectState, userStatsWithWeapon, userHP);
+      const opponentEffectResult = BattleEffectsService.processEffects(opponentBattleSkills.effectState, opponentStats, opponentHP);
+      
+      // Áp dụng effect modifications
+      userHP = userEffectResult.modifiedHP;
+      opponentHP = opponentEffectResult.modifiedHP;
+      
+      // Log effect messages
+      if (userEffectResult.messages.length > 0) {
+        battleLog.push(...userEffectResult.messages);
+      }
+      if (opponentEffectResult.messages.length > 0) {
+        battleLog.push(...opponentEffectResult.messages);
+      }
+      
+      // Giảm duration của effects
+      BattleEffectsService.reduceEffectDurations(userBattleSkills.effectState);
+      BattleEffectsService.reduceEffectDurations(opponentBattleSkills.effectState);
       
       // Lưu base damage để hiển thị trong log
       const userOriginalDamage = userBaseDamage;
