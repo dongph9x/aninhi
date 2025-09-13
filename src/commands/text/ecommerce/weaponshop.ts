@@ -1,4 +1,4 @@
-import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
+import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } from "discord.js";
 
 import { Bot } from "@/classes";
 import { FishCoinService } from "@/utils/fish-coin";
@@ -64,44 +64,34 @@ async function showWeaponShop(message: any, guildId: string, userId: string) {
 
     // Lấy FishCoin balance của user
     const balance = await FishCoinService.getFishBalance(userId, guildId);
+    embed.addFields({ name: "🐟 FishCoin Balance", value: `${balance.toLocaleString()} FishCoin`, inline: false });
 
     // Danh sách vũ khí có sẵn
     const weapons = WeaponService.getAllWeapons();
     
-    let shopText = `🐟 **FishCoin Balance:** ${balance.toLocaleString()} FishCoin\n\n`;
-    shopText += "⚔️ **Danh sách vũ khí:**\n\n";
-
-    weapons.forEach((weapon, index) => {
+    // Tạo dropdown options với emoji đúng
+    const options = weapons.map(weapon => {
+        const canAfford = balance >= weapon.price;
         const emoji = getWeaponEmoji(weapon.type, weapon.id);
-        shopText += `${index + 1}. ${emoji} **${weapon.name}**\n`;
-        shopText += `   🐟 Giá: ${weapon.price.toLocaleString()} FishCoin\n`;
-        shopText += `   ⚔️ Sức mạnh: +${weapon.power} ATK\n`;
-        shopText += `   🛡️ Phòng thủ: +${weapon.defense} DEF\n`;
-        shopText += `   🎯 Độ chính xác: +${weapon.accuracy}\n`;
-        shopText += `   📝 ${weapon.description}\n\n`;
+        return new StringSelectMenuOptionBuilder()
+            .setLabel(`${weapon.name} - ${weapon.price.toLocaleString()} FishCoin`)
+            .setDescription(`${weapon.description} ${canAfford ? '✅' : '❌'}`)
+            .setValue(weapon.id)
+            .setEmoji(emoji);
     });
 
-    shopText += "💡 **Cách sử dụng:**\n";
-    shopText += "• `n.weaponshop buy <weapon_id> [số lượng]` - Mua vũ khí\n";
-    shopText += "• `n.weaponshop inventory` - Xem kho vũ khí\n";
-    shopText += "• `n.weaponshop equip <weapon_id>` - Trang bị vũ khí\n";
-    shopText += "• `n.weaponshop info <weapon_id>` - Xem thông tin vũ khí";
+    // Tạo select menu
+    const selectMenu = new StringSelectMenuBuilder()
+        .setCustomId('weapon_shop_buy_select')
+        .setPlaceholder('Chọn vũ khí để mua...')
+        .addOptions(options);
 
-    embed.setDescription(shopText);
-
-    // Thêm footer
-    embed.setFooter({
-        text: "Fish Weapon Shop - Tăng sức mạnh cho cá của bạn!",
-        iconURL: message.client.user.displayAvatarURL()
-    });
+    const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>()
+        .addComponents(selectMenu);
 
     // Tạo buttons
-    const row = new ActionRowBuilder<ButtonBuilder>()
+    const buttonRow = new ActionRowBuilder<ButtonBuilder>()
         .addComponents(
-            new ButtonBuilder()
-                .setCustomId('weapon_shop_buy')
-                .setLabel('🛒 Mua Vũ Khí')
-                .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
                 .setCustomId('weapon_shop_inventory')
                 .setLabel('🎒 Kho Vũ Khí')
@@ -116,7 +106,13 @@ async function showWeaponShop(message: any, guildId: string, userId: string) {
                 .setStyle(ButtonStyle.Secondary)
         );
 
-    message.reply({ embeds: [embed], components: [row] });
+    // Thêm footer
+    embed.setFooter({
+        text: "Fish Weapon Shop - Tăng sức mạnh cho cá của bạn!",
+        iconURL: message.client.user.displayAvatarURL()
+    });
+
+    message.reply({ embeds: [embed], components: [selectRow, buttonRow] });
 }
 
 async function buyWeapon(message: any, guildId: string, userId: string, weaponId: string, quantity: number) {

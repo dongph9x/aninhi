@@ -47,6 +47,9 @@ export class WeaponShopHandler {
                 case 'weapon_equip_select':
                     await this.handleEquipSelect(interaction, guildId, userId, selectedValue);
                     break;
+                case 'weapon_inventory_view':
+                    await this.handleInventoryView(interaction, guildId, userId, selectedValue);
+                    break;
                 default:
                     await interaction.reply({ content: "❌ Lệnh không hợp lệ!", ephemeral: true });
             }
@@ -76,7 +79,7 @@ export class WeaponShopHandler {
             const emoji = this.getWeaponEmoji(weapon.type, weapon.id);
             return new StringSelectMenuOptionBuilder()
                 .setLabel(`${weapon.name} - ${weapon.price.toLocaleString()} FishCoin`)
-                .setDescription(`${emoji} ${weapon.description} ${canAfford ? '✅' : '❌'}`)
+                .setDescription(`${weapon.description} ${canAfford ? '✅' : '❌'}`)
                 .setValue(weapon.id)
                 .setEmoji(emoji);
         });
@@ -140,7 +143,34 @@ export class WeaponShopHandler {
 
         embed.setDescription(inventoryText);
 
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        // Tạo dropdown để xem chi tiết vũ khí
+        const options = inventory.map(item => {
+            const weapon = WeaponService.getWeaponById(item.weaponId);
+            if (!weapon) return null;
+
+            const emoji = this.getWeaponEmoji(weapon.type, weapon.id);
+            const equippedStatus = item.isEquipped ? " ⚔️ ĐANG TRANG BỊ" : "";
+            
+            return new StringSelectMenuOptionBuilder()
+                .setLabel(`${weapon.name}${equippedStatus}`)
+                .setDescription(`${emoji} +${weapon.power} ATK | +${weapon.defense} DEF | +${weapon.accuracy} | Qty: ${item.quantity}`)
+                .setValue(weapon.id)
+                .setEmoji(emoji);
+        }).filter(Boolean);
+
+        if (options.length > 0) {
+            const selectMenu = new StringSelectMenuBuilder()
+                .setCustomId('weapon_inventory_view')
+                .setPlaceholder('Chọn vũ khí để xem chi tiết...')
+                .addOptions(options as StringSelectMenuOptionBuilder[]);
+
+            const row = new ActionRowBuilder<StringSelectMenuBuilder>()
+                .addComponents(selectMenu);
+
+            await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+        } else {
+            await interaction.reply({ embeds: [embed], ephemeral: true });
+        }
     }
 
     static async handleEquipButton(interaction: ButtonInteraction, guildId: string, userId: string) {
@@ -282,6 +312,40 @@ export class WeaponShopHandler {
                 { name: "⚔️ Sức mạnh", value: `+${weapon.power} ATK`, inline: true },
                 { name: "🛡️ Phòng thủ", value: `+${weapon.defense} DEF`, inline: true },
                 { name: "🎯 Độ chính xác", value: `+${weapon.accuracy}`, inline: true }
+            )
+            .setTimestamp();
+
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+    }
+
+    static async handleInventoryView(interaction: StringSelectMenuInteraction, guildId: string, userId: string, weaponId: string) {
+        const weapon = WeaponService.getWeaponById(weaponId);
+        if (!weapon) {
+            return interaction.reply({ content: "❌ Không tìm thấy vũ khí!", ephemeral: true });
+        }
+
+        const inventory = await WeaponService.getUserWeaponInventory(userId, guildId);
+        const userWeapon = inventory.find(item => item.weaponId === weaponId);
+        
+        if (!userWeapon) {
+            return interaction.reply({ content: "❌ Bạn không có vũ khí này!", ephemeral: true });
+        }
+
+        const emoji = this.getWeaponEmoji(weapon.type, weapon.id);
+        const equippedStatus = userWeapon.isEquipped ? " ⚔️ **ĐANG TRANG BỊ**" : "";
+
+        const embed = new EmbedBuilder()
+            .setTitle(`${emoji} ${weapon.name}${equippedStatus}`)
+            .setColor("#ff6b6b")
+            .setDescription(weapon.description)
+            .setThumbnail("https://media.discordapp.net/attachments/1396335030216822875/1398676895524192358/3516.png?ex=68863ade&is=6884e95e&hm=a6b593878a7a2af5807cf6c5b35a9d007a6939e9fdc72ea3f6889800331e5b15&=&format=webp&quality=lossless&width=664&height=592")
+            .addFields(
+                { name: "📦 Số lượng", value: `${userWeapon.quantity}`, inline: true },
+                { name: "⚔️ Sức mạnh", value: `+${weapon.power} ATK`, inline: true },
+                { name: "🛡️ Phòng thủ", value: `+${weapon.defense} DEF`, inline: true },
+                { name: "🎯 Độ chính xác", value: `+${weapon.accuracy}`, inline: true },
+                { name: "⭐ Hiếm", value: weapon.rarity, inline: true },
+                { name: "💰 Giá", value: `${weapon.price.toLocaleString()} FishCoin`, inline: true }
             )
             .setTimestamp();
 

@@ -4,7 +4,10 @@ import {
     EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    StringSelectMenuBuilder,
+    StringSelectMenuOptionBuilder,
+    MessageFlags
 } from "discord.js";
 import { FishSkillService } from "@/utils/fish-skills";
 import { FISH_SKILLS, FishSkillHelper } from "@/config/fish-skills";
@@ -36,7 +39,7 @@ export class SkillShopHandler {
             if (!messageData) {
                 await interaction.reply({ 
                     content: '❌ Không tìm thấy dữ liệu message!', 
-                    ephemeral: true 
+                    flags: MessageFlags.Ephemeral
                 });
                 return;
             }
@@ -45,7 +48,7 @@ export class SkillShopHandler {
             if (interaction.user.id !== messageData.userId) {
                 await interaction.reply({ 
                     content: '❌ Bạn không có quyền sử dụng lệnh này!', 
-                    ephemeral: true 
+                    flags: MessageFlags.Ephemeral
                 });
                 return;
             }
@@ -59,7 +62,7 @@ export class SkillShopHandler {
             console.error('Error handling skill shop interaction:', error);
             await interaction.reply({ 
                 content: '❌ Có lỗi xảy ra khi xử lý tương tác!', 
-                ephemeral: true 
+                flags: MessageFlags.Ephemeral
             });
         }
     }
@@ -72,6 +75,208 @@ export class SkillShopHandler {
             await this.handleSkillSelection(interaction, messageData, selectedValue);
         } else if (customId === 'skill_shop_select_fish') {
             await this.handleFishSelection(interaction, messageData, selectedValue);
+        } else if (customId === 'skill_shop_buy_select') {
+            await this.handleBuySkillSelect(interaction, messageData, selectedValue);
+        } else if (customId === 'skill_shop_ui_buy_select') {
+            await this.handleBuySkillSelect(interaction, messageData, selectedValue);
+        } else if (customId.startsWith('skill_buy_fish_select_')) {
+            const skillId = customId.replace('skill_buy_fish_select_', '');
+            await this.handleBuySkillForFish(interaction, messageData, skillId, selectedValue);
+        }
+    }
+
+    private static async handleBuySkillSelect(interaction: StringSelectMenuInteraction, messageData: any, skillId: string): Promise<void> {
+        try {
+            const { userId, guildId } = messageData;
+            
+            // Lấy thông tin skill
+            const skill = await prisma.fishSkillDefinition.findUnique({
+                where: { id: skillId }
+            });
+
+            if (!skill) {
+                await interaction.reply({ 
+                    content: '❌ Không tìm thấy skill!', 
+                    flags: MessageFlags.Ephemeral 
+                });
+                return;
+            }
+
+            // Lấy user balance
+            const user = await prisma.user.findUnique({
+                where: { userId_guildId: { userId, guildId } }
+            });
+            const userBalance = Number(user?.fishBalance || 0);
+
+            // Kiểm tra đủ tiền không
+            if (userBalance < skill.baseCost) {
+                await interaction.reply({ 
+                    content: `❌ Không đủ FishCoin! Cần ${skill.baseCost.toLocaleString()} FishCoin, hiện có ${userBalance.toLocaleString()} FishCoin.`, 
+                    flags: MessageFlags.Ephemeral 
+                });
+                return;
+            }
+
+            // Lấy battle fish inventory
+            const { BattleFishInventoryService } = await import("@/utils/battle-fish-inventory");
+            const inventory = await BattleFishInventoryService.getBattleFishInventory(userId, guildId);
+
+            if (inventory.items.length === 0) {
+                await interaction.reply({ 
+                    content: '❌ Bạn chưa có cá đấu nào! Sử dụng `n.battlefish add` để thêm cá vào túi đấu.', 
+                    flags: MessageFlags.Ephemeral 
+                });
+                return;
+            }
+
+            // Tạo embed hiển thị skill và danh sách cá
+            const embed = new EmbedBuilder()
+                .setTitle(`🛒 Mua Skill: ${skill.name}`)
+                .setColor('#FF6B6B')
+                .setDescription(`Chọn cá để mua skill **${skill.name}**`)
+                .addFields(
+                    { name: '💰 Giá', value: `${skill.baseCost.toLocaleString()} FishCoin`, inline: true },
+                    { name: '💥 Damage', value: `${skill.baseDamage}`, inline: true },
+                    { name: '🎯 Success Rate', value: `${Math.round(skill.baseSuccessRate * 100)}%`, inline: true },
+                    { name: '📋 Mô tả', value: skill.description, inline: false }
+                )
+                .setTimestamp();
+
+            // Tạo dropdown chọn cá
+            const fishOptions = inventory.items.map(item => {
+                const fish = item.fish;
+                const canLearn = fish.level >= (skill.requirements?.level || 1);
+                const status = canLearn ? '✅' : '❌';
+                
+                return new StringSelectMenuOptionBuilder()
+                    .setLabel(`${fish.name} (Lv.${fish.level}) ${status}`)
+                    .setDescription(`${canLearn ? 'Có thể học' : 'Level không đủ'} - ${fish.species}`)
+                    .setValue(fish.id)
+                    .setEmoji('🐟');
+            });
+
+            const selectMenu = new StringSelectMenuBuilder()
+                .setCustomId(`skill_buy_fish_select_${skillId}`)
+                .setPlaceholder('Chọn cá để mua skill...')
+                .addOptions(fishOptions);
+
+            const row = new ActionRowBuilder<StringSelectMenuBuilder>()
+                .addComponents(selectMenu);
+
+            await interaction.reply({ 
+                embeds: [embed], 
+                components: [row], 
+                flags: MessageFlags.Ephemeral 
+            });
+
+        } catch (error) {
+            console.error('Error handling buy skill select:', error);
+            await interaction.reply({ 
+                content: '❌ Có lỗi xảy ra!', 
+                flags: MessageFlags.Ephemeral 
+            });
+        }
+    }
+
+    private static async handleBuySkillForFish(interaction: StringSelectMenuInteraction, messageData: any, skillId: string, fishId: string): Promise<void> {
+        try {
+            const { userId, guildId } = messageData;
+            
+            // Lấy thông tin skill
+            const skill = await prisma.fishSkillDefinition.findUnique({
+                where: { id: skillId }
+            });
+
+            if (!skill) {
+                await interaction.reply({ 
+                    content: '❌ Không tìm thấy skill!', 
+                    flags: MessageFlags.Ephemeral 
+                });
+                return;
+            }
+
+            // Lấy thông tin cá
+            const fish = await prisma.fish.findFirst({
+                where: { id: fishId, userId, guildId }
+            });
+
+            if (!fish) {
+                await interaction.reply({ 
+                    content: '❌ Không tìm thấy cá!', 
+                    flags: MessageFlags.Ephemeral 
+                });
+                return;
+            }
+
+            // Kiểm tra cá đã học skill này chưa
+            const existingSkill = await prisma.fishSkill.findFirst({
+                where: { fishId, skillId }
+            });
+
+            if (existingSkill) {
+                await interaction.reply({ 
+                    content: `❌ **${fish.name}** đã học skill **${skill.name}** rồi!`, 
+                    flags: MessageFlags.Ephemeral 
+                });
+                return;
+            }
+
+            // Kiểm tra level yêu cầu
+            const requiredLevel = skill.requirements?.level || 1;
+            if (fish.level < requiredLevel) {
+                await interaction.reply({ 
+                    content: `❌ **${fish.name}** cần level ${requiredLevel} để học skill này! (Hiện tại: Lv.${fish.level})`, 
+                    flags: MessageFlags.Ephemeral 
+                });
+                return;
+            }
+
+            // Lấy user balance
+            const user = await prisma.user.findUnique({
+                where: { userId_guildId: { userId, guildId } }
+            });
+            const userBalance = Number(user?.fishBalance || 0);
+
+            // Kiểm tra đủ tiền không
+            if (userBalance < skill.baseCost) {
+                await interaction.reply({ 
+                    content: `❌ Không đủ FishCoin! Cần ${skill.baseCost.toLocaleString()} FishCoin, hiện có ${userBalance.toLocaleString()} FishCoin.`, 
+                    flags: MessageFlags.Ephemeral 
+                });
+                return;
+            }
+
+            // Thực hiện mua skill
+            const { FishSkillService } = await import("@/utils/fish-skills");
+            const result = await FishSkillService.learnSkill(fishId, skillId, userId, guildId);
+
+            if (result.success) {
+                const embed = new EmbedBuilder()
+                    .setTitle('✅ Mua Skill Thành Công!')
+                    .setColor('#00FF00')
+                    .setDescription(`**${fish.name}** đã học skill **${skill.name}** thành công!`)
+                    .addFields(
+                        { name: '💰 Chi Phí', value: `${result.cost?.toLocaleString()} FishCoin`, inline: true },
+                        { name: '📈 Level Skill', value: `Level ${result.newLevel}`, inline: true },
+                        { name: '💥 Damage', value: `${skill.baseDamage}`, inline: true },
+                        { name: '🎯 Success Rate', value: `${Math.round(skill.baseSuccessRate * 100)}%`, inline: true }
+                    )
+                    .setTimestamp();
+
+                await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            } else {
+                await interaction.reply({ 
+                    content: `❌ ${result.error || 'Không thể mua skill!'}`, 
+                    flags: MessageFlags.Ephemeral 
+                });
+            }
+
+        } catch (error) {
+            console.error('Error buying skill for fish:', error);
+            await interaction.reply({ 
+                content: '❌ Có lỗi xảy ra!', 
+                flags: MessageFlags.Ephemeral 
+            });
         }
     }
 
@@ -115,7 +320,7 @@ export class SkillShopHandler {
             default:
                 await interaction.reply({ 
                     content: '❌ Hành động không hợp lệ!', 
-                    ephemeral: true 
+                    flags: MessageFlags.Ephemeral 
                 });
         }
     }
@@ -158,7 +363,7 @@ export class SkillShopHandler {
             console.error('Error handling skill selection:', error);
             await interaction.followUp({ 
                 content: '❌ Có lỗi xảy ra khi chọn skill!', 
-                ephemeral: true 
+                flags: MessageFlags.Ephemeral 
             });
         }
     }
@@ -170,7 +375,7 @@ export class SkillShopHandler {
             if (fishId === 'no_fish') {
                 await interaction.followUp({ 
                     content: '❌ Bạn cần có cá trong túi đấu để trang bị skills!', 
-                    ephemeral: true 
+                    flags: MessageFlags.Ephemeral 
                 });
                 return;
             }
@@ -209,7 +414,7 @@ export class SkillShopHandler {
             console.error('Error handling fish selection:', error);
             await interaction.followUp({ 
                 content: '❌ Có lỗi xảy ra khi chọn cá!', 
-                ephemeral: true 
+                flags: MessageFlags.Ephemeral 
             });
         }
     }
@@ -224,7 +429,7 @@ export class SkillShopHandler {
             if (!selectedSkillId || !selectedFishId) {
                 await interaction.followUp({ 
                     content: '❌ Vui lòng chọn skill và cá trước khi mua!', 
-                    ephemeral: true 
+                    flags: MessageFlags.Ephemeral 
                 });
                 return;
             }
@@ -280,7 +485,7 @@ export class SkillShopHandler {
                 // Gửi thông báo thành công
                 await interaction.followUp({
                     embeds: [successEmbed],
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             } else {
                 const errorEmbed = new EmbedBuilder()
@@ -291,14 +496,14 @@ export class SkillShopHandler {
 
                 await interaction.followUp({
                     embeds: [errorEmbed],
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
         } catch (error) {
             console.error('Error buying skill:', error);
             await interaction.followUp({ 
                 content: '❌ Có lỗi xảy ra khi mua skill!', 
-                ephemeral: true 
+                flags: MessageFlags.Ephemeral 
             });
         }
     }
@@ -411,7 +616,7 @@ export class SkillShopHandler {
             console.error('Error showing skill inventory:', error);
             await interaction.followUp({ 
                 content: '❌ Có lỗi xảy ra khi xem skills đã mua!', 
-                ephemeral: true 
+                flags: MessageFlags.Ephemeral 
             });
         }
     }
@@ -460,7 +665,7 @@ export class SkillShopHandler {
             console.error('Error refreshing skill shop:', error);
             await interaction.followUp({ 
                 content: '❌ Có lỗi xảy ra khi làm mới shop!', 
-                ephemeral: true 
+                flags: MessageFlags.Ephemeral 
             });
         }
     }
@@ -486,7 +691,7 @@ export class SkillShopHandler {
             console.error('Error closing skill shop:', error);
             await interaction.followUp({ 
                 content: '❌ Có lỗi xảy ra khi đóng shop!', 
-                ephemeral: true 
+                flags: MessageFlags.Ephemeral 
             });
         }
     }
@@ -536,7 +741,7 @@ export class SkillShopHandler {
             console.error('Error showing skill shop UI:', error);
             await interaction.followUp({ 
                 content: '❌ Có lỗi xảy ra khi mở giao diện shop!', 
-                ephemeral: true 
+                flags: MessageFlags.Ephemeral 
             });
         }
     }
@@ -574,7 +779,7 @@ export class SkillShopHandler {
             console.error('Error showing skill shop help:', error);
             await interaction.followUp({ 
                 content: '❌ Có lỗi xảy ra khi hiển thị hướng dẫn!', 
-                ephemeral: true 
+                flags: MessageFlags.Ephemeral 
             });
         }
     }
@@ -664,7 +869,7 @@ export class SkillShopHandler {
             console.error('Error showing all skills:', error);
             await interaction.followUp({ 
                 content: '❌ Có lỗi xảy ra khi hiển thị tất cả skills!', 
-                ephemeral: true 
+                flags: MessageFlags.Ephemeral 
             });
         }
     }
@@ -716,7 +921,7 @@ export class SkillShopHandler {
             console.error('Error showing skills by element:', error);
             await interaction.followUp({ 
                 content: '❌ Có lỗi xảy ra khi hiển thị skills theo hệ!', 
-                ephemeral: true 
+                flags: MessageFlags.Ephemeral 
             });
         }
     }
@@ -770,7 +975,7 @@ export class SkillShopHandler {
             console.error('Error showing battle fish UI:', error);
             await interaction.followUp({ 
                 content: '❌ Có lỗi xảy ra khi hiển thị túi đấu cá!', 
-                ephemeral: true 
+                flags: MessageFlags.Ephemeral 
             });
         }
     }

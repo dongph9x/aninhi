@@ -1,4 +1,4 @@
-import { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } from "discord.js";
+import { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } from "discord.js";
 import { Bot } from "@/classes";
 import { FishSkillService } from "@/utils/fish-skills";
 import { FISH_SKILLS, FishSkillDefinition, FishSkillHelper } from "@/config/fish-skills";
@@ -75,37 +75,31 @@ async function showSkillShop(message: any, userId: string, guildId: string) {
             })
             .setTimestamp();
 
-        // Thêm từng hệ element
-        const elementEmojis = {
-            fire: '🔥',
-            water: '💧',
-            earth: '🪨',
-            air: '💨',
-            light: '✨',
-            dark: '🌑'
-        };
-
-        Object.entries(skillsByElement).forEach(([element, skills]) => {
-            const elementEmoji = elementEmojis[element as keyof typeof elementEmojis] || '❓';
-            const skillsText = skills.slice(0, 3).map(skill => {
-                const damage = skill.baseDamage > 0 ? skill.baseDamage : 'Support';
-                const cost = skill.baseCost.toLocaleString();
-                const rarity = skill.requirements?.rarity || 'common';
-                const rarityFormatted = rarity.charAt(0).toUpperCase() + rarity.slice(1);
-                const level = skill.requirements?.level || 1;
-                const successRate = Math.round((skill.baseSuccessRate || 0.5) * 100);
-                
-                return `**${skill.emoji}** **${skill.name}**\n` +
-                       `💰 ${cost} FishCoin | 💥 ${damage} damage | 🎯 ${successRate}% thành công\n` +
-                       `📋 Level ${level} | ${rarityFormatted}`;
-            }).join('\n\n');
-
-            embed.addFields({
-                name: `${elementEmoji} ${element.toUpperCase()} Skills (${skills.length})`,
-                value: skillsText,
-                inline: false
-            });
+        // Tạo dropdown options với emoji đúng
+        const options = skills.map(skill => {
+            const canAfford = userBalance >= skill.baseCost;
+            const damage = skill.baseDamage > 0 ? skill.baseDamage : 'Support';
+            const cost = skill.baseCost.toLocaleString();
+            const rarity = skill.requirements?.rarity || 'common';
+            const rarityFormatted = rarity.charAt(0).toUpperCase() + rarity.slice(1);
+            const level = skill.requirements?.level || 1;
+            const successRate = Math.round((skill.baseSuccessRate || 0.5) * 100);
+            
+            return new StringSelectMenuOptionBuilder()
+                .setLabel(`${skill.name} - ${cost} FishCoin`)
+                .setDescription(`${damage} damage | 🎯 ${successRate}% | Lv.${level} | ${rarityFormatted} ${canAfford ? '✅' : '❌'}`)
+                .setValue(skill.id)
+                .setEmoji(skill.emoji);
         });
+
+        // Tạo select menu
+        const selectMenu = new StringSelectMenuBuilder()
+            .setCustomId('skill_shop_buy_select')
+            .setPlaceholder('Chọn skill để mua...')
+            .addOptions(options);
+
+        const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>()
+            .addComponents(selectMenu);
 
         // Thêm hướng dẫn
         embed.addFields({
@@ -115,7 +109,7 @@ async function showSkillShop(message: any, userId: string, guildId: string) {
         });
 
         // Tạo buttons
-        const row = new ActionRowBuilder<ButtonBuilder>();
+        const buttonRow = new ActionRowBuilder<ButtonBuilder>();
         
         const shopUIButton = new ButtonBuilder()
             .setCustomId('skill_shop_ui')
@@ -132,12 +126,12 @@ async function showSkillShop(message: any, userId: string, guildId: string) {
             .setLabel('❓ Hướng Dẫn')
             .setStyle(ButtonStyle.Secondary);
 
-        row.addComponents(shopUIButton, inventoryButton, helpButton);
+        buttonRow.addComponents(shopUIButton, inventoryButton, helpButton);
 
         // Gửi message
         const sentMessage = await message.reply({
             embeds: [embed],
-            components: [row]
+            components: [selectRow, buttonRow]
         });
 
         // Lưu message data để xử lý interaction
@@ -171,28 +165,70 @@ async function showSkillShopUI(message: any, userId: string, guildId: string) {
         // Lấy skills từ database
         const skills = await FishSkillService.getAllSkillDefinitions();
         
-        // Tạo UI
-        const { SkillShopUI } = await import("@/components/MessageComponent/SkillShopUI");
-        const ui = new SkillShopUI(
-            skills,
-            inventory.items.map(item => item.fish),
-            userId,
-            guildId,
-            userBalance
-        );
-        
-        const embed = ui.createEmbed();
-        const components = ui.createComponents();
+        // Tạo embed đơn giản
+        const embed = new EmbedBuilder()
+            .setTitle('🏪 Skill Shop UI - Cửa Hàng Kỹ Năng')
+            .setColor('#FF6B6B')
+            .setDescription('Mua và trang bị skills cho cá đấu của bạn!')
+            .addFields(
+                { name: '💰 FishCoin Của Bạn', value: `${userBalance.toLocaleString()} FishCoin`, inline: true },
+                { name: '🐟 Cá Đấu Có Sẵn', value: `${inventory.items.length} cá trong túi đấu`, inline: true },
+                { name: '📋 Quy Tắc Đơn Giản', value: '• 1 cá chỉ học được 1 skill duy nhất\n• Chỉ cần có đủ FishCoin là mua được\n• Cá đã có skill sẽ hiển thị ❌ ĐÃ CÓ SKILL', inline: false },
+                { name: '🎯 Cách Sử Dụng', value: 'Chọn skill từ dropdown để xem chi tiết\nChọn cá từ dropdown cá đấu\nMua skill cho cá đã chọn\nXem inventory để quản lý skills đã mua', inline: false }
+            )
+            .setTimestamp();
+
+        // Tạo dropdown options với emoji đúng
+        const options = skills.map(skill => {
+            const canAfford = userBalance >= skill.baseCost;
+            const damage = skill.baseDamage > 0 ? skill.baseDamage : 'Support';
+            const cost = skill.baseCost.toLocaleString();
+            const rarity = skill.requirements?.rarity || 'common';
+            const rarityFormatted = rarity.charAt(0).toUpperCase() + rarity.slice(1);
+            const level = skill.requirements?.level || 1;
+            const successRate = Math.round((skill.baseSuccessRate || 0.5) * 100);
+            
+            return new StringSelectMenuOptionBuilder()
+                .setLabel(`${skill.name} - ${cost} FishCoin`)
+                .setDescription(`${damage} damage | 🎯 ${successRate}% | Lv.${level} | ${rarityFormatted} ${canAfford ? '✅' : '❌'}`)
+                .setValue(skill.id)
+                .setEmoji(skill.emoji);
+        });
+
+        // Tạo select menu
+        const selectMenu = new StringSelectMenuBuilder()
+            .setCustomId('skill_shop_ui_buy_select')
+            .setPlaceholder('Chọn skill để mua...')
+            .addOptions(options);
+
+        const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>()
+            .addComponents(selectMenu);
+
+        // Tạo buttons
+        const buttonRow = new ActionRowBuilder<ButtonBuilder>()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('skill_shop_ui')
+                    .setLabel('🛒 Mở Shop UI')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId('skill_inventory')
+                    .setLabel('🎒 Skills Đã Mua')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('skill_shop_help')
+                    .setLabel('❓ Hướng Dẫn')
+                    .setStyle(ButtonStyle.Secondary)
+            );
 
         // Gửi message
         const sentMessage = await message.reply({
             embeds: [embed],
-            components: components
+            components: [selectRow, buttonRow]
         });
 
         // Lưu message data để xử lý interaction
         const { SkillShopHandler } = await import("@/components/MessageComponent/SkillShopHandler");
-        
         
         SkillShopHandler.setMessageData(sentMessage.id, {
             userId,
