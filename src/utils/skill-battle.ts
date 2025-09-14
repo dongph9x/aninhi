@@ -283,8 +283,8 @@ export class SkillBattleService {
       }
     }
     
-    // Giảm duration của effects
-    BattleEffectsService.reduceEffectDurations(battleState.effectState);
+    // Note: Effect durations are reduced separately in the battle loop
+    // to avoid double reduction per round
   }
 
   /**
