@@ -128,6 +128,11 @@ export class SkillBattleService {
    * Chọn skill để sử dụng trong battle
    */
   static selectSkillForBattle(battleState: BattleSkillState): FishSkillData | null {
+    // Kiểm tra xem có thể sử dụng skill không (bị khóa bởi effect)
+    if (!this.canUseSkill(battleState)) {
+      return null;
+    }
+
     const availableSkills = battleState.skills.filter(skill => 
       battleState.cooldowns.get(skill.skillId) === 0
     );
@@ -158,6 +163,18 @@ export class SkillBattleService {
     effectsApplied: EffectResult[];
   }> {
     try {
+      // Kiểm tra xem có thể sử dụng skill không (bị khóa bởi effect)
+      if (!this.canUseSkill(battleState)) {
+        return {
+          success: false,
+          skillUsed: skill,
+          damage: 0,
+          message: `🔒 **${skill.skillDefinition.name}** bị khóa! Không thể sử dụng kỹ năng.`,
+          cooldownRemaining: 0,
+          effectsApplied: []
+        };
+      }
+
       const skillDef = skill.skillDefinition;
       const skillLevel = skill.level;
       
