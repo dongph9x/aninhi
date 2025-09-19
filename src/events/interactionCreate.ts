@@ -473,6 +473,25 @@ export default Bot.createEvent({
                 return;
             }
 
+            // Kiểm tra xem có phải Bầu Cua modal không
+            if (interaction.customId.startsWith('baucua_modal_')) {
+                console.log("Bầu Cua modal submitted:", interaction.customId);
+                
+                try {
+                    // Import và gọi handler từ baucua command
+                    const { handleModalSubmission } = await import("../commands/text/games/baucua");
+                    
+                    // Gọi handler với game = null để nó tự tìm game
+                    await handleModalSubmission(interaction, null);
+                } catch (error) {
+                    console.error("Error handling Bầu Cua modal:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý modal Bầu Cua!`);
+                    }
+                }
+                return;
+            }
+
             try {
                 const payload: CustomIdData = JSON.parse(interaction.customId);
                 const component = client.components.modalSubmit.get(payload.n);
