@@ -81,9 +81,9 @@ export default Bot.createCommand({
         return message.reply('❌ Không tìm thấy thông tin user!');
       }
 
-      const userBalance = Number(user.fishBalance || 0);
+      const userBalance = BigInt(user.fishBalance || 0);
 
-      if (userBalance <= 0) {
+      if (userBalance <= 0n) {
         return message.reply('❌ Bạn không có đủ FishCoin để tạo game!');
       }
 
@@ -96,7 +96,7 @@ export default Bot.createCommand({
         id: gameId,
         hostId: userId,
         hostName: message.author.displayName || message.author.username,
-        hostBalance: userBalance,
+        hostBalance: Number(userBalance),
         guildId,
         channelId,
         messageId: '', // Sẽ được set sau khi tạo message
@@ -326,22 +326,22 @@ async function handleBetInteraction(interaction: any, game: BaucuaGame) {
       return interaction.reply({ content: '❌ Không tìm thấy thông tin user!', flags: 64 });
     }
 
-    const userBalance = Number(user.fishBalance || 0);
-    const minBet = 100; // Cược tối thiểu 100 FishCoin
-    const maxBetLimit = 1000000; // Cược tối đa 1 triệu FishCoin
+    const userBalance = BigInt(user.fishBalance || 0);
+    const minBet = 100n; // Cược tối thiểu 100 FishCoin
+    const maxBetLimit = 1000000n; // Cược tối đa 1 triệu FishCoin
 
     if (userBalance < minBet) {
       return interaction.reply({ 
-        content: `❌ Bạn cần ít nhất ${formatNumber(minBet)} FishCoin để tham gia cược!`, 
+        content: `❌ Bạn cần ít nhất ${formatNumber(Number(minBet))} FishCoin để tham gia cược!`, 
         flags: 64 
       });
     }
 
     // Tính số tiền cược tối đa (không quá 1 triệu và không quá số dư host)
     const currentTotalBets = Array.from(game.bets.values()).reduce((sum, bet) => sum + bet.amount, 0);
-    const maxBet = Math.min(userBalance, game.hostBalance - currentTotalBets, maxBetLimit);
+    const maxBet = Math.min(Number(userBalance), game.hostBalance - currentTotalBets, Number(maxBetLimit));
 
-    if (maxBet < minBet) {
+    if (maxBet < Number(minBet)) {
       return interaction.reply({ 
         content: '❌ Chủ phòng không đủ tiền để nhận thêm cược!', 
         flags: 64 
@@ -357,7 +357,7 @@ async function handleBetInteraction(interaction: any, game: BaucuaGame) {
       .setCustomId('bet_amount')
       .setLabel(`Số tiền cược (Tối đa: ${formatNumber(maxBet)} FishCoin)`)
       .setStyle(TextInputStyle.Short)
-      .setPlaceholder(`Nhập số tiền cược (${formatNumber(minBet)} - ${formatNumber(maxBetLimit)})`)
+      .setPlaceholder(`Nhập số tiền cược (${formatNumber(Number(minBet))} - ${formatNumber(Number(maxBetLimit))})`)
       .setRequired(true)
       .setMaxLength(10);
 
@@ -431,7 +431,8 @@ async function endGame(gameId: string, gameMessage?: any) {
     // Cập nhật database
     for (const result of results) {
       if (result.isWin) {
-        // Người thắng: cộng tiền thắng (tiền cược đã được trừ khi đặt cược)
+        // Người thắng: cộng tiền cược gốc + tiền thắng (tiền cược đã được trừ khi đặt cược)
+        const totalPayout = result.amount + result.winnings; // Hoàn tiền cược + tiền thắng
         await prisma.user.update({
           where: { 
             userId_guildId: {
@@ -441,11 +442,11 @@ async function endGame(gameId: string, gameMessage?: any) {
           },
           data: {
             fishBalance: {
-              increment: result.winnings
+              increment: BigInt(totalPayout)
             }
           }
         });
-        console.log(`🎉 ${result.username} thắng ${result.winnings} FishCoin`);
+        console.log(`🎉 ${result.username} thắng ${result.winnings} FishCoin + hoàn ${result.amount} FishCoin cược = ${totalPayout} FishCoin`);
       } else {
         // Người thua: không cần làm gì vì tiền đã được trừ khi đặt cược
         console.log(`💸 ${result.username} thua ${result.amount} FishCoin (đã trừ khi đặt cược)`);
@@ -454,8 +455,13 @@ async function endGame(gameId: string, gameMessage?: any) {
 
     // Cập nhật balance của chủ phòng
     // Chủ phòng nhận tiền từ người thua (đã được trừ khi đặt cược) và trả tiền cho người thắng
-    const hostNetResult = totalLosses - totalWinnings;
-    console.log(`💰 Chủ phòng: nhận ${totalLosses} từ người thua, trả ${totalWinnings} cho người thắng, lãi/lỗ: ${hostNetResult}`);
+    // Tính tổng tiền phải trả cho người thắng (tiền cược gốc + tiền thắng)
+    const totalPayoutToWinners = results
+      .filter(r => r.isWin)
+      .reduce((sum, r) => sum + r.amount + r.winnings, 0);
+    
+    const hostNetResult = totalLosses - totalPayoutToWinners;
+    console.log(`💰 Chủ phòng: nhận ${totalLosses} từ người thua, trả ${totalPayoutToWinners} cho người thắng, lãi/lỗ: ${hostNetResult}`);
     
     await prisma.user.update({
       where: { 
@@ -466,7 +472,7 @@ async function endGame(gameId: string, gameMessage?: any) {
       },
       data: {
         fishBalance: {
-          increment: hostNetResult
+          increment: BigInt(hostNetResult)
         }
       }
     });
@@ -611,9 +617,10 @@ function createResultEmbed(game: BaucuaGame, diceResults: any[], results: any[],
     const resultList = results.map(result => {
       const animal = ANIMALS.find(a => a.id === result.animal);
       const status = result.isWin ? '🎉' : '💸';
-      const change = result.isWin ? `+${formatNumber(result.winnings)}` : `-${formatNumber(result.amount)}`;
+      const change = result.isWin ? `+${formatNumber(result.amount + result.winnings)}` : `-${formatNumber(result.amount)}`;
       const winLoseText = result.isWin ? 'THẮNG' : 'THUA';
-      return `${status} **${result.username}** cược ${animal?.emoji} ${animal?.name}: **${winLoseText}** ${change} FishCoin`;
+      const winDetails = result.isWin ? `(cược: ${formatNumber(result.amount)} + thắng: ${formatNumber(result.winnings)})` : '';
+      return `${status} **${result.username}** cược ${animal?.emoji} ${animal?.name}: **${winLoseText}** ${change} FishCoin ${winDetails}`;
     }).join('\n');
 
     const winCount = results.filter(r => r.isWin).length;
@@ -628,8 +635,8 @@ function createResultEmbed(game: BaucuaGame, diceResults: any[], results: any[],
 
   // Tạo footer với thông tin thú vị
   const totalBets = results.reduce((sum, r) => sum + r.amount, 0);
-  const totalWinnings = results.filter(r => r.isWin).reduce((sum, r) => sum + r.winnings, 0);
-  const footerText = `🎲 Game đã kết thúc! Tổng cược: ${formatNumber(totalBets)} | Tổng thắng: ${formatNumber(totalWinnings)} FishCoin`;
+  const totalPayoutToWinners = results.filter(r => r.isWin).reduce((sum, r) => sum + r.amount + r.winnings, 0);
+  const footerText = `🎲 Game đã kết thúc! Tổng cược: ${formatNumber(totalBets)} | Tổng trả thắng: ${formatNumber(totalPayoutToWinners)} FishCoin`;
   
   embed.setFooter({ text: footerText });
 
@@ -716,8 +723,8 @@ export async function handleModalSubmission(interaction: any, game: BaucuaGame |
       return interaction.reply({ content: '❌ Không tìm thấy thông tin user!', flags: 64 });
     }
 
-    const userBalance = Number(user.fishBalance || 0);
-    const maxBet = Math.min(userBalance, game.hostBalance - currentTotalBets, maxBetLimit);
+    const userBalance = BigInt(user.fishBalance || 0);
+    const maxBet = Math.min(Number(userBalance), game.hostBalance - currentTotalBets, maxBetLimit);
     
     console.log('🔍 DEBUG: User balance:', userBalance);
     console.log('🔍 DEBUG: Host balance:', game.hostBalance);
@@ -739,8 +746,8 @@ export async function handleModalSubmission(interaction: any, game: BaucuaGame |
       // Nếu giới hạn là do maxBetLimit, thông báo rõ ràng hơn
       if (maxBet === maxBetLimit) {
         errorMessage = `❌ Số tiền cược tối đa là ${formatNumber(maxBetLimit)} FishCoin (giới hạn game)!`;
-      } else if (maxBet === userBalance) {
-        errorMessage = `❌ Bạn không đủ FishCoin! Số dư hiện tại: ${formatNumber(userBalance)} FishCoin`;
+      } else if (maxBet === Number(userBalance)) {
+        errorMessage = `❌ Bạn không đủ FishCoin! Số dư hiện tại: ${formatNumber(Number(userBalance))} FishCoin`;
       } else if (maxBet === game.hostBalance - currentTotalBets) {
         errorMessage = `❌ Chủ phòng không đủ tiền để nhận thêm cược! Tối đa: ${formatNumber(maxBet)} FishCoin`;
       }
@@ -760,10 +767,10 @@ export async function handleModalSubmission(interaction: any, game: BaucuaGame |
     // Kiểm tra xem user có đủ FishCoin không (user đã được lookup ở trên)
     console.log('🔍 DEBUG: User balance check in modal:', userBalance);
 
-    if (userBalance < betAmount) {
+    if (userBalance < BigInt(betAmount)) {
       console.log('🔍 DEBUG: User balance too low in modal, replying with error');
       return interaction.reply({ 
-        content: `❌ Bạn không đủ FishCoin! Số dư hiện tại: ${formatNumber(userBalance)} FishCoin`, 
+        content: `❌ Bạn không đủ FishCoin! Số dư hiện tại: ${formatNumber(Number(userBalance))} FishCoin`, 
         flags: 64 
       });
     }
@@ -791,7 +798,7 @@ export async function handleModalSubmission(interaction: any, game: BaucuaGame |
       },
       data: {
         fishBalance: {
-          decrement: betAmount
+          decrement: BigInt(betAmount)
         }
       }
     });
