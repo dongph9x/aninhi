@@ -403,9 +403,11 @@ async function endGame(gameId: string, gameMessage?: any) {
 
     for (const [userId, bet] of game.bets) {
       const count = animalCounts.get(bet.animal) || 0;
-      const winnings = bet.amount * count; // Tỷ lệ 1:1
+      const winnings = bet.amount * count; // Tiền thắng = tiền cược × số lần xuất hiện
       
-      if (winnings > 0) {
+      console.log(`🎲 DEBUG: ${bet.username} cược ${bet.animal}, xuất hiện ${count} lần, tiền cược: ${bet.amount}, tiền thắng: ${winnings}`);
+      
+      if (count > 0) {
         results.push({
           userId,
           username: bet.username,
@@ -433,6 +435,8 @@ async function endGame(gameId: string, gameMessage?: any) {
       if (result.isWin) {
         // Người thắng: cộng tiền cược gốc + tiền thắng (tiền cược đã được trừ khi đặt cược)
         const totalPayout = result.amount + result.winnings; // Hoàn tiền cược + tiền thắng
+        console.log(`💰 DEBUG: Trả tiền cho ${result.username}: tiền cược ${result.amount} + tiền thắng ${result.winnings} = ${totalPayout} FishCoin`);
+        
         await prisma.user.update({
           where: { 
             userId_guildId: {
