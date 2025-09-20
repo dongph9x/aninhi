@@ -211,6 +211,24 @@ export default Bot.createEvent({
                 return;
             }
 
+            // Kiểm tra xem có phải horse racing interaction không
+            if (interaction.customId.startsWith("bet_")) {
+                console.log("HorseRacing interaction:", interaction.customId);
+                
+                try {
+                    const { HorseRacingHandler } = await import("../components/MessageComponent/HorseRacingHandler");
+                    if (interaction.isButton()) {
+                        await HorseRacingHandler.handleInteraction(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling HorseRacing interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác đua ngựa!`);
+                    }
+                }
+                return;
+            }
+
             // Kiểm tra xem có phải fish market interaction không
             if (interaction.customId.startsWith("market_")) {
                 console.log("FishMarket interaction:", interaction.customId);
@@ -492,28 +510,64 @@ export default Bot.createEvent({
                 return;
             }
 
+            // Kiểm tra xem có phải horse racing modal submission không
+            if (interaction.customId.startsWith("horseracing_modal_")) {
+                console.log("HorseRacing modal submission:", interaction.customId);
+                
+                try {
+                    const { handleHorseRacingModalSubmission } = await import("../commands/text/games/horseracing");
+                    await handleHorseRacingModalSubmission(interaction);
+                } catch (error) {
+                    console.error("Error handling HorseRacing modal submission:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý modal đua ngựa!`);
+                    }
+                }
+                return;
+            }
+
+            // Kiểm tra xem customId có phải JSON không trước khi parse
+            let isJsonCustomId = false;
             try {
-                const payload: CustomIdData = JSON.parse(interaction.customId);
-                const component = client.components.modalSubmit.get(payload.n);
+                JSON.parse(interaction.customId);
+                isJsonCustomId = true;
+            } catch {
+                isJsonCustomId = false;
+            }
 
-                const { t, locale } = await i18n(interaction.guildId);
+            if (isJsonCustomId) {
+                try {
+                    const payload: CustomIdData = JSON.parse(interaction.customId);
+                    const component = client.components.modalSubmit.get(payload.n);
 
-                // Kiểm tra chế độ bảo trì cho modal submits
-                if (client.maintenanceMode) {
-                    return interaction.reply(`${emojis.info} **Bot đang trong chế độ bảo trì**\nVui lòng chờ cho đến khi bảo trì hoàn tất.`);
+                    const { t, locale } = await i18n(interaction.guildId);
+
+                    // Kiểm tra chế độ bảo trì cho modal submits
+                    if (client.maintenanceMode) {
+                        return interaction.reply(`${emojis.info} **Bot đang trong chế độ bảo trì**\nVui lòng chờ cho đến khi bảo trì hoàn tất.`);
+                    }
+
+                    if (!component) {
+                        logger.error(`Component "${payload.n}" doesn't exist.`);
+                        return interaction.reply(`${emojis.error} | ${t("errors.unknown")}`);
+                    }
+
+                    if (!client.filter.slash(interaction, t, component.options)) return;
+                    component.run({ client, interaction, t, locale, data: payload.d });
+                } catch (error) {
+                    console.error("Error handling modal submit:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý modal!`);
+                    }
                 }
-
-                if (!component) {
-                    logger.error(`Component "${payload.n}" doesn't exist.`);
-                    return interaction.reply(`${emojis.error} | ${t("errors.unknown")}`);
-                }
-
-                if (!client.filter.slash(interaction, t, component.options)) return;
-                component.run({ client, interaction, t, locale, data: payload.d });
-            } catch (error) {
-                console.error("Error handling modal submit:", error);
+            } else {
+                // Xử lý modal submissions không phải JSON (như horse racing)
+                console.log("Non-JSON modal submission:", interaction.customId);
                 if (!interaction.replied && !interaction.deferred) {
-                    interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý modal!`);
+                    await interaction.reply({ 
+                        content: "❌ Modal submission không được hỗ trợ!", 
+                        ephemeral: true 
+                    });
                 }
             }
 
