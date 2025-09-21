@@ -9,7 +9,7 @@ export default {
             console.error("Error in HorseRacingModal:", error);
             if (!interaction.replied && !interaction.deferred) {
                 await interaction.reply({ 
-                    content: "❌ Có lỗi xảy ra khi xử lý cược đua ngựa!", 
+                    content: "❌ Có lỗi xảy ra khi xử lý cược đua Cá!", 
                     ephemeral: true 
                 });
             }

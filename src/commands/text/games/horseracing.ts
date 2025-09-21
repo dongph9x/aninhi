@@ -1,13 +1,14 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import { Bot } from '@/classes';
 import prisma from '../../../utils/prisma';
+import { FISH_LIST } from '../../../config/fish-data';
 
 // Helper function để format số
 function formatNumber(num: number): string {
   return num.toLocaleString('vi-VN');
 }
 
-// Interface cho game Đua Ngựa
+// Interface cho game Đua Cá
 interface HorseRacingGame {
   id: string;
   hostId: string;
@@ -21,6 +22,7 @@ interface HorseRacingGame {
   bets: Map<string, BetInfo>; // userId -> BetInfo
   isActive: boolean;
   raceResults: HorseResult[];
+  horses: DynamicHorse[]; // Lưu trữ Cá ngẫu nhiên cho game này
 }
 
 interface BetInfo {
@@ -39,15 +41,52 @@ interface HorseResult {
   time: number;
 }
 
-// 6 con ngựa trong cuộc đua
-const HORSES = [
-  { id: 'thunder', name: 'Thunder', emoji: '⚡', speed: 85, stamina: 90 },
-  { id: 'lightning', name: 'Lightning', emoji: '⚡', speed: 95, stamina: 80 },
-  { id: 'storm', name: 'Storm', emoji: '🌩️', speed: 80, stamina: 95 },
-  { id: 'blaze', name: 'Blaze', emoji: '🔥', speed: 90, stamina: 85 },
-  { id: 'shadow', name: 'Shadow', emoji: '🌙', speed: 75, stamina: 100 },
-  { id: 'phoenix', name: 'Phoenix', emoji: '🔥', speed: 100, stamina: 70 }
-];
+interface DynamicHorse {
+  id: string;
+  name: string;
+  emoji: string;
+  speed: number;
+  stamina: number;
+}
+
+// Function để tạo Cá cố định với 6 ID cố định (1,2,3,4,5,6)
+function generateFixedHorses(): DynamicHorse[] {
+  const horses: DynamicHorse[] = [];
+  
+  // 6 cá cố định với ID từ 1-6 để tránh lỗi khi click button cược
+  const fixedHorseData = [
+    { id: '1', name: 'Thunder Bolt', emoji: '🐟' },
+    { id: '2', name: 'Lightning Flash', emoji: '🐠' },
+    { id: '3', name: 'Storm Runner', emoji: '🐡' },
+    { id: '4', name: 'Blaze Speed', emoji: '🦈' },
+    { id: '5', name: 'Shadow Dash', emoji: '🐋' },
+    { id: '6', name: 'Phoenix Rise', emoji: '🐳' }
+  ];
+  
+  // Tạo 6 con Cá cố định
+  for (let i = 0; i < 6; i++) {
+    const horseData = fixedHorseData[i];
+    
+    // Tạo stats ngẫu nhiên nhưng cân bằng
+    const baseSpeed = Math.floor(Math.random() * 40) + 60; // 60-100
+    const baseStamina = Math.floor(Math.random() * 40) + 60; // 60-100
+    
+    // Không cần điều chỉnh rarity vì đã cố định tên và emoji
+    const speed = Math.min(100, baseSpeed);
+    const stamina = Math.min(100, baseStamina);
+    
+    horses.push({
+      id: horseData.id, // ID cố định: 1, 2, 3, 4, 5, 6
+      name: horseData.name,
+      emoji: horseData.emoji,
+      speed: speed,
+      stamina: stamina
+    });
+  }
+  
+  return horses;
+}
+
 
 // Lưu trữ các game đang hoạt động
 export const activeHorseRacingGames = new Map<string, HorseRacingGame>();
@@ -68,12 +107,21 @@ export default Bot.createCommand({
 
     try {
       // Kiểm tra xem đã có game nào đang hoạt động trong channel này chưa
-      const existingGame = Array.from(activeHorseRacingGames.values()).find(
+      const existingGameInChannel = Array.from(activeHorseRacingGames.values()).find(
         game => game.channelId === channelId && game.isActive
       );
 
-      if (existingGame) {
-        return message.reply('❌ Đã có game Đua Ngựa đang diễn ra trong channel này! Vui lòng chờ game kết thúc.');
+      if (existingGameInChannel) {
+        return message.reply('❌ Đã có game Đua Cá đang diễn ra trong channel này! Vui lòng chờ game kết thúc.');
+      }
+
+      // Kiểm tra xem user này đã có game nào đang hoạt động chưa
+      const existingGameByUser = Array.from(activeHorseRacingGames.values()).find(
+        game => game.hostId === userId && game.isActive
+      );
+
+      if (existingGameByUser) {
+        return message.reply('❌ Bạn đã có game Đua Cá đang hoạt động! Vui lòng chờ game hiện tại kết thúc trước khi tạo game mới.');
       }
 
       // Lấy thông tin user và balance
@@ -101,6 +149,9 @@ export default Bot.createCommand({
       const startTime = Date.now();
       const endTime = startTime + 30000; // 30 giây
 
+      // Tạo Cá cố định cho game này để tránh lỗi khi click button cược
+      const randomHorses = generateFixedHorses();
+
       const game: HorseRacingGame = {
         id: gameId,
         hostId: userId,
@@ -113,12 +164,13 @@ export default Bot.createCommand({
         endTime,
         bets: new Map(),
         isActive: true,
-        raceResults: []
+        raceResults: [],
+        horses: randomHorses
       };
 
       // Tạo embed và buttons
       const embed = createRaceEmbed(game);
-      const buttons = createBetButtons(gameId);
+      const buttons = createBetButtons(gameId, game.horses);
 
       const gameMessage = await message.reply({
         embeds: [embed],
@@ -131,7 +183,9 @@ export default Bot.createCommand({
 
       // Không cần collector vì đã có handler trong interactionCreate
       // Chỉ cần timer để kết thúc game
+      console.log(`🏇 Setting timer for game ${gameId} to end in 30 seconds`);
       setTimeout(async () => {
+        console.log(`🏇 Timer triggered for game ${gameId}, calling endRace`);
         await endRace(gameId, gameMessage);
       }, 30000);
 
@@ -160,7 +214,7 @@ export default Bot.createCommand({
             const updatedEmbed = createRaceEmbed(currentGame);
             await gameMessage.edit({
               embeds: [updatedEmbed],
-              components: createBetButtons(gameId)
+              components: createBetButtons(gameId, currentGame.horses)
             });
             lastBetCount = currentBetCount;
           } catch (error) {
@@ -169,7 +223,7 @@ export default Bot.createCommand({
         }
       }, 2000);
 
-      console.log(`🏇 Game Đua Ngựa created by ${message.author.username} in ${message.guild?.name}`);
+      console.log(`🏇 Game Đua Cá created by ${message.author.username} in ${message.guild?.name}`);
 
     } catch (error) {
       console.error('Error in horseracing command:', error);
@@ -183,7 +237,7 @@ function createRaceEmbed(game: HorseRacingGame): EmbedBuilder {
   const totalBets = Array.from(game.bets.values()).reduce((sum, bet) => sum + bet.amount, 0);
   
   const embed = new EmbedBuilder()
-    .setTitle('🏇 **CUỘC ĐUA NGỰA** 🏇')
+    .setTitle('🏇 **CUỘC ĐUA Cá** 🏇')
     .setColor('#FFD700')
     .setDescription(`**Chủ phòng:** ${game.hostName}\n**Số dư chủ phòng:** ${formatNumber(game.hostBalance)} FishCoin\n**Tổng cược hiện tại:** ${formatNumber(totalBets)} FishCoin`)
     .setImage('https://cdn.discordapp.com/attachments/1399016226189086720/1418611452486619246/horse-racing.gif')
@@ -210,13 +264,13 @@ function createRaceEmbed(game: HorseRacingGame): EmbedBuilder {
       }
     );
 
-  // Hiển thị danh sách ngựa
-  const horsesList = HORSES.map(horse => 
+  // Hiển thị danh sách Cá
+  const horsesList = game.horses.map(horse => 
     `${horse.emoji} **${horse.name}** (Tốc độ: ${horse.speed}, Sức bền: ${horse.stamina})`
   ).join('\n');
 
   embed.addFields({
-    name: '🐎 Danh sách ngựa',
+    name: '🐎 Danh sách Cá',
     value: horsesList,
     inline: false
   });
@@ -227,7 +281,7 @@ function createRaceEmbed(game: HorseRacingGame): EmbedBuilder {
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 10)
       .map(bet => {
-        const horse = HORSES.find(h => h.id === bet.horseId);
+        const horse = game.horses.find(h => h.id === bet.horseId);
         return `**${bet.username}** cược **${horse?.emoji} ${horse?.name}** - ${formatNumber(bet.amount)} FishCoin`;
       })
       .join('\n');
@@ -244,14 +298,14 @@ function createRaceEmbed(game: HorseRacingGame): EmbedBuilder {
   return embed;
 }
 
-function createBetButtons(gameId: string): ActionRowBuilder<ButtonBuilder>[] {
+function createBetButtons(gameId: string, horses: DynamicHorse[]): ActionRowBuilder<ButtonBuilder>[] {
   const rows: ActionRowBuilder<ButtonBuilder>[] = [];
   
-  // Chia 6 con ngựa thành 2 hàng: 3 con đầu và 3 con sau
+  // Chia 6 con Cá thành 2 hàng: 3 con đầu và 3 con sau
   const firstRow = new ActionRowBuilder<ButtonBuilder>();
   const secondRow = new ActionRowBuilder<ButtonBuilder>();
 
-  HORSES.forEach((horse, index) => {
+  horses.forEach((horse, index) => {
     const button = new ButtonBuilder()
       .setCustomId(`bet_${gameId}_${horse.id}`)
       .setLabel(`${horse.emoji} ${horse.name}`)
@@ -282,6 +336,12 @@ export async function handleBetInteraction(interaction: any, game: HorseRacingGa
       return;
     }
 
+    // Kiểm tra xem interaction có còn hợp lệ không
+    if (interaction.replied || interaction.deferred) {
+      console.log('🔍 DEBUG: Interaction already replied/deferred, returning');
+      return;
+    }
+
     const customId = interaction.customId;
     const parts = customId.split('_');
     
@@ -292,11 +352,12 @@ export async function handleBetInteraction(interaction: any, game: HorseRacingGa
       return;
     }
 
-    // Tìm horseId (phần cuối cùng)
-    const horseId = parts[parts.length - 1];
-    
-    // Tìm gameId (tất cả phần giữa bet và horseId)
-    const betGameId = parts.slice(1, -1).join('_');
+    // Tìm horseId và gameId
+    // Format: bet_horseracing_timestamp_userId_X
+    // gameId = horseracing_timestamp_userId
+    // horseId = X (số thứ tự: 1, 2, 3, 4, 5, 6)
+    const horseId = parts[parts.length - 1]; // Phần cuối cùng là horseId
+    const betGameId = parts.slice(1, -1).join('_'); // Tất cả phần trừ phần cuối
 
     console.log('🔍 DEBUG: betGameId:', betGameId, 'game.id:', game.id);
 
@@ -308,10 +369,10 @@ export async function handleBetInteraction(interaction: any, game: HorseRacingGa
     console.log(`🏇 Bet interaction: ${interaction.user.username} betting on ${horseId} in game ${game.id}`);
 
     const userId = interaction.user.id;
-    const horse = HORSES.find(h => h.id === horseId);
+    const horse = game.horses.find(h => h.id === horseId);
 
     if (!horse) {
-      return interaction.reply({ content: '❌ Con ngựa không hợp lệ!', flags: 64 });
+      return interaction.reply({ content: '❌ Con Cá không hợp lệ!', flags: 64 });
     }
 
     // Kiểm tra xem user đã cược chưa
@@ -387,26 +448,49 @@ export async function handleBetInteraction(interaction: any, game: HorseRacingGa
     
     try {
       await interaction.showModal(modal);
+      console.log('🔍 DEBUG: Modal shown successfully');
     } catch (error) {
       console.error('Error showing modal:', error);
+      
+      // Không cố gắng reply nếu interaction đã hết hạn hoặc đã được xử lý
+      if ((error as any).code === 10062 || (error as any).code === 40060) {
+        console.log('🔍 DEBUG: Interaction expired or already acknowledged, skipping reply');
+        return;
+      }
+      
       if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({ 
-          content: '❌ Không thể hiển thị form cược. Vui lòng thử lại!', 
-          ephemeral: true 
-        });
+        try {
+          await interaction.reply({ 
+            content: '❌ Không thể hiển thị form cược. Vui lòng thử lại!', 
+            ephemeral: true 
+          });
+        } catch (replyError) {
+          console.error('Error replying after modal error:', replyError);
+        }
       }
     }
 
   } catch (error) {
     console.error('Error in handleBetInteraction:', error);
-    return interaction.reply({ content: '❌ Có lỗi xảy ra khi xử lý cược!', flags: 64 });
+    if (!interaction.replied && !interaction.deferred) {
+      try {
+        return interaction.reply({ content: '❌ Có lỗi xảy ra khi xử lý cược!', flags: 64 });
+      } catch (replyError) {
+        console.error('Error replying to interaction:', replyError);
+      }
+    }
   }
 }
 
 async function endRace(gameId: string, gameMessage?: any) {
+  console.log(`🏇 endRace called for gameId: ${gameId}`);
   const game = activeHorseRacingGames.get(gameId);
-  if (!game || !game.isActive) return;
+  if (!game || !game.isActive) {
+    console.log(`🏇 Game ${gameId} not found or not active, returning`);
+    return;
+  }
 
+  console.log(`🏇 Ending game ${gameId} with ${game.bets.size} bets`);
   game.isActive = false;
 
   try {
@@ -414,7 +498,7 @@ async function endRace(gameId: string, gameMessage?: any) {
     await createRaceAnimation(gameMessage, game);
     
     // Tính toán kết quả cuộc đua
-    const raceResults = calculateRaceResults();
+    const raceResults = calculateRaceResults(game.horses);
     game.raceResults = raceResults;
 
     // Tính toán thắng thua
@@ -526,19 +610,20 @@ async function endRace(gameId: string, gameMessage?: any) {
 
     // Xóa game khỏi active games
     activeHorseRacingGames.delete(gameId);
+    console.log(`🏇 Game ${gameId} deleted from activeHorseRacingGames`);
 
-    console.log(`🏇 Game Đua Ngựa ${gameId} ended. Host result: ${hostNetResult} FishCoin`);
+    console.log(`🏇 Game Đua Cá ${gameId} ended. Host result: ${hostNetResult} FishCoin`);
 
   } catch (error) {
     console.error('Error ending race:', error);
   }
 }
 
-function calculateRaceResults(): HorseResult[] {
-  // Tạo kết quả ngẫu nhiên dựa trên stats của ngựa
+function calculateRaceResults(horses: DynamicHorse[]): HorseResult[] {
+  // Tạo kết quả ngẫu nhiên dựa trên stats của Cá
   const results: HorseResult[] = [];
   
-  for (const horse of HORSES) {
+  for (const horse of horses) {
     // Tính điểm dựa trên tốc độ, sức bền và yếu tố ngẫu nhiên
     const speedFactor = horse.speed / 100;
     const staminaFactor = horse.stamina / 100;
@@ -574,7 +659,7 @@ async function createRaceAnimation(gameMessage: any, game: HorseRacingGame) {
     const animationEmbed = new EmbedBuilder()
       .setTitle('🏇 **CUỘC ĐUA ĐANG DIỄN RA...** 🏇')
       .setColor('#FFA500')
-      .setDescription('**Chủ phòng:** ' + game.hostName + '\n**Các con ngựa đang chạy, vui lòng chờ...**')
+      .setDescription('**Chủ phòng:** ' + game.hostName + '\n**Các con Cá đang chạy, vui lòng chờ...**')
       .addFields(
         {
           name: '🏁 Trạng thái cuộc đua',
@@ -590,14 +675,14 @@ async function createRaceAnimation(gameMessage: any, game: HorseRacingGame) {
       components: []
     });
 
-    // Tạo hiệu ứng đua ngựa với 5 lần cập nhật
-    const raceEffects = ['🏇', '💨', '⚡', '🔥', '🌟'];
+    // Tạo hiệu ứng đua Cá với 10 lần cập nhật
+    const raceEffects = ['🏇', '💨', '⚡', '🔥', '🌟', '⭐', '💫', '✨', '🎆', '🎇'];
     
-    for (let round = 0; round < 5; round++) {
-      await new Promise(resolve => setTimeout(resolve, 800));
+    for (let round = 0; round < 10; round++) {
+      await new Promise(resolve => setTimeout(resolve, 500)); // Giảm thời gian từ 800ms xuống 500ms
       
       // Tạo kết quả ngẫu nhiên cho animation
-      const randomResults = HORSES.map(horse => ({
+      const randomResults = game.horses.map(horse => ({
         ...horse,
         progress: Math.random() * 100
       })).sort((a, b) => b.progress - a.progress);
@@ -610,8 +695,8 @@ async function createRaceAnimation(gameMessage: any, game: HorseRacingGame) {
       
       const roundEmbed = new EmbedBuilder()
         .setTitle(`${raceEffect} **CUỘC ĐUA ĐANG DIỄN RA...** ${raceEffect}`)
-        .setColor(round < 3 ? '#FFA500' : '#FF6B6B')
-        .setDescription(`**Chủ phòng:** ${game.hostName}\n**Các con ngựa đang chạy, vui lòng chờ...**`)
+        .setColor(round < 6 ? '#FFA500' : '#FF6B6B')
+        .setDescription(`**Chủ phòng:** ${game.hostName}\n**Các con Cá đang chạy, vui lòng chờ...**`)
         .addFields(
           {
             name: '🏁 Tiến độ cuộc đua',
@@ -619,7 +704,7 @@ async function createRaceAnimation(gameMessage: any, game: HorseRacingGame) {
             inline: false
           }
         )
-        .setFooter({ text: `Lần cập nhật thứ ${round + 1}/5... ${'🏇'.repeat(round + 1)}` });
+        .setFooter({ text: `Lần cập nhật thứ ${round + 1}/10... ${'🏇'.repeat(Math.min(round + 1, 5))}` });
 
       await gameMessage.edit({
         embeds: [roundEmbed],
@@ -627,31 +712,17 @@ async function createRaceAnimation(gameMessage: any, game: HorseRacingGame) {
       });
     }
 
-    // Hiệu ứng đếm ngược cuối cùng
-    const countdownSteps = [
-      { text: '🏇 **KẾT QUẢ CUỐI CÙNG!** 🏇', color: '#FF6B6B', desc: '**Kết quả đang được tính toán...**', footer: '3...' },
-      { text: '🏁 **SẮP RA KẾT QUẢ!** 🏁', color: '#FF4444', desc: '**Đang chuẩn bị kết quả cuối cùng...**', footer: '2...' },
-      { text: '🎉 **KẾT QUẢ NGAY BÂY GIỜ!** 🎉', color: '#FF0000', desc: '**Kết quả sẽ hiển thị ngay!**', footer: '1...' }
-    ];
+    // Hiển thị kết quả ngay lập tức thay vì đếm ngược
+    const finalEmbed = new EmbedBuilder()
+      .setTitle('🏁 **KẾT QUẢ CUỘC ĐUA!** 🏁')
+      .setColor('#00FF00')
+      .setDescription('**Kết quả cuộc đua đã sẵn sàng!**\n**Chủ phòng:** ' + game.hostName)
+      .setFooter({ text: '🎉 Kết quả chính thức!' });
 
-    for (let i = 0; i < countdownSteps.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const step = countdownSteps[i];
-      const countdownEmbed = new EmbedBuilder()
-        .setTitle(step.text)
-        .setColor(step.color as any)
-        .setDescription(`**Chủ phòng:** ${game.hostName}\n${step.desc}`)
-        .setFooter({ text: step.footer });
-
-      await gameMessage.edit({
-        embeds: [countdownEmbed],
-        components: []
-      });
-    }
-
-    // Chờ thêm 1 giây trước khi hiển thị kết quả thật
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await gameMessage.edit({
+      embeds: [finalEmbed],
+      components: []
+    });
 
   } catch (error) {
     console.error('Error in race animation:', error);
@@ -665,7 +736,7 @@ function createResultEmbed(game: HorseRacingGame, raceResults: HorseResult[], re
   const color = isHostWin ? '#00FF00' : '#FF6B6B';
   
   const embed = new EmbedBuilder()
-    .setTitle(`${titleEmoji} **KẾT QUẢ CUỘC ĐUA NGỰA** ${titleEmoji}`)
+    .setTitle(`${titleEmoji} **KẾT QUẢ CUỘC ĐUA Cá** ${titleEmoji}`)
     .setColor(color)
     .setDescription(`**Chủ phòng:** ${game.hostName}\n**Kết quả chủ phòng:** ${hostResult >= 0 ? '+' : ''}${formatNumber(hostResult)} FishCoin`)
     .setImage('https://cdn.discordapp.com/attachments/1399016226189086720/1418611452486619246/horse-racing-finish.gif');
@@ -686,7 +757,7 @@ function createResultEmbed(game: HorseRacingGame, raceResults: HorseResult[], re
   // Hiển thị kết quả người chơi
   if (results.length > 0) {
     const resultList = results.map(result => {
-      const horse = HORSES.find(h => h.id === result.horseId);
+      const horse = game.horses.find(h => h.id === result.horseId);
       const status = result.isWin ? '🎉' : '💸';
       const change = result.isWin ? `+${formatNumber(result.amount + result.winnings)}` : `-${formatNumber(result.amount)}`;
       const winLoseText = result.isWin ? 'THẮNG' : 'THUA';
@@ -737,8 +808,11 @@ export async function handleHorseRacingModalSubmission(interaction: any, game: H
     }
 
     // Tìm gameId và horseId
-    const gameId = parts.slice(2, -1).join('_');
-    const horseId = parts[parts.length - 1];
+    // Format: horseracing_modal_horseracing_timestamp_userId_X
+    // gameId = horseracing_timestamp_userId
+    // horseId = X (số thứ tự: 1, 2, 3, 4, 5, 6)
+    const gameId = parts.slice(2, -1).join('_'); // Tất cả phần trừ phần cuối
+    const horseId = parts[parts.length - 1]; // Phần cuối cùng là horseId
 
     console.log('🔍 DEBUG: modal gameId:', gameId);
     console.log('🔍 DEBUG: modal horseId:', horseId);
@@ -758,10 +832,10 @@ export async function handleHorseRacingModalSubmission(interaction: any, game: H
       return;
     }
 
-    const horse = HORSES.find(h => h.id === horseId);
+    const horse = game.horses.find(h => h.id === horseId);
     if (!horse) {
       console.log('🔍 DEBUG: Invalid horse in modal, replying with error');
-      return interaction.reply({ content: '❌ Con ngựa không hợp lệ!', flags: 64 });
+      return interaction.reply({ content: '❌ Con Cá không hợp lệ!', flags: 64 });
     }
 
     // Lấy số tiền cược từ modal
@@ -875,24 +949,28 @@ export async function handleHorseRacingModalSubmission(interaction: any, game: H
     });
     console.log(`💸 Đã trừ ${betAmount} FishCoin từ ${interaction.user.username} khi đặt cược`);
 
-    console.log('🔍 DEBUG: Sending reply from modal...');
-    // Thông báo cược thành công
+    console.log('🔍 DEBUG: Bet successfully added to game');
+    
+    // Acknowledge modal submission để tránh "Something went wrong"
     try {
-      await interaction.reply({ 
-        content: `✅ **${interaction.user.username}** đã cược **${horse.emoji} ${horse.name}** với số tiền **${formatNumber(betAmount)} FishCoin**!`, 
-        ephemeral: false 
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ 
+          content: '✅ Cược thành công!', 
+          ephemeral: true 
+        });
+      }
+    } catch (error) {
+      console.error('Error acknowledging modal:', error);
+    }
+    
+    // Gửi thông báo thành công vào channel
+    try {
+      await interaction.channel?.send({
+        content: `✅ **${interaction.user.username}** đã cược **${horse.emoji} ${horse.name}** với số tiền **${formatNumber(betAmount)} FishCoin**!`,
+        flags: 0 // Không ephemeral, hiển thị công khai
       });
     } catch (error) {
-      console.error('Error replying to modal submission:', error);
-      // Nếu không thể reply, thử followUp
-      try {
-        await interaction.followUp({ 
-          content: `✅ **${interaction.user.username}** đã cược **${horse.emoji} ${horse.name}** với số tiền **${formatNumber(betAmount)} FishCoin**!`, 
-          ephemeral: false 
-        });
-      } catch (followUpError) {
-        console.error('Error with followUp:', followUpError);
-      }
+      console.error('Error sending success message:', error);
     }
     
     // Cập nhật embed ngay lập tức khi có cược mới
@@ -902,7 +980,7 @@ export async function handleHorseRacingModalSubmission(interaction: any, game: H
       if (gameMessage) {
         await gameMessage.edit({
           embeds: [updatedEmbed],
-          components: createBetButtons(game.id)
+          components: createBetButtons(game.id, game.horses)
         });
       }
     } catch (error) {
@@ -913,6 +991,6 @@ export async function handleHorseRacingModalSubmission(interaction: any, game: H
 
   } catch (error) {
     console.error('Error in handleHorseRacingModalSubmission:', error);
-    return interaction.reply({ content: '❌ Có lỗi xảy ra khi xử lý cược!', flags: 64 });
+    // Không cố gắng reply vì modal submission có thể đã hết hạn
   }
 }

@@ -223,7 +223,7 @@ export default Bot.createEvent({
                 } catch (error) {
                     console.error("Error handling HorseRacing interaction:", error);
                     if (!interaction.replied && !interaction.deferred) {
-                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác đua ngựa!`);
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác đua Cá!`);
                     }
                 }
                 return;
@@ -520,7 +520,7 @@ export default Bot.createEvent({
                 } catch (error) {
                     console.error("Error handling HorseRacing modal submission:", error);
                     if (!interaction.replied && !interaction.deferred) {
-                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý modal đua ngựa!`);
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý modal đua Cá!`);
                     }
                 }
                 return;
