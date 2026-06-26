@@ -45,26 +45,20 @@ export default Bot.createCommand({
             const tempFile = path.join(tempDir, `backup-${Date.now()}.db`);
             fs.writeFileSync(tempFile, Buffer.from(buffer));
 
-            // Backup database hiện tại (cả data và prisma)
+            // Database thật chỉ có 1 nơi duy nhất: data/database.db (DATABASE_URL trỏ
+            // về đây, xem .env). Không còn prisma/data/database.db nữa - thư mục đó
+            // đã bị bỏ vì gây nhầm lẫn (2 bản database khác nhau cùng tồn tại).
             const dataDb = path.resolve('data/database.db');
-            const prismaDb = path.resolve('prisma/data/database.db');
-            
+
             if (fs.existsSync(dataDb)) {
                 const backupData = path.resolve('data/database.db.backup-' + Date.now());
                 fs.copyFileSync(dataDb, backupData);
-                await message.reply(`💾 Đã backup data database: ${path.basename(backupData)}`);
-            }
-            
-            if (fs.existsSync(prismaDb)) {
-                const backupPrisma = path.resolve('data/prisma-database.db.backup-' + Date.now());
-                fs.copyFileSync(prismaDb, backupPrisma);
-                await message.reply(`💾 Đã backup prisma database: ${path.basename(backupPrisma)}`);
+                await message.reply(`💾 Đã backup database hiện tại: ${path.basename(backupData)}`);
             }
 
-            // Thay thế cả hai database
+            // Thay thế database
             fs.copyFileSync(tempFile, dataDb);
-            fs.copyFileSync(tempFile, prismaDb);
-            
+
             // Xóa file temp
             fs.unlinkSync(tempFile);
 
@@ -76,11 +70,10 @@ export default Bot.createCommand({
 📁 File: ${attachment.name}
 📊 Kích thước: ${sizeKB} KB
 🕐 Thời gian: ${new Date().toLocaleString('vi-VN')}
-🔄 Đã cập nhật: Data Database + Prisma Database
 
 🚀 **Bước tiếp theo:**
-1. \`docker-compose down\`
-2. \`docker-compose up -d --build\`
+1. \`docker compose down\`
+2. \`docker compose up -d --build\`
 3. \`n.balance\` để kiểm tra dữ liệu
 
 💡 **Lý do restart:** Đảm bảo bot đọc database mới và đồng bộ cache`);

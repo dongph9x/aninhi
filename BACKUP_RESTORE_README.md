@@ -1,176 +1,102 @@
 # 💾 Backup & Restore Database
 
-Hướng dẫn sử dụng các lệnh backup và restore database đã được cập nhật để sử dụng Prisma database thực tế.
+Database thật của bot chỉ có **đúng 1 nơi duy nhất**: `data/database.db` (SQLite, theo `DATABASE_URL` trong `.env`). Không còn database "kép" ở `prisma/data/` — bản đó từng gây nhầm lẫn (backup/restore sai file) và đã bị bỏ.
 
-## 🔄 Thay đổi quan trọng
+> ⚠️ Luôn backup trước khi restore. Restore là hành động **ghi đè toàn bộ** dữ liệu hiện tại (balance, inventory, fishing data...), không thể hoàn tác nếu không có backup.
 
-### Trước đây:
-- Backup từ: `data/database.db` (database cũ)
-- Restore vào: `data/database.db` (database cũ)
+---
 
-### Bây giờ:
-- Backup từ: `prisma/data/database.db` (database thực tế bot đang dùng)
-- Restore vào: Cả `data/database.db` và `prisma/data/database.db`
+## Cách 1 — Dùng lệnh Discord (khuyến nghị, không cần SSH)
 
-## 📋 Lệnh Backup
+| Lệnh | Mô tả |
+|---|---|
+| `n.backupdb` | Tạo backup database hiện tại, lưu vào `data/backup/`. Gửi kèm file qua Discord nếu < 8MB |
+| `n.listbackups` | Xem danh sách các file backup đã tạo (`data/backup/` + `temp/`) |
+| `n.dbstatus` | Xem thông tin database: kích thước, số lượng records (users, transactions, fishing data...) |
+| `n.syncdb` | Kiểm tra trạng thái database + danh sách backup. Có thêm `n.syncdb backup` / `n.syncdb list` |
+| `n.restoredb` (alias `n.importdb`) | Restore database từ file `.db` đính kèm trong message |
 
-### `n.backupdb`
-Backup database từ Prisma database thực tế (database mà bot đang sử dụng).
+**Quy trình restore qua Discord:**
+1. Upload file backup `.db` lên Discord (đính kèm vào message)
+2. Gõ `n.restoredb` trong cùng message đó
+3. Bot tự backup database hiện tại trước (an toàn), rồi ghi đè bằng file bạn upload
+4. **Restart container** để bot đọc dữ liệu mới (Prisma giữ connection/cache cũ):
+   ```bash
+   docker compose -f docker-compose.yml down
+   docker compose -f docker-compose.yml up -d --build
+   ```
+5. Gõ `n.balance` để xác nhận dữ liệu đã đúng
 
-**Tính năng:**
-- ✅ Backup từ Prisma database (database thực tế)
-- ✅ Fallback về data database nếu Prisma không tồn tại
-- ✅ Hiển thị nguồn database được backup
-- ✅ Gửi file qua Discord nếu < 8MB
-- ✅ Lưu vào `data/backup/` nếu > 8MB
+Tất cả lệnh trên yêu cầu quyền **Administrator**.
 
-**Ví dụ output:**
-```
-✅ Đã backup database thành công!
-📊 Nguồn: Prisma Database
-📁 Kích thước: 440 KB
-```
+---
 
-## 📋 Lệnh Restore
+## Cách 2 — Backup/restore trực tiếp trên VPS (SSH)
 
-### `n.restoredb` hoặc `n.importdb`
-Restore database từ file backup, cập nhật cả data và Prisma database.
+Vì `data/` được bind-mount từ host vào container (`./data:/app/data` trong `docker-compose.yml`), bạn **không cần `docker cp`** — chỉ cần copy file trực tiếp trên host.
 
-**Tính năng:**
-- ✅ Backup database hiện tại trước khi restore
-- ✅ Restore vào cả data và Prisma database
-- ✅ Hướng dẫn restart bot sau khi restore
-- ✅ Kiểm tra định dạng file (.db)
-
-**Ví dụ output:**
-```
-💾 Đã backup data database: database.db.backup-1752738000000
-💾 Đã backup prisma database: prisma-database.db.backup-1752738000001
-
-✅ Đã restore database thành công!
-
-📁 File: database-backup.db
-📊 Kích thước: 440 KB
-🕐 Thời gian: 17/7/2025 14:30:00
-🔄 Đã cập nhật: Data Database + Prisma Database
-
-🚀 Bước tiếp theo:
-1. `docker-compose down`
-2. `docker-compose up -d --build`
-3. `n.balance` để kiểm tra dữ liệu
-
-💡 Lý do restart: Đảm bảo bot đọc database mới và đồng bộ cache
-```
-
-## 🔧 Scripts hỗ trợ
-
-### Sync Database:
+### Backup
 ```bash
-# Sync từ Prisma database (khuyến nghị)
-npm run db:sync:prisma
-
-# Sync từ data database (cũ)
-npm run db:sync:container
-
-# Sync đơn giản
-npm run db:sync
+./scripts/backup-database.sh
+# → lưu vào data/backup/database-<timestamp>.db, tự giữ 10 bản mới nhất
+```
+hoặc thủ công:
+```bash
+cp data/database.db data/backup/database-$(date +%Y%m%d-%H%M%S).db
 ```
 
-### Check Balance:
+### Restore
 ```bash
-# Kiểm tra balance từ nhiều nguồn
-./scripts/check-balance.sh
-```
-
-### Check Prisma Cache:
-```bash
-# Kiểm tra Prisma cache và connection
-./scripts/check-prisma-cache.sh
-```
-
-## 🎯 Workflow khuyến nghị
-
-### 1. Backup Database:
-```bash
-# Trong Discord
-n.backupdb
-```
-
-### 2. Restore Database:
-```bash
-# 1. Upload file backup (.db) lên Discord
-# 2. Gõ lệnh
-n.restoredb
-
-# 3. Restart bot
-docker compose down
-docker compose up -d --build
-
-# 4. Kiểm tra dữ liệu
-n.balance
-```
-
-### 3. Sync Database (nếu cần):
-```bash
-# Sync từ Prisma database
-npm run db:sync:prisma
-
-# Mở Prisma Studio
-npm run db:studio:correct
-```
-
-## ⚠️ Lưu ý quan trọng
-
-1. **Luôn backup trước khi restore**
-2. **Restart bot sau khi restore** để đồng bộ cache
-3. **Kiểm tra dữ liệu** sau khi restore
-4. **Prisma database là nguồn chính xác** bot đang sử dụng
-
-## 🔍 Troubleshooting
-
-### Backup không thành công:
-```bash
-# Kiểm tra database files
-ls -la data/database.db
-ls -la prisma/data/database.db
-
-# Sync database
-npm run db:sync:prisma
-```
-
-### Restore không thành công:
-```bash
-# Kiểm tra file backup
+# Xem danh sách backup có sẵn
 ls -la data/backup/
 
-# Kiểm tra quyền file
-chmod 644 data/database.db
-chmod 644 prisma/data/database.db
+# Restore (script tự dừng bot, backup file hiện tại, ghi đè, rồi hỏi có khởi động lại không)
+./scripts/restore-database.sh database-20260626-140000.db
 ```
 
-### Bot không đọc database mới:
+### Backup khi database không phải bind-mount (trường hợp hiếm)
+Nếu vì lý do nào đó `data/` không phải bind-mount (chạy bằng named volume), dùng `docker cp` để lấy file ra ngoài:
 ```bash
-# Restart hoàn toàn
-docker compose down
-docker compose up -d --build
-
-# Hoặc reset Prisma cache
-./scripts/reset-prisma-cache.sh
+./scripts/backup-docker-db.sh
+# → copy ra ./backup-from-docker/database-<timestamp>.db
 ```
 
-## 📊 Database Files
+---
 
+## Kiểm tra tính toàn vẹn trước khi restore (đặc biệt quan trọng trên VPS)
+
+Luôn kiểm tra file backup trước khi restore, để không vô tình phục hồi một file đã hỏng:
+
+```bash
+docker compose -f docker-compose.yml exec aninhi-bot sh -c \
+  "apk add --no-cache sqlite && sqlite3 /app/data/database.db 'PRAGMA integrity_check;'"
 ```
-aninhi/
-├── data/
-│   ├── database.db                    # Data database
-│   ├── database.db.backup-*           # Backup files
-│   └── backup/                        # Backup có tổ chức
-├── prisma/
-│   └── data/
-│       └── database.db                # Prisma database (thực tế)
-└── scripts/
-    ├── sync-prisma-database.sh        # Sync từ Prisma
-    ├── check-balance.sh               # Check balance
-    └── check-prisma-cache.sh          # Check cache
-``` 
+
+Kết quả phải là `ok`. Nếu khác `ok` (liệt kê lỗi page/index...), **không restore file đó** — tìm bản backup gần nhất còn nguyên vẹn.
+
+> `sqlite3` không có sẵn trong image (Alpine tối giản). Lệnh trên cài tạm trong container đang chạy, không cần rebuild, mất khi container restart.
+
+---
+
+## Lịch backup tự động (khuyến nghị cho VPS)
+
+Thêm cron job trên VPS để backup định kỳ, độc lập với bot (không cần bot đang chạy):
+
+```bash
+crontab -e
+```
+Thêm dòng (backup mỗi ngày lúc 3h sáng):
+```
+0 3 * * * cd /root/aninhi && ./scripts/backup-database.sh >> /root/aninhi/logs/backup.log 2>&1
+```
+
+Script `backup-database.sh` tự động giữ lại 10 bản gần nhất và xoá bản cũ hơn, không cần dọn tay.
+
+---
+
+## Lưu ý quan trọng
+
+- **Không sửa `data/database.db` trong lúc bot đang chạy** (đọc/viết cùng lúc dễ gây corrupt file SQLite) — luôn `docker compose down` trước khi restore thủ công qua SSH.
+- **Sau khi restore, luôn restart container** — Prisma giữ connection/cache, không tự nhận file database bị thay ngầm dưới chân.
+- File backup chứa toàn bộ dữ liệu thật của user (balance, FishCoin, inventory...) — coi như dữ liệu nhạy cảm, không chia sẻ công khai.
+- Backup chỉ nằm trên cùng VPS — nếu VPS gặp sự cố nghiêm trọng (mất ổ cứng...), backup trong `data/backup/` cũng mất theo. Định kỳ tải backup ra ngoài VPS (rsync về máy khác, upload cloud storage...) nếu cần chống rủi ro mất toàn bộ server.
