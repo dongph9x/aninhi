@@ -11,8 +11,13 @@ export default Bot.createHandler({
     run: async client => {
         const componentFolder = path.join(client.root, "components/MessageComponent");
         if (!fs.existsSync(componentFolder)) {
-            logger.warn(`Folder "${componentFolder}" not found, creating...`);
-            return fs.mkdirSync(componentFolder, { recursive: true });
+            try {
+                logger.warn(`Folder "${componentFolder}" not found, creating...`);
+                fs.mkdirSync(componentFolder, { recursive: true });
+            } catch (error) {
+                logger.warn(`Could not create folder "${componentFolder}" (read-only filesystem?), treating as empty.`);
+            }
+            return;
         }
 
         for (const file of fs.readdirSync(componentFolder)) {

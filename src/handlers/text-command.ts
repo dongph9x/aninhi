@@ -11,8 +11,13 @@ export default Bot.createHandler({
         const commandFolder = path.join(client.root, "commands/text");
 
         if (!fs.existsSync(commandFolder)) {
-            logger.warn("No text command folder found, creating...");
-            return fs.mkdirSync(commandFolder, { recursive: true });
+            try {
+                logger.warn("No text command folder found, creating...");
+                fs.mkdirSync(commandFolder, { recursive: true });
+            } catch (error) {
+                logger.warn(`Could not create folder "${commandFolder}" (read-only filesystem?), treating as empty.`);
+            }
+            return;
         }
 
         for (const category of fs.readdirSync(commandFolder)) {

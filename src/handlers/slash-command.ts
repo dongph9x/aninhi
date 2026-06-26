@@ -12,8 +12,13 @@ export default Bot.createHandler({
         const commandFolder = path.join(client.root, "commands/slash");
 
         if (!fs.existsSync(commandFolder)) {
-            logger.warn("No slash command folder found, creating...");
-            return fs.mkdirSync(commandFolder, { recursive: true });
+            try {
+                logger.warn("No slash command folder found, creating...");
+                fs.mkdirSync(commandFolder, { recursive: true });
+            } catch (error) {
+                logger.warn(`Could not create folder "${commandFolder}" (read-only filesystem?), treating as empty.`);
+            }
+            return;
         }
 
         for (const category of fs.readdirSync(commandFolder)) {
