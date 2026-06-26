@@ -21,6 +21,7 @@ RUN npx prisma generate
 
 # Copy phần còn lại của source code
 COPY src ./src
+COPY assets ./assets
 COPY tsconfig.json tsx.config.json ./
 
 # Tạo sẵn thư mục mount; quyền thực tế do docker-entrypoint.sh chỉnh lại mỗi lần

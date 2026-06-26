@@ -482,13 +482,11 @@ export class FishingService {
             // Kiểm tra pity system
             const shouldActivatePity = await PitySystemService.shouldActivatePity(userId, guildId);
             
-            // Chọn cá ngẫu nhiên (Admin luôn câu được cá huyền thoại, hoặc khi kích hoạt pity)
+            // Chọn cá ngẫu nhiên (đã bỏ auto cá huyền thoại cho Admin - Admin câu random như user thường, chỉ khi kích hoạt pity mới đảm bảo ra huyền thoại)
             let fish: Fish;
             let isPityActivated = false;
-            
-            if (isAdmin) {
-                fish = this.getAdminFish();
-            } else if (shouldActivatePity) {
+
+            if (shouldActivatePity) {
                 // Kích hoạt pity system - đảm bảo ra cá huyền thoại
                 fish = PitySystemService.getRandomLegendaryFish();
                 isPityActivated = true;
@@ -878,20 +876,13 @@ export class FishingService {
     }
 
     /**
-     * Chọn cá huyền thoại cho Admin
-     */
-    private static getAdminFish(): Fish {
-        const legendaryFish = FISH_LIST.filter(fish => fish.rarity === "legendary");
-        const randomIndex = Math.floor(Math.random() * legendaryFish.length);
-        return legendaryFish[randomIndex];
-    }
-
-    /**
      * Chọn cá ngẫu nhiên dựa trên cần câu và mồi
      */
     private static async getRandomFish(fishingData: any, userId: string, guildId: string): Promise<Fish> {
-        const rod = FISHING_RODS[fishingData.currentRod];
-        const bait = BAITS[fishingData.currentBait];
+        // Fallback về "basic" khi currentRod/currentBait rỗng hoặc không tồn tại
+        // (ví dụ: cần câu hết độ bền bị xoá -> currentRod = ""), tránh crash khi đọc rarityBonus.
+        const rod = FISHING_RODS[fishingData.currentRod] ?? FISHING_RODS["basic"];
+        const bait = BAITS[fishingData.currentBait] ?? BAITS["basic"];
         const totalBonus = rod.rarityBonus + bait.rarityBonus;
 
         // Áp dụng hệ số may mắn theo mùa

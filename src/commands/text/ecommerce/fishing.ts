@@ -1,4 +1,5 @@
-import { EmbedBuilder, Message } from "discord.js";
+import { EmbedBuilder, Message, AttachmentBuilder } from "discord.js";
+import path from "path";
 
 import { Bot } from "@/classes";
 import { config } from "@/config";
@@ -212,8 +213,13 @@ async function fishWithAnimation(message: Message) {
         }
 
         // Tối ưu: Load GIF một lần và tái sử dụng
-        const fishingGifUrl = "https://cdn.discordapp.com/attachments/1396335030216822875/1397399341475430411/fish-shark.gif?ex=6881950d&is=6880438d&hm=60523d4d9a24ab5f45a42e6fd1c8dddf28680e015cadf0e5fce617e12599f552&";
-        
+        // Lưu local trong assets/gifs/ thay vì link CDN Discord (link CDN có tham số
+        // hết hạn "ex=" sẽ tự 404 sau một thời gian) - dùng AttachmentBuilder để gửi
+        // kèm file, tham chiếu qua "attachment://<tên file>" trong embed.
+        const fishingGifPath = path.resolve(process.cwd(), "assets/gifs/fishing-default.gif");
+        const fishingGifAttachment = new AttachmentBuilder(fishingGifPath, { name: "fishing-default.gif" });
+        const fishingGifUrl = "attachment://fishing-default.gif";
+
         // GIF đặc biệt cho Admin (hiển thị trên cùng)
         const adminGifUrl = "https://cdn.discordapp.com/attachments/1396335030216822875/1398569226188619787/113_146.gif?ex=6885d697&is=68848517&hm=51f234796bc3ada147d02b4b679afe6995bc1602f98f09571de115c5854cffb0&";
         
@@ -226,15 +232,22 @@ async function fishWithAnimation(message: Message) {
         // GIF đặc biệt cho Top 1 FishCoin (theo yêu cầu)
         const topFishCoinGifUrl = "https://media.discordapp.net/attachments/1396335030216822875/1398569226595336324/113_147.gif?ex=6885d697&is=68848517&hm=6997312ba231ae7d566ffde7a4176d509ccc9dc85d2ff312934a34508c072e1c&=&width=600&height=168";
         
-        // Animation 3 giây với các bước khác nhau (chỉ text thay đổi, GIF giữ nguyên)
+        // Animation chỉ còn 2 bước, mỗi bước hiển thị lâu hơn (tổng ~3.6s) để GIF
+        // có đủ thời gian chạy hết animation trước khi chuyển sang kết quả.
+        const ANIMATION_STEP_DELAY = 1800; // ms
         const animationSteps = [
-            "🎣 Đang thả mồi...",
-            "🌊 Đang chờ cá cắn câu...",
-            "🐟 Có gì đó đang cắn câu!",
-            "🎣 Đang kéo cá lên..."
+            "🐟 Có cá cắn câu...",
+            "🎣 Đang kéo cần..."
         ];
 
-        // Bắt đầu animation câu cá với GIF ngay từ đầu
+        // Tách riêng embed text (đổi mỗi 750ms) và embed GIF (đứng yên, không bao giờ
+        // bị tạo lại) - vì nếu gộp ảnh + text vào 1 embed, mỗi lần edit text Discord
+        // client sẽ re-render luôn ảnh, làm GIF bị restart/giật. Embed GIF dưới đây
+        // được tạo DUY NHẤT 1 lần và luôn dùng lại chính object này trong các lần edit.
+        const gifEmbed = new EmbedBuilder()
+            .setColor("#0099ff")
+            .setImage(fishingGifUrl);
+
         const fishingEmbed = new EmbedBuilder()
             .setTitle("🎣 Đang Câu Cá...")
             .setDescription(
@@ -245,7 +258,6 @@ async function fishWithAnimation(message: Message) {
             )
             .setColor("#0099ff")
             .setThumbnail(message.author.displayAvatarURL())
-            .setImage(fishingGifUrl) // Luôn giữ GIF câu cá cũ
             .setTimestamp();
 
         // Tạo embed cho Admin GIF (hiển thị nhỏ gọn - 100x50px equivalent)
@@ -299,24 +311,25 @@ async function fishWithAnimation(message: Message) {
         }
 
         // Gửi embed(s) dựa trên vai trò - Priority: Achievement > Admin > Top Fisher > Top FishCoin > Top Lose
-        let embeds: EmbedBuilder[] = [fishingEmbed];
+        // gifEmbed luôn ở vị trí cuối mảng, dùng lại nguyên object trong mọi lần edit.
+        let embeds: EmbedBuilder[] = [fishingEmbed, gifEmbed];
         if (hasAchievement && achievementEmbed) {
-            embeds = [achievementEmbed, fishingEmbed]; // Achievement có priority cao nhất
+            embeds = [achievementEmbed, fishingEmbed, gifEmbed]; // Achievement có priority cao nhất
         } else if (isAdmin && adminEmbed) {
-            embeds = [adminEmbed, fishingEmbed];
+            embeds = [adminEmbed, fishingEmbed, gifEmbed];
         } else if (isTopFisher && topFisherEmbed) {
-            embeds = [topFisherEmbed, fishingEmbed];
+            embeds = [topFisherEmbed, fishingEmbed, gifEmbed];
         } else if (isTopFishCoin && topFishCoinEmbed) {
-            embeds = [topFishCoinEmbed, fishingEmbed];
+            embeds = [topFishCoinEmbed, fishingEmbed, gifEmbed];
         } else if (isTopLose && topLoseEmbed) {
-            embeds = [topLoseEmbed, fishingEmbed];
+            embeds = [topLoseEmbed, fishingEmbed, gifEmbed];
         }
-        const fishingMsg = await message.reply({ embeds });
+        const fishingMsg = await message.reply({ embeds, files: [fishingGifAttachment] });
 
         // Cập nhật các bước tiếp theo (chỉ thay đổi description, không động đến image để tránh nháy GIF)
         for (let i = 1; i < animationSteps.length; i++) {
-            await new Promise(resolve => setTimeout(resolve, 750)); // 750ms mỗi bước = 3 giây tổng
-            
+            await new Promise(resolve => setTimeout(resolve, ANIMATION_STEP_DELAY));
+
             if (hasAchievement && achievementEmbed) {
                 // Achievement: Cập nhật cả hai embed
                 const updatedFishingEmbed = EmbedBuilder.from(fishingMsg.embeds[1]) // Embed thứ 2 là fishing embed
@@ -327,7 +340,7 @@ async function fishWithAnimation(message: Message) {
                         `⏳ ${animationSteps[i]}`
                     );
                 
-                const updatedEmbeds = [achievementEmbed, updatedFishingEmbed];
+                const updatedEmbeds = [achievementEmbed, updatedFishingEmbed, gifEmbed];
                 await fishingMsg.edit({ embeds: updatedEmbeds });
             } else if (isAdmin && adminEmbed) {
                 // Admin: Cập nhật cả hai embed
@@ -339,7 +352,7 @@ async function fishWithAnimation(message: Message) {
                         `⏳ ${animationSteps[i]}`
                     );
                 
-                const updatedEmbeds = [adminEmbed, updatedFishingEmbed];
+                const updatedEmbeds = [adminEmbed, updatedFishingEmbed, gifEmbed];
                 await fishingMsg.edit({ embeds: updatedEmbeds });
             } else if (isTopFisher && topFisherEmbed) {
                 // Top 1 Fisher: Cập nhật cả hai embed
@@ -351,7 +364,7 @@ async function fishWithAnimation(message: Message) {
                         `⏳ ${animationSteps[i]}`
                     );
                 
-                const updatedEmbeds = [topFisherEmbed, updatedFishingEmbed];
+                const updatedEmbeds = [topFisherEmbed, updatedFishingEmbed, gifEmbed];
                 await fishingMsg.edit({ embeds: updatedEmbeds });
             } else if (isTopFishCoin && topFishCoinEmbed) {
                 // Top 1 FishCoin: Cập nhật cả hai embed
@@ -363,7 +376,7 @@ async function fishWithAnimation(message: Message) {
                         `⏳ ${animationSteps[i]}`
                     );
                 
-                const updatedEmbeds = [topFishCoinEmbed, updatedFishingEmbed];
+                const updatedEmbeds = [topFishCoinEmbed, updatedFishingEmbed, gifEmbed];
                 await fishingMsg.edit({ embeds: updatedEmbeds });
             } else if (isTopLose && topLoseEmbed) {
                 // Top 1 Lose: Cập nhật cả hai embed
@@ -375,7 +388,7 @@ async function fishWithAnimation(message: Message) {
                         `⏳ ${animationSteps[i]}`
                     );
                 
-                const updatedEmbeds = [topLoseEmbed, updatedFishingEmbed];
+                const updatedEmbeds = [topLoseEmbed, updatedFishingEmbed, gifEmbed];
                 await fishingMsg.edit({ embeds: updatedEmbeds });
             } else {
                 // Normal user: Chỉ cập nhật một embed
@@ -387,9 +400,12 @@ async function fishWithAnimation(message: Message) {
                         `⏳ ${animationSteps[i]}`
                     );
                 
-                await fishingMsg.edit({ embeds: [updatedEmbed] });
+                await fishingMsg.edit({ embeds: [updatedEmbed, gifEmbed] });
             }
         }
+
+        // Giữ bước cuối hiển thị đủ lâu (cùng độ trễ mỗi bước) trước khi chuyển sang kết quả
+        await new Promise(resolve => setTimeout(resolve, ANIMATION_STEP_DELAY));
 
         // Thực hiện câu cá
         const result = await FishingService.fish(userId, guildId, isAdmin);
@@ -546,23 +562,26 @@ async function fishWithAnimation(message: Message) {
             .setTimestamp();
 
         // Gửi kết quả dựa trên vai trò - Priority: Achievement > Admin > Top Fisher > Top FishCoin > Top Lose
+        // successEmbed không còn setImage(GIF) nữa nên phải xoá attachment cũ bằng
+        // "attachments: []", nếu không GIF câu cá vẫn dính trên message dù không
+        // còn embed nào tham chiếu tới nó (gây hiện tượng ảnh đứng hình/giật).
         if (hasAchievement && achievementEmbed) {
             const finalEmbeds = [achievementEmbed, successEmbed];
-            await fishingMsg.edit({ embeds: finalEmbeds });
+            await fishingMsg.edit({ embeds: finalEmbeds, attachments: [] });
         } else if (isAdmin && adminEmbed) {
             const finalEmbeds = [adminEmbed, successEmbed];
-            await fishingMsg.edit({ embeds: finalEmbeds });
+            await fishingMsg.edit({ embeds: finalEmbeds, attachments: [] });
         } else if (isTopFisher && topFisherEmbed) {
             const finalEmbeds = [topFisherEmbed, successEmbed];
-            await fishingMsg.edit({ embeds: finalEmbeds });
+            await fishingMsg.edit({ embeds: finalEmbeds, attachments: [] });
         } else if (isTopFishCoin && topFishCoinEmbed) {
             const finalEmbeds = [topFishCoinEmbed, successEmbed];
-            await fishingMsg.edit({ embeds: finalEmbeds });
+            await fishingMsg.edit({ embeds: finalEmbeds, attachments: [] });
         } else if (isTopLose && topLoseEmbed) {
             const finalEmbeds = [topLoseEmbed, successEmbed];
-            await fishingMsg.edit({ embeds: finalEmbeds });
+            await fishingMsg.edit({ embeds: finalEmbeds, attachments: [] });
         } else {
-            await fishingMsg.edit({ embeds: [successEmbed] });
+            await fishingMsg.edit({ embeds: [successEmbed], attachments: [] });
         }
     } catch (error: any) {
         const errorEmbed = new EmbedBuilder()
