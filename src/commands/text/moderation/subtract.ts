@@ -82,7 +82,7 @@ export default Bot.createCommand({
                         `**<@${targetUser.id}>** không có đủ AniCoin!\n\n` +
                         `**Số dư hiện tại:** ${currentUser.balance.toLocaleString()} AniCoin\n` +
                         `**Số tiền muốn trừ:** ${amount.toLocaleString()} AniCoin\n` +
-                        `**Thiếu:** ${(amount - currentUser.balance).toLocaleString()} AniCoin\n\n` +
+                        `**Thiếu:** ${(amount - Number(currentUser.balance)).toLocaleString()} AniCoin\n\n` +
                         "Bạn có muốn trừ toàn bộ số dư hiện tại không?"
                     )
                     .setColor("#ff9900")
@@ -106,7 +106,7 @@ export default Bot.createCommand({
             console.log(`  - After balance: ${user.balance.toLocaleString()}`);
             console.log(`  - Expected difference: ${amount}`);
             console.log(`  - Actual difference: ${beforeBalance - user.balance}`);
-            console.log(`  - Success: ${beforeBalance - user.balance === amount}`);
+            console.log(`  - Success: ${Number(beforeBalance - user.balance) === amount}`);
 
             // Ghi lại moderation log
             await ModerationService.logAction({
