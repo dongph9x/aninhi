@@ -221,20 +221,6 @@ async function fishWithAnimation(message: Message) {
         const fishingGifAttachment = new AttachmentBuilder(fishingGifPath, { name: "fishing-default.gif" });
         const fishingGifUrl = "attachment://fishing-default.gif";
 
-        // GIF đặc biệt cho Admin (hiển thị trên cùng)
-        const adminGifUrl = "https://cdn.discordapp.com/attachments/1396335030216822875/1398569226188619787/113_146.gif?ex=6885d697&is=68848517&hm=51f234796bc3ada147d02b4b679afe6995bc1602f98f09571de115c5854cffb0&";
-        
-        // GIF đặc biệt cho Top 1 Fisher - lưu local giống fishingGif, tránh link CDN hết hạn
-        const topFisherGifPath = path.resolve(process.cwd(), "assets/gifs/top-fisher.gif");
-        const topFisherGifAttachment = new AttachmentBuilder(topFisherGifPath, { name: "top-fisher.gif" });
-        const topFisherGifUrl = "attachment://top-fisher.gif";
-
-
-        // GIF đặc biệt cho Top 1 Lose (theo yêu cầu)
-        const topLoseGifUrl = "https://media.discordapp.net/attachments/1396335030216822875/1398569302663368714/113_156.gif?ex=6885d6a9&is=68848529&hm=e67d702c44f4916882ea5cb64940485e0b66aed91f74b7f7f5f6e53934fcd47d&=&width=408&height=192";
-        
-        // GIF đặc biệt cho Top 1 FishCoin (theo yêu cầu)
-        const topFishCoinGifUrl = "https://media.discordapp.net/attachments/1396335030216822875/1398569226595336324/113_147.gif?ex=6885d697&is=68848517&hm=6997312ba231ae7d566ffde7a4176d509ccc9dc85d2ff312934a34508c072e1c&=&width=600&height=168";
         
         // Animation chỉ còn 2 bước, mỗi bước hiển thị lâu hơn (tổng ~3.6s) để GIF
         // có đủ thời gian chạy hết animation trước khi chuyển sang kết quả.
@@ -264,38 +250,29 @@ async function fishWithAnimation(message: Message) {
             .setThumbnail(message.author.displayAvatarURL())
             .setTimestamp();
 
-        // Tạo embed cho Admin GIF (hiển thị nhỏ gọn - 100x50px equivalent)
-        let adminEmbed: EmbedBuilder | undefined = undefined;
-        // if (isAdmin) {
-        //     adminEmbed = new EmbedBuilder()
-        //         .setThumbnail(adminGifUrl) // GIF đặc biệt cho Admin (nhỏ gọn)
-        //         .setColor("#ffd700") // Màu vàng cho Admin
-        //         .setTitle("👑 Admin Fishing"); // Tiêu đề nhỏ cho Admin
-        // }
+        // Admin embed đã bị tắt (luôn undefined) - không hiện badge riêng cho Admin nữa
+        const adminEmbed: EmbedBuilder | undefined = undefined;
 
-        // Tạo embed cho Top 1 Fisher GIF (hiển thị nhỏ gọn)
+        // Top 1 Fisher: chỉ hiện title kèm vương miện, không dùng GIF nữa
         let topFisherEmbed: EmbedBuilder | undefined = undefined;
         if (isTopFisher && !isAdmin) {
             topFisherEmbed = new EmbedBuilder()
-                .setThumbnail(topFisherGifUrl)
                 .setColor("#ff6b35")
-                .setTitle("🏆 Top 1 Câu Cá");
+                .setTitle("👑 Top 1 Câu Cá");
         }
 
-        // Tạo embed cho Top 1 Lose GIF (hiển thị nhỏ gọn)
+        // Top 1 Lose: chỉ hiện title, không dùng GIF
         let topLoseEmbed: EmbedBuilder | undefined = undefined;
         if (isTopLose && !isAdmin && !isTopFisher) {
             topLoseEmbed = new EmbedBuilder()
-                .setThumbnail(topLoseGifUrl)
                 .setColor("#ff4757")
                 .setTitle("💸 Top 1 Thua Lỗ");
         }
 
-        // Tạo embed cho Top 1 FishCoin GIF (hiển thị nhỏ gọn)
+        // Top 1 FishCoin: chỉ hiện title, không dùng GIF
         let topFishCoinEmbed: EmbedBuilder | undefined = undefined;
         if (isTopFishCoin && !isAdmin && !isTopFisher) {
             topFishCoinEmbed = new EmbedBuilder()
-                .setThumbnail(topFishCoinGifUrl)
                 .setColor("#00d4aa")
                 .setTitle("💰 Top 1 FishCoin");
         }
@@ -328,11 +305,7 @@ async function fishWithAnimation(message: Message) {
         } else if (isTopLose && topLoseEmbed) {
             embeds = [topLoseEmbed, fishingEmbed, gifEmbed];
         }
-        const files = [fishingGifAttachment];
-        if (isTopFisher && topFisherEmbed) {
-            files.push(topFisherGifAttachment);
-        }
-        const fishingMsg = await message.reply({ embeds, files });
+        const fishingMsg = await message.reply({ embeds, files: [fishingGifAttachment] });
 
         // Cập nhật các bước tiếp theo (chỉ thay đổi description, không động đến image để tránh nháy GIF)
         for (let i = 1; i < animationSteps.length; i++) {
@@ -580,10 +553,8 @@ async function fishWithAnimation(message: Message) {
             const finalEmbeds = [adminEmbed, successEmbed];
             await fishingMsg.edit({ embeds: finalEmbeds, attachments: [] });
         } else if (isTopFisher && topFisherEmbed) {
-            // topFisherEmbed vẫn dùng attachment://top-fisher.gif - phải re-attach lại
-            // file đó (không thể chỉ "attachments: []") nếu không thumbnail sẽ bị vỡ.
             const finalEmbeds = [topFisherEmbed, successEmbed];
-            await fishingMsg.edit({ embeds: finalEmbeds, attachments: [], files: [topFisherGifAttachment] });
+            await fishingMsg.edit({ embeds: finalEmbeds, attachments: [] });
         } else if (isTopFishCoin && topFishCoinEmbed) {
             const finalEmbeds = [topFishCoinEmbed, successEmbed];
             await fishingMsg.edit({ embeds: finalEmbeds, attachments: [] });
