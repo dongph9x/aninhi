@@ -41,7 +41,7 @@ export class WeaponShopHandler {
 
         try {
             switch (customId) {
-                case 'weapon_buy_select':
+                case 'weapon_shop_buy_select':
                     await this.handleBuySelect(interaction, guildId, userId, selectedValue);
                     break;
                 case 'weapon_equip_select':
