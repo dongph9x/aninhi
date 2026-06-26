@@ -181,8 +181,8 @@ __tests__/
 *.spec.js
 *.spec.ts
 
-# Scripts
-scripts/
+# Scripts - giữ lại scripts/*.ts (cần để chạy tay trong container, vd: seed data,
+# migration thủ công), chỉ loại *.sh ở root (build/deploy script chạy trên host)
 *.sh
 !docker-entrypoint.sh
 
