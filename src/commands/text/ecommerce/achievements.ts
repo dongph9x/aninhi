@@ -89,10 +89,11 @@ export default Bot.createCommand({
                 text: `Tổng cộng: ${userAchievements.length} danh hiệu • Danh hiệu ưu tiên sẽ hiển thị khi câu cá`
             });
 
-            // Tạo buttons để chọn active achievement (chỉ khi có nhiều hơn 1 achievement)
+            // Tạo buttons để chọn active achievement (hiện cả khi chỉ có 1 achievement,
+            // để user có thể tự active lại nếu đang ở trạng thái chưa active)
             let components: ActionRowBuilder<ButtonBuilder>[] = [];
-            
-            if (userAchievements.length > 1) {
+
+            if (userAchievements.length >= 1) {
                 const activeButtons = userAchievements.map((achievement, index) => {
                     const typeEmoji = AchievementService.getAchievementTypeEmoji(achievement.type);
                     const statusEmoji = achievement.active ? '✅' : '❌';

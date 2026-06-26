@@ -143,12 +143,20 @@ async function addAchievement(message: Message, args: string[]) {
 
     const prisma = (await import('../../../utils/prisma')).default;
 
+    // Tắt các danh hiệu khác của user trước, để danh hiệu mới gắn trở thành
+    // danh hiệu active duy nhất (giống hành vi nút "Active" trong n.achievements).
+    await prisma.achievement.updateMany({
+      where: { target },
+      data: { active: false },
+    });
+
     const achievement = await prisma.achievement.create({
       data: {
         name,
         link,
         target,
         type,
+        active: true,
       },
     });
 
