@@ -212,7 +212,10 @@ export default Bot.createEvent({
             }
 
             // Kiểm tra xem có phải horse racing interaction không
-            if (interaction.customId.startsWith("bet_")) {
+            // Lưu ý: customId của baucua cũng bắt đầu bằng "bet_" (bet_baucua_...), nên
+            // phải check "bet_horseracing_" cụ thể, nếu không sẽ cướp interaction của
+            // baucua (baucua tự xử lý qua collector riêng trong baucua.ts).
+            if (interaction.customId.startsWith("bet_horseracing_")) {
                 console.log("HorseRacing interaction:", interaction.customId);
                 
                 try {
