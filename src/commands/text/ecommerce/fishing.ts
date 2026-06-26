@@ -262,12 +262,12 @@ async function fishWithAnimation(message: Message) {
 
         // Tạo embed cho Admin GIF (hiển thị nhỏ gọn - 100x50px equivalent)
         let adminEmbed: EmbedBuilder | undefined = undefined;
-        if (isAdmin) {
-            adminEmbed = new EmbedBuilder()
-                .setThumbnail(adminGifUrl) // GIF đặc biệt cho Admin (nhỏ gọn)
-                .setColor("#ffd700") // Màu vàng cho Admin
-                .setTitle("👑 Admin Fishing"); // Tiêu đề nhỏ cho Admin
-        }
+        // if (isAdmin) {
+        //     adminEmbed = new EmbedBuilder()
+        //         .setThumbnail(adminGifUrl) // GIF đặc biệt cho Admin (nhỏ gọn)
+        //         .setColor("#ffd700") // Màu vàng cho Admin
+        //         .setTitle("👑 Admin Fishing"); // Tiêu đề nhỏ cho Admin
+        // }
 
         // Tạo embed cho Top 1 Fisher GIF (hiển thị nhỏ gọn)
         let topFisherEmbed: EmbedBuilder | undefined = undefined;
