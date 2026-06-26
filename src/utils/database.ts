@@ -32,7 +32,7 @@ export { prisma };
 // Database service class
 export class DatabaseService {
   private static instance: DatabaseService;
-  private client: PrismaClient;
+  private client: typeof prisma;
 
   private constructor() {
     this.client = prisma;
@@ -45,7 +45,7 @@ export class DatabaseService {
     return DatabaseService.instance;
   }
 
-  public getClient(): PrismaClient {
+  public getClient(): typeof prisma {
     return this.client;
   }
 
