@@ -315,6 +315,14 @@ export class FishBarnUI {
         components.push(selectRow, actionRow, closeRow);
       }
     } else {
+      // Cá đang được chọn đã đạt max level chưa (để disable nút Cho Ăn cho đúng nghĩa)
+      const selectedFishItem = this.selectedFishId
+        ? this.inventory.items.find((item: any) => item.fish.id === this.selectedFishId)
+        : undefined;
+      const selectedFishMaxed = selectedFishItem
+        ? selectedFishItem.fish.level >= getMaxLevelForGeneration(selectedFishItem.fish.generation)
+        : false;
+
       // Row 1: Feed, Sell, Breed, Clone và Level Up (cho admin)
       const actionRow1 = new ActionRowBuilder<ButtonBuilder>()
         .addComponents(
@@ -323,7 +331,7 @@ export class FishBarnUI {
             .setLabel('Cho Ăn')
             .setStyle(ButtonStyle.Primary)
             .setEmoji('🍽️')
-            .setDisabled(!this.selectedFishId),
+            .setDisabled(!this.selectedFishId || selectedFishMaxed),
           new ButtonBuilder()
             .setCustomId('fishbarn_sell')
             .setLabel('Bán Cá')
@@ -339,53 +347,40 @@ export class FishBarnUI {
 
 
 
-      // Row 2: Select menu để chọn cá
-      const availableFish = this.inventory.items
-        .filter((item: any) => {
-          const maxLevel = getMaxLevelForGeneration(item.fish.generation);
-          return item.fish.level < maxLevel;
-        }) // Lọc bỏ cá đã đạt max level
-        .slice(0, 25); // Giới hạn tối đa 25 options
-      
-      if (availableFish.length > 0) {
-        const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>()
-          .addComponents(
-            new StringSelectMenuBuilder()
-              .setCustomId('fishbarn_select_fish')
-              .setPlaceholder(this.selectedFishId ? 'Đổi cá khác...' : 'Chọn cá để thao tác...')
-              .addOptions(
-                availableFish.map((item: any, index: number) => {
-                  const fish = item.fish;
-                  const stats = this.parseStats(fish.stats);
-                  const totalPower = this.calculateTotalPower(fish);
-                  // Tính giá theo level (tăng 2% mỗi level)
-                  const levelBonus = fish.level > 1 ? (fish.level - 1) * 0.02 : 0;
-                  const finalValue = Math.floor(Number(fish.value) * (1 + levelBonus));
-                  
-                  return {
-                    label: `${fish.species} (Gen.${fish.generation}, Lv.${fish.level})`,
-                    description: `Power: ${totalPower} - ${fish.status === 'adult' ? 'Trưởng thành' : 'Đang lớn'} - ${finalValue.toLocaleString()} FishCoin`,
-                    value: fish.id,
-                    emoji: fish.status === 'adult' ? '🐟' : '🐠',
-                  };
-                })
-              )
-          );
-        // Thêm cloneRow nếu là admin và có cá được chọn
-        const cloneRow = this.createCloneRow();
-        if (cloneRow) {
-          components.push(actionRow1, selectRow, cloneRow);
-        } else {
-          components.push(actionRow1, selectRow);
-        }
+      // Row 2: Select menu để chọn cá - bao gồm cả cá đã max level (để Bán/Nhân Bản/
+      // Nâng Cấp vẫn chọn được; chỉ riêng nút Cho Ăn tự disable với cá đã max ở trên).
+      const availableFish = this.inventory.items.slice(0, 25); // Giới hạn tối đa 25 options
+
+      const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>()
+        .addComponents(
+          new StringSelectMenuBuilder()
+            .setCustomId('fishbarn_select_fish')
+            .setPlaceholder(this.selectedFishId ? 'Đổi cá khác...' : 'Chọn cá để thao tác...')
+            .addOptions(
+              availableFish.map((item: any, index: number) => {
+                const fish = item.fish;
+                const stats = this.parseStats(fish.stats);
+                const totalPower = this.calculateTotalPower(fish);
+                // Tính giá theo level (tăng 2% mỗi level)
+                const levelBonus = fish.level > 1 ? (fish.level - 1) * 0.02 : 0;
+                const finalValue = Math.floor(Number(fish.value) * (1 + levelBonus));
+                const isMaxed = fish.level >= getMaxLevelForGeneration(fish.generation);
+
+                return {
+                  label: `${fish.species} (Gen.${fish.generation}, Lv.${fish.level}${isMaxed ? ' MAX' : ''})`,
+                  description: `Power: ${totalPower} - ${fish.status === 'adult' ? 'Trưởng thành' : 'Đang lớn'} - ${finalValue.toLocaleString()} FishCoin`,
+                  value: fish.id,
+                  emoji: fish.status === 'adult' ? '🐟' : '🐠',
+                };
+              })
+            )
+        );
+      // Thêm cloneRow nếu là admin và có cá được chọn
+      const cloneRow = this.createCloneRow();
+      if (cloneRow) {
+        components.push(actionRow1, selectRow, cloneRow);
       } else {
-        // Nếu không có cá nào dưới max level, chỉ hiển thị buttons
-        const cloneRow = this.createCloneRow();
-        if (cloneRow) {
-          components.push(actionRow1, cloneRow);
-        } else {
-          components.push(actionRow1);
-        }
+        components.push(actionRow1, selectRow);
       }
 
       // Row 3: Select menu để chọn thức ăn (chỉ hiển thị khi có cá được chọn)
