@@ -22,7 +22,17 @@ else
     exit 1
 fi
 
-# Giữ lại 10 bản backup mới nhất, xóa bản cũ hơn
-ls -t "$BACKUP_DIR"/database-*.db | tail -n +11 | xargs -r rm --
+# Backup luôn các file cấu hình runtime (maintenance, admin fishing bypass, channel restrictions)
+for CONFIG_FILE in maintenance-mode.json admin-fishing-bypass.json channel-restrictions.json; do
+    if [ -f "./data/$CONFIG_FILE" ]; then
+        cp "./data/$CONFIG_FILE" "$BACKUP_DIR/${CONFIG_FILE%.json}-$TIMESTAMP.json"
+    fi
+done
+
+# Giữ lại 10 bản backup mới nhất của mỗi loại, xóa bản cũ hơn
+ls -t "$BACKUP_DIR"/database-*.db 2>/dev/null | tail -n +11 | xargs -r rm --
+for CONFIG_FILE in maintenance-mode admin-fishing-bypass channel-restrictions; do
+    ls -t "$BACKUP_DIR"/$CONFIG_FILE-*.json 2>/dev/null | tail -n +11 | xargs -r rm --
+done
 
 echo "🎉 Hoàn thành backup!" 

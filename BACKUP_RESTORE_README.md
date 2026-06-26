@@ -100,3 +100,4 @@ Script `backup-database.sh` tự động giữ lại 10 bản gần nhất và x
 - **Sau khi restore, luôn restart container** — Prisma giữ connection/cache, không tự nhận file database bị thay ngầm dưới chân.
 - File backup chứa toàn bộ dữ liệu thật của user (balance, FishCoin, inventory...) — coi như dữ liệu nhạy cảm, không chia sẻ công khai.
 - Backup chỉ nằm trên cùng VPS — nếu VPS gặp sự cố nghiêm trọng (mất ổ cứng...), backup trong `data/backup/` cũng mất theo. Định kỳ tải backup ra ngoài VPS (rsync về máy khác, upload cloud storage...) nếu cần chống rủi ro mất toàn bộ server.
+- Ngoài `database.db`, thư mục `data/` còn chứa các file cấu hình runtime dạng JSON (`maintenance-mode.json`, `admin-fishing-bypass.json`, `channel-restrictions.json`) — backup luôn cả thư mục `data/` (không chỉ riêng `database.db`) để không mất cấu hình khi restore.

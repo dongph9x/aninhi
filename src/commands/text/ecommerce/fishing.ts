@@ -1,7 +1,7 @@
 import { EmbedBuilder, Message, AttachmentBuilder } from "discord.js";
 import path from "path";
 
-import { Bot } from "@/classes";
+import { Bot, ExtendedClient } from "@/classes";
 import { config } from "@/config";
 import { EcommerceService } from "@/utils/ecommerce-db";
 import { FishingService } from "@/utils/fishing";
@@ -146,9 +146,10 @@ async function fishWithAnimation(message: Message) {
         // Đánh dấu user đang câu cá
         fishingInProgress.set(userId, true);
 
-        // Kiểm tra quyền Admin
+        // Kiểm tra quyền Admin - chỉ bypass cooldown/cần/mồi khi flag adminFishingBypass
+        // đang bật (n.adminfishing on/off), để admin có thể chơi như user thường khi cần.
         const member = await message.guild?.members.fetch(userId);
-        const isAdmin = member?.permissions.has('Administrator') || false;
+        const isAdmin = (member?.permissions.has('Administrator') || false) && (message.client as ExtendedClient).adminFishingBypass;
 
         // Kiểm tra xem user có phải là top 1 fisher không
         const topFisher = await FishingService.getTopFisher(guildId);
@@ -223,9 +224,12 @@ async function fishWithAnimation(message: Message) {
         // GIF đặc biệt cho Admin (hiển thị trên cùng)
         const adminGifUrl = "https://cdn.discordapp.com/attachments/1396335030216822875/1398569226188619787/113_146.gif?ex=6885d697&is=68848517&hm=51f234796bc3ada147d02b4b679afe6995bc1602f98f09571de115c5854cffb0&";
         
-        // GIF đặc biệt cho Top 1 Fisher (theo yêu cầu)
-        const topFisherGifUrl = "https://media.discordapp.net/attachments/1396335030216822875/1398568859987869696/113_137.gif?ex=6885d640&is=688484c0&hm=caa5221123afc40711c4fcfc972f92181fc6ed9fbbc2052d689e7962b6a0e55d&=&width=480&height=184";
-        
+        // GIF đặc biệt cho Top 1 Fisher - lưu local giống fishingGif, tránh link CDN hết hạn
+        const topFisherGifPath = path.resolve(process.cwd(), "assets/gifs/top-fisher.gif");
+        const topFisherGifAttachment = new AttachmentBuilder(topFisherGifPath, { name: "top-fisher.gif" });
+        const topFisherGifUrl = "attachment://top-fisher.gif";
+
+
         // GIF đặc biệt cho Top 1 Lose (theo yêu cầu)
         const topLoseGifUrl = "https://media.discordapp.net/attachments/1396335030216822875/1398569302663368714/113_156.gif?ex=6885d6a9&is=68848529&hm=e67d702c44f4916882ea5cb64940485e0b66aed91f74b7f7f5f6e53934fcd47d&=&width=408&height=192";
         
@@ -324,7 +328,11 @@ async function fishWithAnimation(message: Message) {
         } else if (isTopLose && topLoseEmbed) {
             embeds = [topLoseEmbed, fishingEmbed, gifEmbed];
         }
-        const fishingMsg = await message.reply({ embeds, files: [fishingGifAttachment] });
+        const files = [fishingGifAttachment];
+        if (isTopFisher && topFisherEmbed) {
+            files.push(topFisherGifAttachment);
+        }
+        const fishingMsg = await message.reply({ embeds, files });
 
         // Cập nhật các bước tiếp theo (chỉ thay đổi description, không động đến image để tránh nháy GIF)
         for (let i = 1; i < animationSteps.length; i++) {
@@ -572,8 +580,10 @@ async function fishWithAnimation(message: Message) {
             const finalEmbeds = [adminEmbed, successEmbed];
             await fishingMsg.edit({ embeds: finalEmbeds, attachments: [] });
         } else if (isTopFisher && topFisherEmbed) {
+            // topFisherEmbed vẫn dùng attachment://top-fisher.gif - phải re-attach lại
+            // file đó (không thể chỉ "attachments: []") nếu không thumbnail sẽ bị vỡ.
             const finalEmbeds = [topFisherEmbed, successEmbed];
-            await fishingMsg.edit({ embeds: finalEmbeds, attachments: [] });
+            await fishingMsg.edit({ embeds: finalEmbeds, attachments: [], files: [topFisherGifAttachment] });
         } else if (isTopFishCoin && topFishCoinEmbed) {
             const finalEmbeds = [topFishCoinEmbed, successEmbed];
             await fishingMsg.edit({ embeds: finalEmbeds, attachments: [] });

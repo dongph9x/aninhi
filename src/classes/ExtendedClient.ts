@@ -19,11 +19,13 @@ import { importDefault } from "@/utils/import";
 import { logger } from "@/utils/logger";
 import { ChannelRestrictionsStorage } from "@/utils/channel-restrictions-storage";
 import { MaintenanceStorage } from "@/utils/maintenance-storage";
+import { AdminFishingBypassStorage } from "@/utils/admin-fishing-bypass-storage";
 
 export class ExtendedClient<Ready extends boolean = boolean> extends Client<Ready> {
     cwd = process.cwd();
     production = process.env.NODE_ENV === "production";
     maintenanceMode = false; // Sẽ được load từ storage khi khởi tạo
+    adminFishingBypass = true; // Admin có bypass cooldown/cần/mồi khi câu cá hay không - load từ storage khi khởi tạo
 
     filter = new Filter(this);
     root = path.join(this.cwd, "src");
@@ -63,6 +65,7 @@ export class ExtendedClient<Ready extends boolean = boolean> extends Client<Read
         // Load channel restrictions và maintenance mode khi khởi tạo
         this.loadChannelRestrictions();
         this.loadMaintenanceMode();
+        this.loadAdminFishingBypass();
 
         if (!this.production) {
             this.on("debug", message => logger.debug(message));
@@ -89,6 +92,17 @@ export class ExtendedClient<Ready extends boolean = boolean> extends Client<Read
         } catch (error) {
             console.error('Error loading maintenance mode:', error);
             this.maintenanceMode = true; // Fallback to enabled
+        }
+    }
+
+    private loadAdminFishingBypass() {
+        try {
+            const config = AdminFishingBypassStorage.load();
+            this.adminFishingBypass = config.enabled;
+            console.log(`Admin fishing bypass loaded: ${this.adminFishingBypass ? 'ENABLED' : 'DISABLED'}`);
+        } catch (error) {
+            console.error('Error loading admin fishing bypass config:', error);
+            this.adminFishingBypass = true; // Fallback to enabled (giữ hành vi cũ)
         }
     }
 
