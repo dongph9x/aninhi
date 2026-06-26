@@ -35,14 +35,16 @@ export class SkillShopHandler {
 
     static async handleInteraction(interaction: ButtonInteraction | StringSelectMenuInteraction): Promise<void> {
         try {
-            const messageData = this.getMessageData(interaction.message.id);
-            if (!messageData) {
-                await interaction.reply({ 
-                    content: '❌ Không tìm thấy dữ liệu message!', 
-                    flags: MessageFlags.Ephemeral
-                });
-                return;
-            }
+            // skillShopMessages chỉ là cache trong RAM, mất sau mỗi lần bot restart.
+            // userId/guildId là 2 field thật sự cần thiết cho mọi handler bên dưới, và
+            // cả 2 đều lấy trực tiếp được từ interaction - fallback về đây khi cache
+            // miss, thay vì chặn hẳn người dùng vì lý do kỹ thuật nội bộ.
+            const messageData = this.getMessageData(interaction.message.id) ?? {
+                userId: interaction.user.id,
+                guildId: interaction.guildId!,
+                userBalance: 0,
+                messageType: "unknown",
+            };
 
             // Kiểm tra quyền truy cập
             if (interaction.user.id !== messageData.userId) {
@@ -149,7 +151,7 @@ export class SkillShopHandler {
                 const status = canLearn ? '✅' : '❌';
                 
                 return new StringSelectMenuOptionBuilder()
-                    .setLabel(`${fish.name} (Lv.${fish.level}) ${status}`)
+                    .setLabel(`${fish.species} (Lv.${fish.level}) ${status}`)
                     .setDescription(`${canLearn ? 'Có thể học' : 'Level không đủ'} - ${fish.species}`)
                     .setValue(fish.id)
                     .setEmoji('🐟');
@@ -215,7 +217,7 @@ export class SkillShopHandler {
 
             if (existingSkill) {
                 await interaction.reply({ 
-                    content: `❌ **${fish.name}** đã học skill **${skill.name}** rồi!`, 
+                    content: `❌ **${fish.species}** đã học skill **${skill.name}** rồi!`, 
                     flags: MessageFlags.Ephemeral 
                 });
                 return;
@@ -225,7 +227,7 @@ export class SkillShopHandler {
             const requiredLevel = skill.requirements?.level || 1;
             if (fish.level < requiredLevel) {
                 await interaction.reply({ 
-                    content: `❌ **${fish.name}** cần level ${requiredLevel} để học skill này! (Hiện tại: Lv.${fish.level})`, 
+                    content: `❌ **${fish.species}** cần level ${requiredLevel} để học skill này! (Hiện tại: Lv.${fish.level})`, 
                     flags: MessageFlags.Ephemeral 
                 });
                 return;
@@ -254,7 +256,7 @@ export class SkillShopHandler {
                 const embed = new EmbedBuilder()
                     .setTitle('✅ Mua Skill Thành Công!')
                     .setColor('#00FF00')
-                    .setDescription(`**${fish.name}** đã học skill **${skill.name}** thành công!`)
+                    .setDescription(`**${fish.species}** đã học skill **${skill.name}** thành công!`)
                     .addFields(
                         { name: '💰 Chi Phí', value: `${result.cost?.toLocaleString()} FishCoin`, inline: true },
                         { name: '📈 Level Skill', value: `Level ${result.newLevel}`, inline: true },
@@ -942,7 +944,7 @@ export class SkillShopHandler {
 
             if (inventory.items.length > 0) {
                 const fishText = inventory.items.map((item: any, index: number) => 
-                    `${index + 1}. **${item.fish.name}** (Lv.${item.fish.level}, Gen.${item.fish.generation}) - 💰${item.fish.value.toLocaleString()}`
+                    `${index + 1}. **${item.fish.species}** (Lv.${item.fish.level}, Gen.${item.fish.generation}) - 💰${item.fish.value.toLocaleString()}`
                 ).join('\n');
 
                 embed.addFields({

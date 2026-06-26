@@ -128,16 +128,20 @@ export default Bot.createCommand({
                 rslots.push(slots[slot1], slots[slot2], slots[slot3]);
             }
 
-            if (win > 0) {
+            const netChange = BigInt(win) - BigInt(amount);
+            if (netChange > 0n) {
+                // win > 0 và multiplier > 1x: thắng nhiều hơn tiền cược, cộng phần lãi
                 await EcommerceService.addMoney(
                     userId,
                     guildId,
-                    BigInt(win) - BigInt(amount),
+                    netChange,
                     `Slots win - bet: ${amount}, multiplier: ${multiplier}x`,
                 );
-            } else {
+            } else if (netChange < 0n) {
+                // Thua: trừ đúng tiền cược
                 await EcommerceService.subtractMoney(userId, guildId, amount, `Slots lose - bet: ${amount}`);
             }
+            // netChange === 0n (multiplier 1x: hoà tiền cược) - không cần cập nhật số dư
 
             // Ghi lại thống kê game
             await GameStatsService.recordGameResult(userId, guildId, "slots", {
