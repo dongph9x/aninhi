@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 
 // Khởi tạo Prisma Client
-const prisma = new PrismaClient({
+const basePrisma = new PrismaClient({
   datasources: {
     db: {
       url: process.env.DATABASE_URL || 'file:./data/database.db',
@@ -9,16 +9,23 @@ const prisma = new PrismaClient({
   },
 });
 
-// Middleware để log queries trong development
-if (process.env.NODE_ENV === 'development') {
-  prisma.$use(async (params: any, next: any) => {
-    const before = Date.now();
-    const result = await next(params);
-    const after = Date.now();
-    console.log(`Query ${params.model}.${params.action} took ${after - before}ms`);
-    return result;
-  });
-}
+// Log queries trong development (Prisma 5+ dùng client extension thay cho $use)
+const prisma =
+  process.env.NODE_ENV === 'development'
+    ? basePrisma.$extends({
+        query: {
+          $allModels: {
+            async $allOperations({ model, operation, args, query }) {
+              const before = Date.now();
+              const result = await query(args);
+              const after = Date.now();
+              console.log(`Query ${model}.${operation} took ${after - before}ms`);
+              return result;
+            },
+          },
+        },
+      })
+    : basePrisma;
 
 export { prisma };
 

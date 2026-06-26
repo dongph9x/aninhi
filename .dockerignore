@@ -56,11 +56,12 @@ jspm_packages/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variables file
+# dotenv environment variables file (mount qua volume lúc runtime, không bake vào image)
 .env
 .env.test
 .env.local
 .env.production
+env/
 
 # parcel-bundler cache
 .cache
@@ -183,6 +184,7 @@ __tests__/
 # Scripts
 scripts/
 *.sh
+!docker-entrypoint.sh
 
 # Husky
 .husky/
@@ -204,8 +206,7 @@ scripts/
 # TypeScript
 *.tsbuildinfo
 
-# Prisma
-prisma/migrations/
+# Prisma (migrations PHẢI có trong image để `prisma migrate deploy` chạy được)
 prisma/seed.ts
 
 # Misc

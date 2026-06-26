@@ -5,34 +5,36 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=file:./data/database.db
+      - DATABASE_URL=file:../data/database.db
     volumes:
-      # Mount thư mục data để lưu trữ database
+      # Database SQLite - quyền sẽ được docker-entrypoint.sh tự chỉnh khi container start
       - ./data:/app/data
-      # Mount thư mục logs
+      # Log output
       - ./logs:/app/logs
-      # Mount file .env (optional - có thể dùng environment variables)
-      - ./.env:/app/.env:ro
+      # Biến môi trường (BOT_TOKEN, ...) - đọc theo env/.env, env/.env.production...
+      - ./env:/app/env:ro
     ports:
       # Expose port nếu bot có web interface
       - "3000:3000"
     networks:
       - aninhi-network
     healthcheck:
-      test: ["CMD", "node", "-e", "console.log('Bot is running')"]
+      test: ["CMD", "su-exec", "node", "sh", "-c", "test -w /app/data && test -w /app/logs"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
 
-  # Service để khởi tạo database
+  # Service để chạy migration thủ công (bot tự chạy "prisma migrate deploy" lúc
+  # start rồi, service này chỉ cần khi muốn tách bước migrate riêng, ví dụ CI/CD)
   database-init:
     build: .
     container_name: aninhi-db-init
     environment:
-      - DATABASE_URL=file:./data/database.db
+      - DATABASE_URL=file:../data/database.db
     volumes:
       - ./data:/app/data
+    entrypoint: ["docker-entrypoint.sh"]
     command: >
       sh -c "
         npx prisma generate &&
@@ -47,12 +49,13 @@ services:
     build: .
     container_name: aninhi-prisma-studio
     environment:
-      - DATABASE_URL=file:./data/database.db
+      - DATABASE_URL=file:../data/database.db
     volumes:
       - ./data:/app/data
       - ./prisma:/app/prisma
     ports:
       - "5555:5555"
+    entrypoint: ["docker-entrypoint.sh"]
     command: >
       sh -c "
         npx prisma generate &&
@@ -63,8 +66,4 @@ services:
 
 networks:
   aninhi-network:
-    driver: bridge
-
-volumes:
-  data:
-  logs: 
+    driver: bridge 

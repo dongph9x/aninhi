@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=file:./data/database.db
+      - DATABASE_URL=file:../data/database.db
       - DEBUG=bot:*
     volumes:
       # Mount source code để hot reload
@@ -19,7 +19,7 @@ services:
       - aninhi-network-dev
     command: ["yarn", "dev"]
     healthcheck:
-      test: ["CMD", "node", "-e", "console.log('Dev bot is running')"]
+      test: ["CMD", "su-exec", "node", "sh", "-c", "test -w /app/data && test -w /app/logs"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -30,11 +30,12 @@ services:
     build: .
     container_name: aninhi-db-init-dev
     environment:
-      - DATABASE_URL=file:./data/database.db
+      - DATABASE_URL=file:../data/database.db
     volumes:
       - .:/app
       - /app/node_modules
       - ./data:/app/data
+    entrypoint: ["docker-entrypoint.sh"]
     command: >
       sh -c "
         npx prisma generate &&
@@ -46,8 +47,4 @@ services:
 
 networks:
   aninhi-network-dev:
-    driver: bridge
-
-volumes:
-  data:
-  logs: 
+    driver: bridge 
