@@ -10,7 +10,7 @@ export default Bot.createCommand({
         aliases: ["sub", "takemoney", "remove"],
     },
     options: {
-        permissions: ["ModerateMembers"],
+        permissions: ["Administrator"],
         inGuild: true,
     },
     run: async ({ message, t, args }) => {
@@ -21,11 +21,11 @@ export default Bot.createCommand({
             const embed = new EmbedBuilder()
                 .setTitle("❌ Cách Dùng Không Đúng")
                 .setDescription(
-                    "**Cách dùng:** `p!subtract <người dùng> <số tiền>`\n\n" +
+                    "**Cách dùng:** `n.subtract <người dùng> <số tiền>`\n\n" +
                         "**Ví dụ:**\n" +
-                        "• `p!subtract @user 1000`\n" +
-                        "• `p!subtract 123456789 500`\n\n" +
-                        "**Lưu ý:** Lệnh này yêu cầu quyền Moderate Members.",
+                        "• `n.subtract @user 1000`\n" +
+                        "• `n.subtract 123456789 500`\n\n" +
+                        "**Lưu ý:** Lệnh này yêu cầu quyền Administrator.",
                 )
                 .setColor("#ff0000")
                 .setTimestamp();
@@ -63,13 +63,50 @@ export default Bot.createCommand({
                 return message.reply({ embeds: [embed] });
             }
 
+            console.log(`🔍 [DEBUG] Subtract command execution:`);
+            console.log(`  - Target user ID: ${targetUser.id}`);
+            console.log(`  - Guild ID: ${guildId}`);
+            console.log(`  - Amount: ${amount}`);
+            console.log(`  - Moderator: ${message.author.username} (${message.author.id})`);
+
+            // Kiểm tra số dư hiện tại của target user
+            const currentUser = await EcommerceService.getUser(targetUser.id, guildId);
+            console.log(`  - Current balance: ${currentUser.balance.toLocaleString()}`);
+            console.log(`  - User exists: ${!!currentUser}`);
+            
+            if (currentUser.balance < amount) {
+                console.log(`  - ❌ Insufficient balance! Need ${amount} but have ${currentUser.balance}`);
+                const embed = new EmbedBuilder()
+                    .setTitle("⚠️ Số Dư Không Đủ")
+                    .setDescription(
+                        `**<@${targetUser.id}>** không có đủ AniCoin!\n\n` +
+                        `**Số dư hiện tại:** ${currentUser.balance.toLocaleString()} AniCoin\n` +
+                        `**Số tiền muốn trừ:** ${amount.toLocaleString()} AniCoin\n` +
+                        `**Thiếu:** ${(amount - currentUser.balance).toLocaleString()} AniCoin\n\n` +
+                        "Bạn có muốn trừ toàn bộ số dư hiện tại không?"
+                    )
+                    .setColor("#ff9900")
+                    .setTimestamp();
+
+                return message.reply({ embeds: [embed] });
+            }
+
+            console.log(`  - ✅ Sufficient balance, proceeding with subtraction...`);
+
             // Thực hiện trừ tiền
+            const beforeBalance = currentUser.balance;
             const user = await EcommerceService.subtractMoney(
                 targetUser.id,
                 guildId,
                 amount,
                 `Admin subtract by ${message.author.username}`,
             );
+
+            console.log(`  - Before balance: ${beforeBalance.toLocaleString()}`);
+            console.log(`  - After balance: ${user.balance.toLocaleString()}`);
+            console.log(`  - Expected difference: ${amount}`);
+            console.log(`  - Actual difference: ${beforeBalance - user.balance}`);
+            console.log(`  - Success: ${beforeBalance - user.balance === amount}`);
 
             // Ghi lại moderation log
             await ModerationService.logAction({
@@ -83,10 +120,12 @@ export default Bot.createCommand({
                 messageId: message.id
             });
 
+            console.log(`  - ✅ Moderation log created`);
+
             const embed = new EmbedBuilder()
                 .setTitle("✅ Đã Trừ Tiền")
                 .setDescription(
-                    `**${message.author.username}** đã trừ **${amount.toLocaleString()}** AniCoin của **<@${targetUser.id}>**\n\n` +
+                    `**${message.author.username}** đã trừ **${amount.toLocaleString()}** AniCoin từ **<@${targetUser.id}>**\n\n` +
                         `💰 **Số dư mới:** ${user.balance.toLocaleString()} AniCoin`,
                 )
                 .setColor("#ff6b6b")
@@ -99,6 +138,7 @@ export default Bot.createCommand({
                 })
                 .setTimestamp();
 
+            console.log(`  - ✅ Sending success embed`);
             message.reply({ embeds: [embed] });
         } catch (error) {
             console.error("Error in subtract command:", error);

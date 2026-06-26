@@ -3,6 +3,7 @@ import type { ColorResolvable } from "discord.js";
 import type { Locale } from "@/utils/locales";
 
 export * from "./autocomplete";
+export * from "./channel-restrictions";
 export { default as emojis } from "./data/emojis.json";
 
 export type BotConfig = {

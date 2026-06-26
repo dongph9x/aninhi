@@ -33,6 +33,7 @@ export interface TournamentData {
     entryFee: number;
     prizePool: number;
     maxParticipants: number;
+    winnerCount?: number;
     startTime: Date;
     endTime: Date;
     createdBy: string;
@@ -46,6 +47,20 @@ export class TournamentService {
      */
     static async createTournament(data: TournamentData) {
         try {
+            // Kiểm tra quyền admin
+            const { FishBattleService } = await import('./fish-battle');
+            const isAdmin = await FishBattleService.isAdministrator(data.createdBy, data.guildId);
+            
+            if (!isAdmin) {
+                throw new Error("Chỉ ADMIN mới có thể tạo tournament!");
+            }
+
+            // Kiểm tra số dư của người tạo tournament
+            const balance = await EcommerceService.getBalance(data.createdBy, data.guildId);
+            if (balance < data.prizePool) {
+                throw new Error(`Không đủ tiền để tạo tournament! Cần ${data.prizePool.toLocaleString()} AniCoin để trả giải thưởng, số dư: ${balance.toLocaleString()} AniCoin`);
+            }
+
             const tournament = await prisma.tournament.create({
                 data: {
                     ...data,
@@ -53,6 +68,9 @@ export class TournamentService {
                     currentParticipants: 0
                 }
             });
+
+            // Trừ tiền giải thưởng từ người tạo tournament
+            await EcommerceService.subtractMoney(data.createdBy, data.guildId, data.prizePool, `Tournament prize pool - ${data.name}`);
 
             return tournament;
         } catch (error) {
@@ -176,7 +194,7 @@ export class TournamentService {
     /**
      * Bắt đầu tournament
      */
-    static async startTournament(tournamentId: string) {
+    static async startTournament(tournamentId: string, winnerCount: number = 1) {
         try {
             const tournament = await prisma.tournament.findUnique({
                 where: { id: tournamentId },
@@ -194,23 +212,63 @@ export class TournamentService {
             }
 
             if (tournament.currentParticipants < 2) {
-                throw new Error("Cần ít nhất 2 người tham gia để bắt đầu");
+                // Không đủ người tham gia, trả lại tiền cho người tạo
+                await EcommerceService.addMoney(
+                    tournament.createdBy,
+                    tournament.guildId,
+                    Number(tournament.prizePool),
+                    `Tournament refund - ${tournament.name} (insufficient participants)`
+                );
+
+                // Cập nhật tournament thành completed
+                await prisma.tournament.update({
+                    where: { id: tournamentId },
+                    data: {
+                        status: "completed"
+                    }
+                });
+
+                throw new Error("INSUFFICIENT_PARTICIPANTS");
             }
 
             // Chọn người chiến thắng ngẫu nhiên
             const participants = tournament.participants;
-            const winner = participants[Math.floor(Math.random() * participants.length)];
+            const actualWinnerCount = Math.min(winnerCount, participants.length);
+            
+            // Shuffle participants và chọn winners
+            const shuffledParticipants = [...participants].sort(() => Math.random() - 0.5);
+            const winners = shuffledParticipants.slice(0, actualWinnerCount);
+            
+            // Tính toán giải thưởng cho mỗi người
+            const prizePerWinner = Math.floor(Number(tournament.prizePool) / actualWinnerCount);
+            const remainingPrize = Number(tournament.prizePool) - (prizePerWinner * actualWinnerCount);
 
-            // Cập nhật tournament
+            // Cập nhật tournament với winner đầu tiên (để tương thích ngược)
             await prisma.tournament.update({
                 where: { id: tournamentId },
                 data: {
                     status: "completed",
-                    winnerId: winner.userId
+                    winnerId: winners[0].userId
                 }
             });
 
-            return winner;
+            // Phát thưởng cho tất cả winners
+            for (let i = 0; i < winners.length; i++) {
+                let prize = prizePerWinner;
+                // Người đầu tiên nhận thêm phần dư
+                if (i === 0) {
+                    prize += remainingPrize;
+                }
+                
+                await EcommerceService.addMoney(
+                    winners[i].userId, 
+                    tournament.guildId, 
+                    prize, 
+                    `Tournament win - ${tournament.name} (${i + 1}/${actualWinnerCount})`
+                );
+            }
+
+            return { winners, prizePerWinner };
         } catch (error) {
             console.error("Error starting tournament:", error);
             throw error;
@@ -220,7 +278,7 @@ export class TournamentService {
     /**
      * Kết thúc tournament sớm
      */
-    static async endTournament(tournamentId: string, userId: string) {
+    static async endTournament(tournamentId: string, userId: string, winnerCount: number = 1) {
         try {
             const tournament = await prisma.tournament.findUnique({
                 where: { id: tournamentId }
@@ -244,7 +302,14 @@ export class TournamentService {
             });
 
             if (participants.length === 0) {
-                // Không có ai tham gia, hủy tournament
+                // Không có ai tham gia, trả lại tiền cho người tạo và hủy tournament
+                await EcommerceService.addMoney(
+                    tournament.createdBy,
+                    tournament.guildId,
+                    Number(tournament.prizePool),
+                    `Tournament refund - ${tournament.name} (no participants)`
+                );
+
                 await prisma.tournament.update({
                     where: { id: tournamentId },
                     data: { status: "completed" }
@@ -252,18 +317,40 @@ export class TournamentService {
                 return null;
             }
 
-            const winner = participants[Math.floor(Math.random() * participants.length)];
+            const actualWinnerCount = Math.min(winnerCount, participants.length);
+            const shuffledParticipants = [...participants].sort(() => Math.random() - 0.5);
+            const winners = shuffledParticipants.slice(0, actualWinnerCount);
 
-            // Cập nhật tournament
+            // Tính toán giải thưởng cho mỗi người
+            const prizePerWinner = Math.floor(Number(tournament.prizePool) / actualWinnerCount);
+            const remainingPrize = Number(tournament.prizePool) - (prizePerWinner * actualWinnerCount);
+
+            // Cập nhật tournament với winner đầu tiên
             await prisma.tournament.update({
                 where: { id: tournamentId },
                 data: {
                     status: "completed",
-                    winnerId: winner.userId
+                    winnerId: winners[0].userId
                 }
             });
 
-            return winner;
+            // Phát thưởng cho tất cả winners
+            for (let i = 0; i < winners.length; i++) {
+                let prize = prizePerWinner;
+                // Người đầu tiên nhận thêm phần dư
+                if (i === 0) {
+                    prize += remainingPrize;
+                }
+                
+                await EcommerceService.addMoney(
+                    winners[i].userId, 
+                    tournament.guildId, 
+                    prize, 
+                    `Tournament win - ${tournament.name} (${i + 1}/${actualWinnerCount})`
+                );
+            }
+
+            return { winners, prizePerWinner };
         } catch (error) {
             console.error("Error ending tournament:", error);
             throw error;
@@ -293,6 +380,22 @@ export class TournamentService {
             let winner = null;
             if (tournament.participants.length > 0) {
                 winner = tournament.participants[Math.floor(Math.random() * tournament.participants.length)];
+                
+                // Phát thưởng cho người chiến thắng
+                await EcommerceService.addMoney(
+                    winner.userId,
+                    tournament.guildId,
+                    Number(tournament.prizePool),
+                    `Tournament force end win - ${tournament.name}`
+                );
+            } else {
+                // Không có ai tham gia, trả lại tiền cho người tạo
+                await EcommerceService.addMoney(
+                    tournament.createdBy,
+                    tournament.guildId,
+                    Number(tournament.prizePool),
+                    `Tournament force end refund - ${tournament.name} (no participants)`
+                );
             }
 
             // Cập nhật tournament

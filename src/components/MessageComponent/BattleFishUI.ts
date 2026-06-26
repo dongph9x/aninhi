@@ -1,0 +1,348 @@
+import { 
+    ButtonBuilder, 
+    ButtonStyle, 
+    EmbedBuilder, 
+    ActionRowBuilder,
+    StringSelectMenuBuilder,
+    StringSelectMenuOptionBuilder
+} from "discord.js";
+import { BattleFishInventoryService } from "@/utils/battle-fish-inventory";
+import { FishBattleService } from "@/utils/fish-battle";
+import { BattleVisualSystem } from "@/utils/battle-visual";
+
+export class BattleFishUI {
+    private inventory: any;
+    private eligibleFish: any[];
+    private selectedFishId?: string;
+    private userId: string;
+    private guildId: string;
+    private dailyBattleInfo?: { canBattle: boolean; remainingBattles: number; error?: string; isAdmin?: boolean };
+    constructor(inventory: any, eligibleFish: any[], userId: string, guildId: string, selectedFishId?: string, dailyBattleInfo?: { canBattle: boolean; remainingBattles: number; error?: string; isAdmin?: boolean }) {
+        this.inventory = inventory;
+        this.eligibleFish = eligibleFish;
+        this.userId = userId;
+        this.guildId = guildId;
+        this.selectedFishId = selectedFishId;
+        this.dailyBattleInfo = dailyBattleInfo;
+    }
+
+    createEmbed(): EmbedBuilder {
+        const embed = new EmbedBuilder()
+            .setTitle('⚔️ Hệ Thống Đấu Cá')
+            .setColor('#FF6B6B')
+            .setDescription('Quản lý cá đấu và tìm đối thủ!')
+            .setTimestamp();
+
+        // Thông tin daily battle limit
+        if (this.dailyBattleInfo) {
+            const isAdmin = this.dailyBattleInfo.isAdmin;
+            const limitText = isAdmin ? '100' : '20';
+            const adminBadge = isAdmin ? ' 👑 Admin' : '';
+            
+            if (this.dailyBattleInfo.canBattle) {
+                embed.addFields({
+                    name: `⏰ Giới Hạn Đấu Cá Hôm Nay${adminBadge}`,
+                    value: `✅ Còn **${this.dailyBattleInfo.remainingBattles}/${limitText}** lần đấu cá`,
+                    inline: true
+                });
+            } else {
+                embed.addFields({
+                    name: `⏰ Giới Hạn Đấu Cá Hôm Nay${adminBadge}`,
+                    value: `❌ **Đã đạt giới hạn!** (0/${limitText})\n${this.dailyBattleInfo.error || 'Vui lòng thử lại vào ngày mai'}`,
+                    inline: true
+                });
+            }
+        }
+
+        // Thông tin túi đấu
+        embed.addFields({
+            name: '📦 Túi Đấu Cá',
+            value: `**${this.inventory.items.length}/${this.inventory.capacity}** cá trong túi đấu`,
+            inline: false
+        });
+
+        // Hiển thị cá trong túi đấu
+        if (this.inventory.items.length === 0) {
+            embed.addFields({
+                name: '🐟 Cá Trong Túi Đấu',
+                value: '❌ Chưa có cá nào trong túi đấu!\nSử dụng nút "Thêm Cá" bên dưới.',
+                inline: false
+            });
+        } else if (this.selectedFishId && this.selectedFishId.startsWith('battle_')) {
+            // Chỉ hiển thị cá được chọn
+            const actualFishId = this.selectedFishId.replace('battle_', '');
+            const selectedItem = this.inventory.items.find((item: any) => item.fish.id === actualFishId);
+            
+            if (selectedItem) {
+                const fish = selectedItem.fish;
+                const stats = fish.stats || {};
+                const power = this.calculatePower(fish);
+                
+                // Sử dụng visual system để hiển thị cá được chọn
+                try {
+                    const fishDisplay = BattleVisualSystem.createDetailedFishDisplay(fish, true);
+                    const statsDisplay = BattleVisualSystem.createStatsBox(stats);
+                    
+                    embed.addFields({
+                        name: '🎯 Cá Được Chọn',
+                        value: `\`\`\`\n${fishDisplay}\n\`\`\``,
+                        inline: false
+                    });
+                    
+                    // embed.addFields({
+                    //     name: '📊 Thống Kê Chi Tiết',
+                    //     value: `\`\`\`\n${statsDisplay}\n\`\`\``,
+                    //     inline: false
+                    // });
+                } catch (error) {
+                    console.error('Error creating visual display:', error);
+                    // Fallback to old display
+                    embed.addFields({
+                        name: '🎯 Cá Được Chọn',
+                        value: `**${fish.name}** (Lv.${fish.level}, Gen.${fish.generation})\n` +
+                               `💪 Power: ${power} | 🐟 ${fish.value.toLocaleString()} FishCoin\n` +
+                               `📊 Stats: 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0}`,
+                        inline: false
+                    });
+                }
+            }
+        } else {
+            // Hiển thị tất cả cá trong túi đấu
+            const battleFishList = this.inventory.items.map((item: any, index: number) => {
+                const fish = item.fish;
+                const stats = fish.stats || {};
+                const power = this.calculatePower(fish);
+                
+                try {
+                    // Sử dụng visual system để hiển thị cá
+                    const fishDisplay = BattleVisualSystem.createFishDisplay(fish);
+                    const statsDisplay = BattleVisualSystem.createStatsDisplay(stats);
+                    
+                    return `**${index + 1}.** ${fishDisplay}\n${statsDisplay}`;
+                } catch (error) {
+                    console.error('Error creating visual display for fish list:', error);
+                    // Fallback to old display
+                    return `**${index + 1}. ${fish.name}** (Lv.${fish.level}, Gen.${fish.generation})\n` +
+                           `💪 Power: ${power} | 🐟 ${fish.value.toLocaleString()} FishCoin\n` +
+                           `📊 Stats: 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0}`;
+                }
+            }).join('\n\n');
+
+            embed.addFields({
+                name: '🐟 Cá Trong Túi Đấu',
+                value: battleFishList,
+                inline: false
+            });
+        }
+
+        // Hiển thị cá có thể thêm
+        if (this.eligibleFish.length > 0) {
+            const eligibleList = this.eligibleFish.slice(0, 3).map((fish: any, index: number) => {
+                const stats = fish.stats || {};
+                const power = this.calculatePower(fish);
+                
+                return `**${index + 1}. ${fish.name}** (Lv.${fish.level}, Gen.${fish.generation})\n` +
+                       `💪 Power: ${power} | 🐟 ${fish.value.toLocaleString()} FishCoin\n` +
+                       `📊 Stats: 💪${stats.strength || 0} 🏃${stats.agility || 0} 🧠${stats.intelligence || 0} 🛡️${stats.defense || 0} 🍀${stats.luck || 0} 🎯${stats.accuracy || 0} 🎯${stats.accuracy || 0}`;
+            }).join('\n\n');
+
+            embed.addFields({
+                name: '📋 Cá Có Thể Thêm Vào Túi Đấu',
+                value: eligibleList + (this.eligibleFish.length > 3 ? '\n\n*... và ' + (this.eligibleFish.length - 3) + ' cá khác*' : ''),
+                inline: false
+            });
+        } else {
+            embed.addFields({
+                name: '📋 Cá Có Thể Thêm Vào Túi Đấu',
+                value: '❌ Không có cá nào đủ điều kiện!\n\n**Điều kiện:**\n• Thế hệ 2 trở lên\n• Đạt max level (trưởng thành)',
+                inline: false
+            });
+        }
+
+        // Thông tin hướng dẫn
+        embed.addFields({
+            name: '🎯 Cách Sử Dụng',
+            value: '1. **Chọn cá** từ dropdown bên dưới để xem chi tiết\n2. **Thêm cá** vào túi đấu\n3. **Tìm đối thủ** để đấu\n4. **Xóa cá** khỏi túi đấu nếu cần\n5. **Đổi tên cá** trong túi đấu',
+            inline: false
+        });
+
+        return embed;
+    }
+
+    createComponents(): ActionRowBuilder<any>[] {
+        const rows: ActionRowBuilder<any>[] = [];
+
+        // Row 1: Dropdown chọn cá
+        const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>();
+        const selectMenu = new StringSelectMenuBuilder()
+            .setCustomId('battle_fish_select')
+            .setPlaceholder('Chọn cá để thao tác...')
+            .setMinValues(1)
+            .setMaxValues(1);
+
+        // Thêm option cho cá trong túi đấu
+        if (this.inventory.items.length > 0) {
+            selectMenu.addOptions(
+                this.inventory.items.map((item: any, index: number) => {
+                    const fish = item.fish;
+                    const power = this.calculatePower(fish);
+                    const isSelected = fish.id === this.selectedFishId;
+                    
+                    // Rút ngắn tên cá nếu quá dài (Discord giới hạn 25 ký tự cho label)
+                    // Cần tính toán: emoji (3) + tên + " (Lv.X, Gen.Y)" (12) = tối đa 25
+                    const maxNameLength = 25 - 3 - 12; // 10 ký tự cho tên
+                    const fishName = fish.name.length > maxNameLength ? fish.name.substring(0, maxNameLength - 6) + '...' : fish.name;
+                    
+                    return new StringSelectMenuOptionBuilder()
+                        .setLabel(`${fishName} (Lv.${fish.level}, Gen.${fish.generation})`)
+                        .setDescription(`Power: ${power} | 🐟${fish.value.toLocaleString()} | ${isSelected ? 'Đã chọn' : 'Trong túi đấu'}`)
+                        .setValue(`battle_${fish.id}`)
+                        .setEmoji(isSelected ? '🎯' : '🐟');
+                })
+            );
+        }
+
+        // Thêm option cho cá có thể thêm
+        if (this.eligibleFish.length > 0) {
+            selectMenu.addOptions(
+                this.eligibleFish.slice(0, 5).map((fish: any, index: number) => {
+                    const power = this.calculatePower(fish);
+                    
+                    // Rút ngắn tên cá nếu quá dài (Discord giới hạn 25 ký tự cho label)
+                    // Cần tính toán: emoji (3) + tên + " (Lv.X, Gen.Y)" (12) = tối đa 25
+                    const maxNameLength = 25 - 3 - 12; // 10 ký tự cho tên
+                    const fishName = fish.name.length > maxNameLength ? fish.name.substring(0, maxNameLength - 6) + '...' : fish.name;
+                    
+                    return new StringSelectMenuOptionBuilder()
+                        .setLabel(`${fishName} (Lv.${fish.level}, Gen.${fish.generation})`)
+                        .setDescription(`Power: ${power} | 🐟${fish.value.toLocaleString()} | Có thể thêm`)
+                        .setValue(`eligible_${fish.id}`)
+                        .setEmoji('➕');
+                })
+            );
+        }
+
+        // Thêm option mặc định nếu không có cá nào
+        if (this.inventory.items.length === 0 && this.eligibleFish.length === 0) {
+            selectMenu.addOptions(
+                new StringSelectMenuOptionBuilder()
+                    .setLabel('Không có cá nào')
+                    .setDescription('Tạo cá thế hệ 2+ và nuôi lên max level')
+                    .setValue('no_fish')
+                    .setEmoji('❌')
+            );
+        }
+
+        selectRow.addComponents(selectMenu);
+        rows.push(selectRow);
+
+        // Row 2: Các nút thao tác
+        const buttonRow = new ActionRowBuilder<ButtonBuilder>();
+
+        // Nút thêm cá
+        const addButton = new ButtonBuilder()
+            .setCustomId('battle_fish_add')
+            .setLabel('➕ Thêm Cá')
+            .setStyle(ButtonStyle.Success)
+            .setDisabled(this.eligibleFish.length === 0 || !this.selectedFishId || !this.selectedFishId.startsWith('eligible_'));
+
+        // Nút tìm đối thủ
+        const battleButton = new ButtonBuilder()
+            .setCustomId('battle_fish_fight')
+            .setLabel('⚔️ Tìm Đối Thủ')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(this.inventory.items.length === 0);
+
+        // Nút xóa cá
+        const removeButton = new ButtonBuilder()
+            .setCustomId('battle_fish_remove')
+            .setLabel('🗑️ Xóa Cá')
+            .setStyle(ButtonStyle.Danger)
+            .setDisabled(!this.selectedFishId || !this.selectedFishId.startsWith('battle_'));
+
+        // Nút xem thống kê
+        const statsButton = new ButtonBuilder()
+            .setCustomId('battle_fish_stats')
+            .setLabel('📊 Thống Kê')
+            .setStyle(ButtonStyle.Secondary);
+
+        // Nút đổi tên cá
+        const renameButton = new ButtonBuilder()
+            .setCustomId('battle_fish_rename')
+            .setLabel('✏️ Đổi Tên')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(!this.selectedFishId || !this.selectedFishId.startsWith('battle_'));
+
+        buttonRow.addComponents(addButton, battleButton, removeButton, statsButton, renameButton);
+        rows.push(buttonRow);
+
+        // Row 3: Các nút phụ
+        const utilityRow = new ActionRowBuilder<ButtonBuilder>();
+
+        // Nút xem lịch sử
+        const historyButton = new ButtonBuilder()
+            .setCustomId('battle_fish_history')
+            .setLabel('📜 Lịch Sử')
+            .setStyle(ButtonStyle.Secondary);
+
+        // Nút bảng xếp hạng
+        const leaderboardButton = new ButtonBuilder()
+            .setCustomId('battle_fish_leaderboard')
+            .setLabel('🏆 Bảng Xếp Hạng')
+            .setStyle(ButtonStyle.Secondary);
+
+        // Nút làm mới
+        const refreshButton = new ButtonBuilder()
+            .setCustomId('battle_fish_refresh')
+            .setLabel('🔄 Làm Mới')
+            .setStyle(ButtonStyle.Secondary);
+
+        // Nút hướng dẫn
+        const helpButton = new ButtonBuilder()
+            .setCustomId('battle_fish_help')
+            .setLabel('❓ Hướng Dẫn')
+            .setStyle(ButtonStyle.Secondary);
+
+        utilityRow.addComponents(historyButton, leaderboardButton, refreshButton, helpButton);
+        rows.push(utilityRow);
+
+        return rows;
+    }
+
+    private calculatePower(fish: any): number {
+        const stats = fish.stats || {};
+        const basePower = (stats.strength || 0) + (stats.agility || 0) + (stats.intelligence || 0) + (stats.defense || 0) + (stats.luck || 0) + (stats.accuracy || 0);
+        return Math.floor(basePower * (1 + fish.level * 0.1));
+    }
+
+    // Cập nhật selected fish ID
+    updateSelectedFish(fishId: string): void {
+        this.selectedFishId = fishId;
+    }
+
+    // Lấy selected fish ID
+    getSelectedFishId(): string | undefined {
+        return this.selectedFishId;
+    }
+
+    // Kiểm tra xem có thể thêm cá được chọn không
+    canAddSelectedFish(): boolean {
+        return this.selectedFishId !== undefined && this.selectedFishId.startsWith('eligible_');
+    }
+
+    // Kiểm tra xem có thể xóa cá được chọn không
+    canRemoveSelectedFish(): boolean {
+        return this.selectedFishId !== undefined && this.selectedFishId.startsWith('battle_');
+    }
+
+    // Kiểm tra xem có thể đổi tên cá được chọn không
+    canRenameSelectedFish(): boolean {
+        return this.selectedFishId !== undefined && this.selectedFishId.startsWith('battle_');
+    }
+
+    // Lấy fish ID thực từ selected fish ID
+    getActualFishId(): string | undefined {
+        if (!this.selectedFishId) return undefined;
+        return this.selectedFishId.replace('battle_', '').replace('eligible_', '');
+    }
+} 

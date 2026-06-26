@@ -10,7 +10,8 @@ import {
 
 import { Bot } from "@/classes";
 import type { MessageComponentProps } from "@/typings";
-import { FishingService, FISHING_RODS, BAITS } from "@/utils/fishing";
+import { FishingService } from "@/utils/fishing";
+import { FISHING_RODS, BAITS } from "@/config/fish-data";
 
 export default Bot.createMessageComponent<ComponentType.Button, { action: string }>({
     type: ComponentType.Button,
@@ -29,6 +30,9 @@ export default Bot.createMessageComponent<ComponentType.Button, { action: string
                     break;
                 case "buy_bait":
                     await showBaitShop(interaction);
+                    break;
+                case "buy_food":
+                    await showFoodShop(interaction);
                     break;
                 case "manage":
                     await showManageEquipment(interaction, userId, guildId);
@@ -62,11 +66,12 @@ async function showShop(interaction: any) {
         .addFields(
             { name: "🛒 Mua Cần Câu", value: "Mua các loại cần câu với độ bền và bonus khác nhau", inline: true },
             { name: "🪱 Mua Mồi", value: "Mua các loại mồi để tăng tỷ lệ câu được cá hiếm", inline: true },
+            { name: "🍽️ Mua Thức Ăn", value: "Mua thức ăn để cho cá ăn và tăng level", inline: true },
             { name: "⚙️ Quản Lý", value: "Xem và thay đổi cần câu, mồi hiện tại", inline: true }
         )
         .setTimestamp();
 
-    const row = new ActionRowBuilder<ButtonBuilder>()
+    const row1 = new ActionRowBuilder<ButtonBuilder>()
         .addComponents(
             new ButtonBuilder()
                 .setCustomId(JSON.stringify({ n: "FishingShop", d: { action: "buy_rod" } }))
@@ -77,6 +82,14 @@ async function showShop(interaction: any) {
                 .setLabel("🪱 Mua Mồi")
                 .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
+                .setCustomId(JSON.stringify({ n: "FishingShop", d: { action: "buy_food" } }))
+                .setLabel("🍽️ Mua Thức Ăn")
+                .setStyle(ButtonStyle.Primary)
+        );
+
+    const row2 = new ActionRowBuilder<ButtonBuilder>()
+        .addComponents(
+            new ButtonBuilder()
                 .setCustomId(JSON.stringify({ n: "FishingShop", d: { action: "manage" } }))
                 .setLabel("⚙️ Quản Lý")
                 .setStyle(ButtonStyle.Secondary)
@@ -84,7 +97,7 @@ async function showShop(interaction: any) {
 
     await interaction.reply({ 
         embeds: [embed], 
-        components: [row],
+        components: [row1, row2],
         ephemeral: true 
     });
 }
@@ -100,7 +113,7 @@ async function showRodShop(interaction: any) {
     Object.entries(FISHING_RODS).forEach(([key, rod]) => {
         embed.addFields({
             name: `${rod.emoji} ${rod.name}`,
-            value: `Giá: ${rod.price}₳ | Độ bền: ${rod.durability} | Bonus: +${rod.rarityBonus}%`,
+            value: `Giá: ${rod.price}🐟 | Độ bền: ${rod.durability} | Bonus: +${rod.rarityBonus}%`,
             inline: true
         });
     });
@@ -113,7 +126,7 @@ async function showRodShop(interaction: any) {
                 .addOptions(
                     Object.entries(FISHING_RODS).map(([key, rod]) => 
                         new StringSelectMenuOptionBuilder()
-                            .setLabel(`${rod.name} - ${rod.price}₳`)
+                            .setLabel(`${rod.name} - ${rod.price}🐟`)
                             .setDescription(`Độ bền: ${rod.durability} | Bonus: +${rod.rarityBonus}%`)
                             .setValue(key)
                             .setEmoji(rod.emoji)
@@ -145,11 +158,11 @@ async function showBaitShop(interaction: any) {
 
     // Rút gọn thông tin từng loại mồi
     Object.entries(BAITS).forEach(([key, bait]) => {
-        embed.addFields({
-            name: `${bait.emoji} ${bait.name}`,
-            value: `Giá: ${bait.price}₳ | Bonus: +${bait.rarityBonus}%`,
-            inline: true
-        });
+                    embed.addFields({
+                name: `${bait.emoji} ${bait.name}`,
+                value: `Giá: ${bait.price}🐟 | Bonus: +${bait.rarityBonus}%`,
+                inline: true
+            });
     });
 
     const row = new ActionRowBuilder<StringSelectMenuBuilder>()
@@ -160,10 +173,59 @@ async function showBaitShop(interaction: any) {
                 .addOptions(
                     Object.entries(BAITS).map(([key, bait]) => 
                         new StringSelectMenuOptionBuilder()
-                            .setLabel(`${bait.name} - ${bait.price}₳`)
+                            .setLabel(`${bait.name} - ${bait.price}🐟`)
                             .setDescription(`Bonus: +${bait.rarityBonus}%`)
                             .setValue(key)
                             .setEmoji(bait.emoji)
+                    )
+                )
+        );
+
+    const backRow = new ActionRowBuilder<ButtonBuilder>()
+        .addComponents(
+            new ButtonBuilder()
+                .setCustomId(JSON.stringify({ n: "FishingShop", d: { action: "shop" } }))
+                .setLabel("⬅️ Quay Lại")
+                .setStyle(ButtonStyle.Secondary)
+        );
+
+    await interaction.reply({ 
+        embeds: [embed], 
+        components: [row, backRow],
+        ephemeral: true 
+    });
+}
+
+async function showFoodShop(interaction: any) {
+    const { FISH_FOOD_TYPES } = await import('@/utils/fish-food');
+    
+    const embed = new EmbedBuilder()
+        .setTitle("🍽️ Cửa Hàng Thức Ăn")
+        .setDescription("Chọn loại thức ăn bạn muốn mua:")
+        .setColor("#00ff99")
+        .setTimestamp();
+
+    // Hiển thị thông tin từng loại thức ăn
+    Object.entries(FISH_FOOD_TYPES).forEach(([key, food]) => {
+        embed.addFields({
+            name: `${food.emoji} ${food.name}`,
+            value: `Giá: ${food.price.toLocaleString()}🐟 | Exp: +${food.expBonus} | ${food.description}`,
+            inline: false
+        });
+    });
+
+    const row = new ActionRowBuilder<StringSelectMenuBuilder>()
+        .addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId(JSON.stringify({ n: "BuyFishFood", d: {} }))
+                .setPlaceholder("Chọn loại thức ăn...")
+                .addOptions(
+                    Object.entries(FISH_FOOD_TYPES).map(([key, food]) => 
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel(`${food.name} - ${food.price.toLocaleString()}🐟`)
+                            .setDescription(`Exp: +${food.expBonus} | ${food.description}`)
+                            .setValue(key)
+                            .setEmoji(food.emoji)
                     )
                 )
         );

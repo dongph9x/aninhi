@@ -4,7 +4,7 @@ import { Bot } from "@/classes";
 import { EcommerceService } from "@/utils/ecommerce-db";
 import { GameStatsService } from "@/utils/gameStats";
 
-const maxBet = 300000;
+const maxBet = 100000;
 const spin = "🪙";
 const heads = "🪙";
 const tails = "🪙";
@@ -83,15 +83,17 @@ export default Bot.createCommand({
             const currentBalance = await EcommerceService.getBalance(userId, guildId);
 
             // Xử lý bet "all"
+            let originalBet = bet;
             if (bet === "all") {
-                bet = currentBalance;
+                // Khi dùng "all", chỉ cược tối đa maxBet để tránh mất hết tiền
+                bet = Math.min(Number(currentBalance), maxBet);
             }
 
             // Chuyển bet thành number để xử lý
             const betAmount = bet as number;
 
             // Kiểm tra số dư
-            if (currentBalance === 0 || currentBalance < betAmount) {
+            if (currentBalance === 0n || currentBalance < BigInt(betAmount)) {
                 const errorEmbed = new EmbedBuilder()
                     .setTitle("🚫 Không Đủ Tiền")
                     .setDescription(
@@ -102,8 +104,8 @@ export default Bot.createCommand({
                 return message.reply({ embeds: [errorEmbed] });
             }
 
-            // Giới hạn bet tối đa
-            if (maxBet && betAmount > maxBet) {
+            // Giới hạn bet tối đa (đã xử lý ở trên cho "all")
+            if (originalBet !== "all" && maxBet && betAmount > maxBet) {
                 bet = maxBet;
             }
 
@@ -127,9 +129,9 @@ export default Bot.createCommand({
 
             // Cập nhật số dư
             if (win) {
-                await EcommerceService.addMoney(userId, guildId, bet, `Coinflip win - bet: ${bet}`);
+                await EcommerceService.addMoney(userId, guildId, betAmount, `Coinflip win - bet: ${betAmount}`);
             } else {
-                await EcommerceService.subtractMoney(userId, guildId, bet, `Coinflip lose - bet: ${bet}`);
+                await EcommerceService.subtractMoney(userId, guildId, betAmount, `Coinflip lose - bet: ${betAmount}`);
             }
 
             // Ghi lại thống kê game
@@ -144,10 +146,22 @@ export default Bot.createCommand({
             const resultText = rand === 1 ? "heads" : "tails";
             const resultEmoji = rand === 1 ? heads : tails;
 
+            // Hiển thị thông tin bet rõ ràng
+            let betDisplayText = `**${bet}** AniCoin`;
+            if (originalBet === "all") {
+                const actualBet = bet as number;
+                const totalBalance = Number(currentBalance);
+                if (actualBet < totalBalance) {
+                    betDisplayText = `**${actualBet}** AniCoin (tối đa ${maxBet.toLocaleString()})`;
+                } else {
+                    betDisplayText = `**${actualBet}** AniCoin (tất cả)`;
+                }
+            }
+
             const embed = new EmbedBuilder()
                 .setTitle("🪙 Coinflip")
                 .setDescription(
-                    `**${message.author.username}** đã cược **${bet}** AniCoin và chọn ${choiceText}\n\n` +
+                    `**${message.author.username}** đã cược ${betDisplayText} và chọn ${choiceText}\n\n` +
                         `Đồng xu quay... ${spin}`,
                 )
                 .setColor("#ffd93d")
@@ -161,7 +175,7 @@ export default Bot.createCommand({
                 const resultEmbed = new EmbedBuilder()
                     .setTitle("🪙 Kết Quả Coinflip")
                     .setDescription(
-                        `**${message.author.username}** đã cược **${bet}** AniCoin và chọn ${choiceText}\n\n` +
+                        `**${message.author.username}** đã cược ${betDisplayText} và chọn ${choiceText}\n\n` +
                             `Đồng xu quay... ${resultEmoji} và kết quả là **${resultText}**\n\n` +
                             (win
                                 ? `🎉 **Bạn đã thắng ${bet * 2} AniCoin!** 🎉`

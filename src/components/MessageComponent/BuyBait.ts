@@ -10,7 +10,8 @@ import {
 
 import { Bot } from "@/classes";
 import type { MessageComponentProps } from "@/typings";
-import { FishingService, BAITS } from "@/utils/fishing";
+import { FishingService } from "@/utils/fishing";
+import { BAITS } from "@/config/fish-data";
 
 export default Bot.createMessageComponent<ComponentType.StringSelect, {}>({
     type: ComponentType.StringSelect,
@@ -52,8 +53,8 @@ async function showQuantitySelector(interaction: any, baitType: string) {
                 .addOptions(
                     quantities.map(qty => 
                         new StringSelectMenuOptionBuilder()
-                            .setLabel(`${baitInfo.name} x${qty} - ${baitInfo.price * qty} AniCoin`)
-                            .setDescription(`${qty} cái - ${baitInfo.price * qty} AniCoin`)
+                            .setLabel(`${baitInfo.name} x${qty} - ${baitInfo.price * qty} FishCoin`)
+                            .setDescription(`${qty} cái - ${baitInfo.price * qty} FishCoin`)
                             .setValue(qty.toString())
                             .setEmoji(baitInfo.emoji)
                     )

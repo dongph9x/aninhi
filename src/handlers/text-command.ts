@@ -24,6 +24,12 @@ export default Bot.createHandler({
 
                 if (!pull) continue;
 
+                // Kiểm tra pull.structure có tồn tại không
+                if (!pull.structure) {
+                    logger.warn(`Command ${file} không có structure hợp lệ`);
+                    continue;
+                }
+
                 if (Array.isArray(pull.structure.aliases)) {
                     for (const alias of pull.structure.aliases) {
                         client.text.aliases.set(alias, pull.structure.name);

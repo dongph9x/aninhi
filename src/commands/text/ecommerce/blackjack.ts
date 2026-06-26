@@ -4,7 +4,7 @@ import { Bot } from "@/classes";
 import { EcommerceService } from "@/utils/ecommerce-db";
 import { GameStatsService } from "@/utils/gameStats";
 
-const maxBet = 300000;
+const maxBet = 100000;
 const hitEmoji = "👊";
 const standEmoji = "🛑";
 const suits = ["♠️", "♥️", "♦️", "♣️"];
@@ -90,9 +90,9 @@ export default Bot.createCommand({
             return message.reply("Số tiền cược không hợp lệ!");
         }
         const balance = await EcommerceService.getBalance(userId, guildId);
-        if (bet === "all") bet = Math.min(balance, maxBet);
+        if (bet === "all") bet = Number(balance < BigInt(maxBet) ? balance : BigInt(maxBet));
         if (typeof bet === "number" && bet > maxBet) bet = maxBet;
-        if (balance < (bet as number)) {
+        if (balance < BigInt(bet as number)) {
             return message.reply(`Bạn không đủ AniCoin! Số dư: ${balance}`);
         }
         if ((bet as number) <= 0) {

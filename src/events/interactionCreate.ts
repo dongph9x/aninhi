@@ -72,6 +72,271 @@ export default Bot.createEvent({
                 return;
             }
 
+            // Kiểm tra xem có phải fishbarn interaction không
+            if (interaction.customId.startsWith("fishbarn_")) {
+                console.log("FishBarn interaction:", interaction.customId);
+                
+                try {
+                    const { FishBarnHandler } = await import("../components/MessageComponent/FishBarnHandler");
+                    if (interaction.isButton() || interaction.isStringSelectMenu()) {
+                        await FishBarnHandler.handleInteraction(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling FishBarn interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác rương nuôi cá!`);
+                    }
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải fish skill interaction không (chỉ cho fish_skill_ prefix)
+            if (interaction.customId.startsWith("fish_skill_")) {
+                console.log("FishSkill interaction:", interaction.customId);
+                
+                try {
+                    const { FishSkillHandler } = await import("../components/MessageComponent/FishSkillHandler");
+                    if (interaction.isButton() || interaction.isStringSelectMenu()) {
+                        await FishSkillHandler.handleInteraction(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling FishSkill interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác skill!`);
+                    }
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải skill shop interaction không
+            if (interaction.customId.startsWith("skill_shop_") || 
+                interaction.customId.startsWith("skill_inventory") ||
+                interaction.customId.startsWith("skill_shop_back_to_main")) {
+                console.log("SkillShop interaction:", interaction.customId);
+                
+                try {
+                    const { SkillShopHandler } = await import("../components/MessageComponent/SkillShopHandler");
+                    if (interaction.isButton() || interaction.isStringSelectMenu()) {
+                        await SkillShopHandler.handleInteraction(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling SkillShop interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác skill shop!`);
+                    }
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải fish skill interaction không (all skills view)
+            if (interaction.customId === "select_skill_element" || 
+                interaction.customId === "back_to_all_skills" || 
+                interaction.customId === "refresh_skills_view" ||
+                interaction.customId === "view_fish_skills" ||
+                interaction.customId === "sync_skills_data" ||
+                interaction.customId.startsWith("view_skills_") ||
+                interaction.customId.startsWith("view_fish_") ||
+                interaction.customId.startsWith("view_skill_")) {
+                console.log("FishSkill all skills interaction:", interaction.customId);
+                
+                try {
+                    const { FishSkillHandler } = await import("../components/MessageComponent/FishSkillHandler");
+                    if (interaction.isButton() || interaction.isStringSelectMenu()) {
+                        await FishSkillHandler.handleInteraction(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling FishSkill all skills interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác fish skill!`);
+                    }
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải battle fish interaction không
+            if (interaction.customId.startsWith("battle_fish_")) {
+                console.log("BattleFish interaction:", interaction.customId);
+                
+                try {
+                    const { BattleFishHandler } = await import("../components/MessageComponent/BattleFishHandler");
+                    if (interaction.isButton() || interaction.isStringSelectMenu()) {
+                        await BattleFishHandler.handleInteraction(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling BattleFish interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác đấu cá!`);
+                    }
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải weapon shop interaction không
+            if (interaction.customId.startsWith("weapon_shop_") || interaction.customId.startsWith("weapon_")) {
+                console.log("WeaponShop interaction:", interaction.customId);
+                
+                try {
+                    const { WeaponShopHandler } = await import("../components/MessageComponent/WeaponShopHandler");
+                    if (interaction.isButton()) {
+                        await WeaponShopHandler.handleButton(interaction);
+                    } else if (interaction.isStringSelectMenu()) {
+                        await WeaponShopHandler.handleSelectMenu(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling WeaponShop interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác weapon shop!`);
+                    }
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải bank interaction không
+            if (interaction.customId.startsWith("bank_")) {
+                console.log("Bank interaction:", interaction.customId);
+                
+                try {
+                    const { BankHandler } = await import("../components/MessageComponent/BankHandler");
+                    if (interaction.isButton()) {
+                        await BankHandler.handleButtonInteraction(interaction);
+                    } else if (interaction.isStringSelectMenu()) {
+                        await BankHandler.handleSelectMenuInteraction(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling Bank interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác ngân hàng!`);
+                    }
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải horse racing interaction không
+            if (interaction.customId.startsWith("bet_")) {
+                console.log("HorseRacing interaction:", interaction.customId);
+                
+                try {
+                    const { HorseRacingHandler } = await import("../components/MessageComponent/HorseRacingHandler");
+                    if (interaction.isButton()) {
+                        await HorseRacingHandler.handleInteraction(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling HorseRacing interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác đua Cá!`);
+                    }
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải fish market interaction không
+            if (interaction.customId.startsWith("market_")) {
+                console.log("FishMarket interaction:", interaction.customId);
+                
+                try {
+                    const { FishMarketHandler } = await import("../components/MessageComponent/FishMarketHandler");
+                    if (interaction.isButton() || interaction.isStringSelectMenu()) {
+                        await FishMarketHandler.handleInteraction(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling FishMarket interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác fish market!`);
+                    }
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải achievement import interaction không
+            if (interaction.customId.startsWith("achievement_")) {
+                console.log("AchievementImport interaction:", interaction.customId);
+                
+                try {
+                    const { AchievementImportHandler } = await import("../components/MessageComponent/AchievementImportHandler");
+                    if (interaction.isButton()) {
+                        await AchievementImportHandler.handleInteraction(interaction);
+                    } else if (interaction.isModalSubmit()) {
+                        await AchievementImportHandler.handleModalSubmit(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling AchievementImport interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác achievement import!`);
+                    }
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải achievement selection interaction không
+            if (interaction.customId.startsWith("activate_achievement_") || interaction.customId === "deactivate_all_achievements") {
+                console.log("Achievement selection interaction:", interaction.customId);
+                
+                try {
+                    const { AchievementHandler } = await import("../components/MessageComponent/AchievementHandler");
+                    if (interaction.isButton()) {
+                        await AchievementHandler.handleInteraction(interaction);
+                    }
+                } catch (error) {
+                    console.error("Error handling Achievement selection interaction:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý tương tác chọn danh hiệu!`);
+                    }
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải battle log button không
+            if (interaction.customId.startsWith('view_battle_details_')) {
+                console.log("Battle log button clicked:", interaction.customId);
+                
+                // Import và gọi handler từ BattleLogHandler
+                const { BattleLogHandler } = await import("../components/MessageComponent/BattleLogHandler");
+                
+                try {
+                    await BattleLogHandler.handleViewBattleDetails(interaction);
+                } catch (error) {
+                    // Kiểm tra xem interaction đã được reply chưa
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi hiển thị chi tiết trận đấu!`);
+                    }
+                    logger.error({ id: interaction.customId, error });
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải battle round select menu không
+            if (interaction.customId.startsWith('battle_round_select_')) {
+                console.log("Battle round select clicked:", interaction.customId);
+                
+                // Import và gọi handler từ BattleLogHandler
+                const { BattleLogHandler } = await import("../components/MessageComponent/BattleLogHandler");
+                
+                try {
+                    await BattleLogHandler.handleRoundSelect(interaction);
+                } catch (error) {
+                    // Kiểm tra xem interaction đã được reply chưa
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi hiển thị hiệp đấu!`);
+                    }
+                    logger.error({ id: interaction.customId, error });
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải battle accept/cancel buttons không
+            if (interaction.customId.startsWith('battle_accept_') || interaction.customId.startsWith('battle_cancel_')) {
+                // Các buttons này được xử lý trực tiếp trong fishbattle.ts command
+                // Không cần xử lý ở đây vì chúng đã có collector riêng
+                return;
+            }
+
+            // Kiểm tra xem có phải battle invite buttons không
+            if (interaction.customId.startsWith('battle_invite_accept_') || interaction.customId.startsWith('battle_invite_decline_')) {
+                // Các buttons này được xử lý trực tiếp trong fishbattle.ts command
+                // Không cần xử lý ở đây vì chúng đã có collector riêng
+                return;
+            }
+
             // Kiểm tra xem có phải vote kick button không
             try {
                 const voteKickData = JSON.parse(interaction.customId);
@@ -103,7 +368,15 @@ export default Bot.createEvent({
             }
 
             try {
-                const payload: CustomIdData = JSON.parse(interaction.customId);
+                // Kiểm tra xem customId có phải JSON không
+                let payload: CustomIdData;
+                try {
+                    payload = JSON.parse(interaction.customId);
+                } catch (parseError) {
+                    // Không phải JSON, bỏ qua
+                    return;
+                }
+
                 const component = client.components.message.get(payload.n);
 
                 if (!component) {
@@ -130,27 +403,172 @@ export default Bot.createEvent({
         }
 
         if (interaction.isModalSubmit()) {
-            const payload: CustomIdData = JSON.parse(interaction.customId);
-            const component = client.components.modalSubmit.get(payload.n);
-
-            const { t, locale } = await i18n(interaction.guildId);
-
-            // Kiểm tra chế độ bảo trì cho modal submits
-            if (client.maintenanceMode) {
-                return interaction.reply(`${emojis.info} **Bot đang trong chế độ bảo trì**\nVui lòng chờ cho đến khi bảo trì hoàn tất.`);
+            // Kiểm tra xem có phải market modal không
+            if (interaction.customId === 'market_sell_modal') {
+                console.log("Market sell modal submitted");
+                
+                try {
+                    const { FishMarketHandler } = await import("../components/MessageComponent/FishMarketHandler");
+                    await FishMarketHandler.handleModalSubmit(interaction);
+                } catch (error) {
+                    console.error("Error handling Market modal:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý modal fish market!`);
+                    }
+                }
+                return;
             }
 
-            if (!component) {
-                logger.error(`Component "${payload.n}" doesn't exist.`);
-                return interaction.reply(`${emojis.error} | ${t("errors.unknown")}`);
+            // Kiểm tra xem có phải buy fish food modal không
+            if (interaction.customId.startsWith('buy_fish_food_modal:')) {
+                console.log("Buy fish food modal submitted");
+                
+                try {
+                    const component = client.components.modalSubmit.get('BuyFishFoodModal');
+                    if (component) {
+                        const { t, locale } = await i18n(interaction.guildId);
+                        await component.run({ client, interaction, t, locale, data: {} });
+                    } else {
+                        console.error("BuyFishFoodModal component not found");
+                        if (!interaction.replied && !interaction.deferred) {
+                            interaction.reply(`${emojis.error} | Component không tồn tại!`);
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error handling Buy fish food modal:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý modal mua thức ăn!`);
+                    }
+                }
+                return;
             }
 
+            // Kiểm tra xem có phải achievement modal không
+            if (interaction.customId === 'achievement_add_modal') {
+                console.log("Achievement add modal submitted");
+                
+                try {
+                    const { AchievementImportHandler } = await import("../components/MessageComponent/AchievementImportHandler");
+                    await AchievementImportHandler.handleModalSubmit(interaction);
+                } catch (error) {
+                    console.error("Error handling Achievement modal:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý modal achievement!`);
+                    }
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải battle fish rename modal không
+            if (interaction.customId.startsWith('rename_fish_modal_')) {
+                console.log("Battle fish rename modal submitted");
+                
+                try {
+                    const { BattleFishHandler } = await import("../components/MessageComponent/BattleFishHandler");
+                    await BattleFishHandler.handleInteraction(interaction);
+                } catch (error) {
+                    console.error("Error handling Battle fish rename modal:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý modal đổi tên cá!`);
+                    }
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải fish skill modal không
+            if (interaction.customId.startsWith('forget_skill_modal_')) {
+                console.log("Fish skill forget modal submitted");
+                
+                try {
+                    const { FishSkillHandler } = await import("../components/MessageComponent/FishSkillHandler");
+                    await FishSkillHandler.handleModalSubmit(interaction);
+                } catch (error) {
+                    console.error("Error handling Fish skill forget modal:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý modal quên skill!`);
+                    }
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải Bầu Cua modal không
+            if (interaction.customId.startsWith('baucua_modal_')) {
+                console.log("Bầu Cua modal submitted:", interaction.customId);
+                
+                try {
+                    // Import và gọi handler từ baucua command
+                    const { handleModalSubmission } = await import("../commands/text/games/baucua");
+                    
+                    // Gọi handler với game = null để nó tự tìm game
+                    await handleModalSubmission(interaction, null);
+                } catch (error) {
+                    console.error("Error handling Bầu Cua modal:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý modal Bầu Cua!`);
+                    }
+                }
+                return;
+            }
+
+            // Kiểm tra xem có phải horse racing modal submission không
+            if (interaction.customId.startsWith("horseracing_modal_")) {
+                console.log("HorseRacing modal submission:", interaction.customId);
+                
+                try {
+                    const { handleHorseRacingModalSubmission } = await import("../commands/text/games/horseracing");
+                    await handleHorseRacingModalSubmission(interaction);
+                } catch (error) {
+                    console.error("Error handling HorseRacing modal submission:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý modal đua Cá!`);
+                    }
+                }
+                return;
+            }
+
+            // Kiểm tra xem customId có phải JSON không trước khi parse
+            let isJsonCustomId = false;
             try {
-                if (!client.filter.slash(interaction, t, component.options)) return;
-                component.run({ client, interaction, t, locale, data: payload.d });
-            } catch (error) {
-                interaction.reply(`${emojis.error} | ${t("errors.unknown")}`);
-                logger.error(error);
+                JSON.parse(interaction.customId);
+                isJsonCustomId = true;
+            } catch {
+                isJsonCustomId = false;
+            }
+
+            if (isJsonCustomId) {
+                try {
+                    const payload: CustomIdData = JSON.parse(interaction.customId);
+                    const component = client.components.modalSubmit.get(payload.n);
+
+                    const { t, locale } = await i18n(interaction.guildId);
+
+                    // Kiểm tra chế độ bảo trì cho modal submits
+                    if (client.maintenanceMode) {
+                        return interaction.reply(`${emojis.info} **Bot đang trong chế độ bảo trì**\nVui lòng chờ cho đến khi bảo trì hoàn tất.`);
+                    }
+
+                    if (!component) {
+                        logger.error(`Component "${payload.n}" doesn't exist.`);
+                        return interaction.reply(`${emojis.error} | ${t("errors.unknown")}`);
+                    }
+
+                    if (!client.filter.slash(interaction, t, component.options)) return;
+                    component.run({ client, interaction, t, locale, data: payload.d });
+                } catch (error) {
+                    console.error("Error handling modal submit:", error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        interaction.reply(`${emojis.error} | Có lỗi xảy ra khi xử lý modal!`);
+                    }
+                }
+            } else {
+                // Xử lý modal submissions không phải JSON (như horse racing)
+                console.log("Non-JSON modal submission:", interaction.customId);
+                if (!interaction.replied && !interaction.deferred) {
+                    await interaction.reply({ 
+                        content: "❌ Modal submission không được hỗ trợ!", 
+                        ephemeral: true 
+                    });
+                }
             }
 
             return;

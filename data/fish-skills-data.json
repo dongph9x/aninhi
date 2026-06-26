@@ -1,0 +1,508 @@
+{
+  "skills": [
+    {
+      "id": "absolute_darkness",
+      "name": "Hắc Ám Tuyệt Đối",
+      "element": "dark",
+      "emoji": "<a:pixel_skill_bong_ma:1415338985873735804>",
+      "description": "Triệu hồi bóng tối tuyệt đối, gây damage khổng lồ và khóa kỹ năng",
+      "baseCost": 32000,
+      "baseDamage": 21,
+      "damageMultiplier": 2.0,
+      "damagePerLevel": 0.3,
+      "maxLevel": 5,
+      "baseSuccessRate": 0.4,
+      "successRatePerLevel": 0.12,
+      "cooldown": 3,
+      "requirements": {
+        "level": 27,
+        "luck": 120,
+        "rarity": "legendary"
+      },
+      "effects": {
+        "effectIds": ["skill_lock", "darkness_curse"],
+        "effectChances": {
+          "skill_lock": 0.8,
+          "darkness_curse": 0.6
+        },
+        "effectIntensities": {
+          "darkness_curse": 0.4
+        }
+      }
+    },
+    {
+      "id": "fire_blast",
+      "name": "Lửa Thiêu Đốt",
+      "element": "fire",
+      "emoji": "🔥",
+      "description": "Tấn công bằng lửa mạnh mẽ, có thể gây burn",
+      "baseCost": 5000,
+      "baseDamage": 15,
+      "damageMultiplier": 1.5,
+      "damagePerLevel": 0.2,
+      "maxLevel": 5,
+      "baseSuccessRate": 0.6,
+      "successRatePerLevel": 0.08,
+      "cooldown": 2,
+      "requirements": {
+        "level": 10,
+        "strength": 50
+      },
+      "effects": {
+        "effectIds": ["burn"],
+        "effectChances": {
+          "burn": 0.7
+        },
+        "effectIntensities": {
+          "burn": 0.12
+        }
+      }
+    },
+    {
+      "id": "earth_shield",
+      "name": "Khiên Đất",
+      "element": "earth",
+      "emoji": "🪨",
+      "description": "Tạo khiên bảo vệ bằng sức mạnh của đất",
+      "baseCost": 12000,
+      "baseDamage": 0,
+      "damageMultiplier": 1.0,
+      "damagePerLevel": 0.1,
+      "maxLevel": 5,
+      "baseSuccessRate": 0.8,
+      "successRatePerLevel": 0.05,
+      "cooldown": 5,
+      "requirements": {
+        "level": 20,
+        "defense": 100
+      },
+      "effects": {
+        "shield": 0.3
+      }
+    },
+    {
+      "id": "wind_slash",
+      "name": "Gió Cắt",
+      "element": "air",
+      "emoji": "💨",
+      "description": "Tấn công nhanh như gió, có thể gây stun",
+      "baseCost": 6000,
+      "baseDamage": 12,
+      "damageMultiplier": 1.3,
+      "damagePerLevel": 0.25,
+      "maxLevel": 5,
+      "baseSuccessRate": 0.65,
+      "successRatePerLevel": 0.09,
+      "cooldown": 2,
+      "requirements": {
+        "level": 12,
+        "agility": 70
+      },
+      "effects": {
+        "stun": 0.08
+      }
+    },
+    {
+      "id": "light_beam",
+      "name": "Tia Sáng",
+      "element": "light",
+      "emoji": "✨",
+      "description": "Tấn công bằng ánh sáng thuần khiết",
+      "baseCost": 15000,
+      "baseDamage": 18,
+      "damageMultiplier": 1.8,
+      "damagePerLevel": 0.22,
+      "maxLevel": 5,
+      "baseSuccessRate": 0.55,
+      "successRatePerLevel": 0.1,
+      "cooldown": 3,
+      "requirements": {
+        "level": 18,
+        "intelligence": 90,
+        "rarity": "epic"
+      },
+      "effects": {}
+    },
+    {
+      "id": "ice_freeze",
+      "name": "Băng Đóng",
+      "element": "water",
+      "emoji": "❄️",
+      "description": "Đóng băng đối thủ, gây damage và freeze",
+      "baseCost": 10000,
+      "baseDamage": 14,
+      "damageMultiplier": 1.4,
+      "damagePerLevel": 0.18,
+      "maxLevel": 5,
+      "baseSuccessRate": 0.5,
+      "successRatePerLevel": 0.12,
+      "cooldown": 4,
+      "requirements": {
+        "level": 16,
+        "intelligence": 75
+      },
+      "effects": {
+        "effectIds": ["freeze"],
+        "effectChances": {
+          "freeze": 0.6
+        }
+      }
+    },
+    {
+      "id": "shadow_bind",
+      "name": "Trói Buộc Bóng Tối",
+      "element": "dark",
+      "emoji": "🌑",
+      "description": "Trói buộc đối thủ bằng bóng tối, ngăn tấn công",
+      "baseCost": 8000,
+      "baseDamage": 8,
+      "damageMultiplier": 1.2,
+      "damagePerLevel": 0.15,
+      "maxLevel": 5,
+      "baseSuccessRate": 0.45,
+      "successRatePerLevel": 0.11,
+      "cooldown": 4,
+      "requirements": {
+        "level": 15,
+        "intelligence": 80,
+        "rarity": "rare"
+      },
+      "effects": {
+        "effectIds": ["shadow_bind"],
+        "effectChances": {
+          "shadow_bind": 0.7
+        }
+      }
+    },
+    {
+      "id": "fire_rage",
+      "name": "Cơn Thịnh Nộ Lửa",
+      "element": "fire",
+      "emoji": "🔥",
+      "description": "Kích hoạt cơn thịnh nộ lửa, tăng damage",
+      "baseCost": 18000,
+      "baseDamage": 20,
+      "damageMultiplier": 1.6,
+      "damagePerLevel": 0.25,
+      "maxLevel": 5,
+      "baseSuccessRate": 0.7,
+      "successRatePerLevel": 0.06,
+      "cooldown": 5,
+      "requirements": {
+        "level": 22,
+        "strength": 120,
+        "rarity": "epic"
+      },
+      "effects": {
+        "effectIds": ["fire_rage"],
+        "effectChances": {
+          "fire_rage": 0.8
+        },
+        "effectIntensities": {
+          "fire_rage": 0.3
+        }
+      }
+    },
+    {
+      "id": "water_shield",
+      "name": "Khiên Nước",
+      "element": "water",
+      "emoji": "💧",
+      "description": "Tạo khiên nước bảo vệ khỏi damage",
+      "baseCost": 14000,
+      "baseDamage": 0,
+      "damageMultiplier": 1.0,
+      "damagePerLevel": 0.1,
+      "maxLevel": 5,
+      "baseSuccessRate": 0.75,
+      "successRatePerLevel": 0.05,
+      "cooldown": 6,
+      "requirements": {
+        "level": 18,
+        "intelligence": 100,
+        "rarity": "rare"
+      },
+      "effects": {
+        "effectIds": ["water_shield"],
+        "effectChances": {
+          "water_shield": 0.9
+        },
+        "effectIntensities": {
+          "water_shield": 0.25
+        }
+      }
+    },
+    {
+      "id": "petrify_stone",
+      "name": "Hóa Đá",
+      "element": "earth",
+      "emoji": "🪨",
+      "description": "Hóa đá đối thủ, ngăn mọi hành động",
+      "baseCost": 25000,
+      "baseDamage": 16,
+      "damageMultiplier": 1.3,
+      "damagePerLevel": 0.2,
+      "maxLevel": 5,
+      "baseSuccessRate": 0.35,
+      "successRatePerLevel": 0.13,
+      "cooldown": 6,
+      "requirements": {
+        "level": 25,
+        "strength": 100,
+        "intelligence": 80,
+        "rarity": "epic"
+      },
+      "effects": {
+        "effectIds": ["petrify"],
+        "effectChances": {
+          "petrify": 0.5
+        }
+      }
+    },
+    {
+      "id": "earth_armor",
+      "name": "Giáp Đất",
+      "element": "earth",
+      "emoji": "🛡️",
+      "description": "Tăng cường defense bằng giáp đất",
+      "baseCost": 16000,
+      "baseDamage": 0,
+      "damageMultiplier": 1.0,
+      "damagePerLevel": 0.1,
+      "maxLevel": 5,
+      "baseSuccessRate": 0.8,
+      "successRatePerLevel": 0.04,
+      "cooldown": 7,
+      "requirements": {
+        "level": 20,
+        "defense": 120,
+        "rarity": "rare"
+      },
+      "effects": {
+        "effectIds": ["earth_armor"],
+        "effectChances": {
+          "earth_armor": 0.85
+        },
+        "effectIntensities": {
+          "earth_armor": 0.5
+        }
+      }
+    },
+    {
+      "id": "confusion_wind",
+      "name": "Gió Hoang Mang",
+      "element": "air",
+      "emoji": "🌪️",
+      "description": "Tạo gió hoang mang, đối thủ có thể tấn công chính mình",
+      "baseCost": 12000,
+      "baseDamage": 10,
+      "damageMultiplier": 1.1,
+      "damagePerLevel": 0.2,
+      "maxLevel": 5,
+      "baseSuccessRate": 0.55,
+      "successRatePerLevel": 0.09,
+      "cooldown": 4,
+      "requirements": {
+        "level": 17,
+        "agility": 90,
+        "intelligence": 70,
+        "rarity": "rare"
+      },
+      "effects": {
+        "effectIds": ["confusion"],
+        "effectChances": {
+          "confusion": 0.65
+        },
+        "effectIntensities": {
+          "confusion": 0.6
+        }
+      }
+    },
+    {
+      "id": "wind_boost",
+      "name": "Tăng Tốc Gió",
+      "element": "air",
+      "emoji": "💨",
+      "description": "Tăng tốc độ với sức mạnh của gió",
+      "baseCost": 11000,
+      "baseDamage": 0,
+      "damageMultiplier": 1.0,
+      "damagePerLevel": 0.1,
+      "maxLevel": 5,
+      "baseSuccessRate": 0.7,
+      "successRatePerLevel": 0.06,
+      "cooldown": 5,
+      "requirements": {
+        "level": 16,
+        "agility": 80
+      },
+      "effects": {
+        "effectIds": ["wind_boost"],
+        "effectChances": {
+          "wind_boost": 0.8
+        },
+        "effectIntensities": {
+          "wind_boost": 0.35
+        }
+      }
+    },
+    {
+      "id": "blinding_light",
+      "name": "Ánh Sáng Mù Quáng",
+      "element": "light",
+      "emoji": "☀️",
+      "description": "Phát ra ánh sáng chói lòa, làm mù đối thủ",
+      "baseCost": 13000,
+      "baseDamage": 12,
+      "damageMultiplier": 1.4,
+      "damagePerLevel": 0.18,
+      "maxLevel": 5,
+      "baseSuccessRate": 0.6,
+      "successRatePerLevel": 0.08,
+      "cooldown": 3,
+      "requirements": {
+        "level": 19,
+        "intelligence": 85,
+        "rarity": "rare"
+      },
+      "effects": {
+        "effectIds": ["blind"],
+        "effectChances": {
+          "blind": 0.7
+        },
+        "effectIntensities": {
+          "blind": 0.45
+        }
+      }
+    },
+    {
+      "id": "divine_blessing",
+      "name": "Phước Lành Thần Thánh",
+      "element": "light",
+      "emoji": "✨",
+      "description": "Nhận phước lành thần thánh, tăng tất cả stats",
+      "baseCost": 30000,
+      "baseDamage": 0,
+      "damageMultiplier": 1.0,
+      "damagePerLevel": 0.1,
+      "maxLevel": 5,
+      "baseSuccessRate": 0.85,
+      "successRatePerLevel": 0.03,
+      "cooldown": 8,
+      "requirements": {
+        "level": 28,
+        "intelligence": 130,
+        "luck": 100,
+        "rarity": "legendary"
+      },
+      "effects": {
+        "effectIds": ["divine_blessing"],
+        "effectChances": {
+          "divine_blessing": 0.9
+        },
+        "effectIntensities": {
+          "divine_blessing": 0.25
+        }
+      }
+    },
+    {
+      "id": "poison_dart",
+      "name": "Phi Tiên Độc",
+      "element": "dark",
+      "emoji": "☠️",
+      "description": "Bắn phi tiên tẩm độc, gây damage theo thời gian",
+      "baseCost": 9000,
+      "baseDamage": 8,
+      "damageMultiplier": 1.2,
+      "damagePerLevel": 0.16,
+      "maxLevel": 5,
+      "baseSuccessRate": 0.65,
+      "successRatePerLevel": 0.07,
+      "cooldown": 3,
+      "requirements": {
+        "level": 14,
+        "agility": 60,
+        "intelligence": 50
+      },
+      "effects": {
+        "effectIds": ["poison"],
+        "effectChances": {
+          "poison": 0.75
+        },
+        "effectIntensities": {
+          "poison": 0.08
+        }
+      }
+    },
+    {
+      "id": "regeneration_aura",
+      "name": "Hào Quang Hồi Sinh",
+      "element": "light",
+      "emoji": "💚",
+      "description": "Tạo hào quang hồi sinh, hồi HP theo thời gian",
+      "baseCost": 20000,
+      "baseDamage": 0,
+      "damageMultiplier": 1.0,
+      "damagePerLevel": 0.1,
+      "maxLevel": 5,
+      "baseSuccessRate": 0.8,
+      "successRatePerLevel": 0.04,
+      "cooldown": 7,
+      "requirements": {
+        "level": 24,
+        "intelligence": 110,
+        "rarity": "epic"
+      },
+      "effects": {
+        "effectIds": ["regeneration"],
+        "effectChances": {
+          "regeneration": 0.85
+        },
+        "effectIntensities": {
+          "regeneration": 0.12
+        }
+      }
+    },
+    {
+      "id": "berserk_fury",
+      "name": "Cuồng Nộ Tử Thần",
+      "element": "fire",
+      "emoji": "⚔️",
+      "description": "Kích hoạt cuồng nộ, tăng damage nhưng giảm defense",
+      "baseCost": 22000,
+      "baseDamage": 25,
+      "damageMultiplier": 1.8,
+      "damagePerLevel": 0.3,
+      "maxLevel": 5,
+      "baseSuccessRate": 0.6,
+      "successRatePerLevel": 0.08,
+      "cooldown": 6,
+      "requirements": {
+        "level": 26,
+        "strength": 140,
+        "rarity": "epic"
+      },
+      "effects": {
+        "effectIds": ["berserk"],
+        "effectChances": {
+          "berserk": 0.7
+        },
+        "effectIntensities": {
+          "berserk": 0.6
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "version": "1.1.0",
+    "lastUpdated": "2024-01-20",
+    "totalSkills": 18,
+    "elements": ["fire", "water", "earth", "air", "light", "dark"],
+    "rarityRequirements": ["common", "rare", "epic", "legendary"],
+    "effectsCoverage": {
+      "totalEffects": 16,
+      "coveredEffects": 16,
+      "coveragePercentage": 100
+    }
+  }
+}

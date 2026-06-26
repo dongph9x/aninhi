@@ -34,13 +34,13 @@ export class EcommerceService {
     /**
      * Lấy số dư của người dùng
      */
-    static async getBalance(userId: string, guildId: string): Promise<number> {
+    static async getBalance(userId: string, guildId: string): Promise<bigint> {
         try {
             const user = await this.getUser(userId, guildId);
             return user.balance;
         } catch (error) {
             console.error("Error getting balance:", error);
-            return 0;
+            return 0n;
         }
     }
 
@@ -50,11 +50,14 @@ export class EcommerceService {
     static async addMoney(
         userId: string,
         guildId: string,
-        amount: number,
+        amount: number | string | bigint,
         description: string = "Added AniCoin"
     ) {
         try {
-            if (amount <= 0) {
+            // Convert amount to BigInt to handle large numbers properly
+            const bigIntAmount = BigInt(amount);
+            
+            if (bigIntAmount <= 0n) {
                 throw new Error("Số tiền phải lớn hơn 0");
             }
 
@@ -67,12 +70,12 @@ export class EcommerceService {
                     }
                 },
                 update: {
-                    balance: { increment: amount }
+                    balance: { increment: bigIntAmount }
                 },
                 create: {
                     userId,
                     guildId,
-                    balance: amount,
+                    balance: bigIntAmount,
                     dailyStreak: 0
                 }
             });
@@ -82,7 +85,7 @@ export class EcommerceService {
                 data: {
                     userId,
                     guildId,
-                    amount,
+                    amount: bigIntAmount,
                     type: "add",
                     description
                 }
@@ -101,16 +104,19 @@ export class EcommerceService {
     static async subtractMoney(
         userId: string,
         guildId: string,
-        amount: number,
+        amount: number | string | bigint,
         description: string = "Subtracted AniCoin"
     ) {
         try {
-            if (amount <= 0) {
+            // Convert amount to BigInt to handle large numbers properly
+            const bigIntAmount = BigInt(amount);
+            
+            if (bigIntAmount <= 0n) {
                 throw new Error("Số tiền phải lớn hơn 0");
             }
 
             const user = await this.getUser(userId, guildId);
-            if (user.balance < amount) {
+            if (user.balance < bigIntAmount) {
                 throw new Error("Không đủ tiền");
             }
 
@@ -122,7 +128,7 @@ export class EcommerceService {
                     }
                 },
                 data: {
-                    balance: { decrement: amount }
+                    balance: { decrement: bigIntAmount }
                 }
             });
 
@@ -131,7 +137,7 @@ export class EcommerceService {
                 data: {
                     userId,
                     guildId,
-                    amount: -amount,
+                    amount: -bigIntAmount,
                     type: "subtract",
                     description
                 }
@@ -225,8 +231,9 @@ export class EcommerceService {
             }
 
             const user = await this.getUser(userId, guildId);
-            const baseAmount = 1000;
-            const streakBonus = Math.min(user.dailyStreak * 100, 1000);
+            const baseAmount = 2000n;
+            const newStreak = user.dailyStreak + 1;
+            const streakBonus = BigInt(Math.min(newStreak * 100, 1000));
             const totalAmount = baseAmount + streakBonus;
 
             // Cập nhật user và ghi lại daily claim
@@ -312,26 +319,32 @@ export class EcommerceService {
      */
     static async resetBalance(userId: string, guildId: string) {
         try {
-            const user = await prisma.user.update({
+            const user = await prisma.user.upsert({
                 where: {
                     userId_guildId: {
                         userId,
                         guildId
                     }
                 },
-                data: {
-                    balance: 0
+                update: {
+                    balance: 0n,
+                    fishBalance: 0n,
+                    dailyStreak: 0
+                },
+                create: {
+                    userId,
+                    guildId,
+                    balance: 0n,
+                    fishBalance: 0n,
+                    dailyStreak: 0
                 }
             });
 
-            // Ghi lại giao dịch
-            await prisma.transaction.create({
-                data: {
+            // Xóa tất cả daily claims cũ
+            await prisma.dailyClaim.deleteMany({
+                where: {
                     userId,
-                    guildId,
-                    amount: -user.balance,
-                    type: "reset",
-                    description: "Balance reset"
+                    guildId
                 }
             });
 
@@ -353,9 +366,13 @@ export class EcommerceService {
             }
 
             const user = await this.getUser(userId, guildId);
-            const baseAmount = 1000;
-            const streakBonus = Math.min(user.dailyStreak * 100, 1000);
-            const totalAmount = baseAmount + streakBonus;
+            const baseAmount = 2000n;
+            const newStreak = user.dailyStreak + 1;
+            const streakBonus = BigInt(Math.min(newStreak * 100, 1000));
+            const totalAniAmount = baseAmount + streakBonus;
+            
+            // Thêm FishCoin với số lượng tương tự
+            const totalFishAmount = totalAniAmount;
 
             // Cập nhật user và ghi lại daily claim
             const result = await prisma.$transaction(async (tx: any) => {
@@ -367,7 +384,8 @@ export class EcommerceService {
                         }
                     },
                     data: {
-                        balance: { increment: totalAmount },
+                        balance: { increment: totalAniAmount },
+                        fishBalance: { increment: totalFishAmount },
                         dailyStreak: { increment: 1 }
                     }
                 });
@@ -379,13 +397,25 @@ export class EcommerceService {
                     }
                 });
 
+                // Ghi lại transaction AniCoin
                 await tx.transaction.create({
                     data: {
                         userId,
                         guildId,
-                        amount: totalAmount,
+                        amount: totalAniAmount,
                         type: "daily",
                         description: `Daily reward (streak: ${user.dailyStreak + 1})`
+                    }
+                });
+
+                // Ghi lại transaction FishCoin
+                await tx.fishTransaction.create({
+                    data: {
+                        userId,
+                        guildId,
+                        amount: totalFishAmount,
+                        type: "daily",
+                        description: `Daily reward FishCoin (streak: ${user.dailyStreak + 1})`
                     }
                 });
 
@@ -394,7 +424,8 @@ export class EcommerceService {
 
             return {
                 success: true,
-                amount: totalAmount,
+                aniAmount: totalAniAmount,
+                fishAmount: totalFishAmount,
                 newStreak: user.dailyStreak + 1
             };
         } catch (error) {
@@ -430,7 +461,7 @@ export class EcommerceService {
      */
     static async getSettings() {
         return {
-            dailyBaseAmount: 1000,
+            dailyBaseAmount: 2000,
             dailyStreakBonus: 100,
             maxStreakBonus: 1000,
             dailyCooldownHours: 24
@@ -444,11 +475,14 @@ export class EcommerceService {
         fromUserId: string,
         toUserId: string,
         guildId: string,
-        amount: number,
+        amount: number | string | bigint,
         description: string = "Transfer"
     ) {
         try {
-            if (amount <= 0) {
+            // Convert amount to BigInt to handle large numbers properly
+            const bigIntAmount = BigInt(amount);
+            
+            if (bigIntAmount <= 0n) {
                 return { success: false, message: "Số tiền phải lớn hơn 0" };
             }
 
@@ -460,7 +494,7 @@ export class EcommerceService {
             const fromUser = await this.getUser(fromUserId, guildId);
             const toUser = await this.getUser(toUserId, guildId);
 
-            if (fromUser.balance < amount) {
+            if (fromUser.balance < bigIntAmount) {
                 return { success: false, message: "Không đủ tiền để chuyển" };
             }
 
@@ -475,7 +509,7 @@ export class EcommerceService {
                         }
                     },
                     data: {
-                        balance: { decrement: amount }
+                        balance: { decrement: bigIntAmount }
                     }
                 });
 
@@ -488,7 +522,7 @@ export class EcommerceService {
                         }
                     },
                     data: {
-                        balance: { increment: amount }
+                        balance: { increment: bigIntAmount }
                     }
                 });
 
@@ -497,7 +531,7 @@ export class EcommerceService {
                     data: {
                         userId: fromUserId,
                         guildId,
-                        amount: -amount,
+                        amount: -bigIntAmount,
                         type: "transfer",
                         description: `${description} -> ${toUserId}`
                     }
@@ -507,7 +541,7 @@ export class EcommerceService {
                     data: {
                         userId: toUserId,
                         guildId,
-                        amount: amount,
+                        amount: bigIntAmount,
                         type: "transfer",
                         description: `${description} <- ${fromUserId}`
                     }

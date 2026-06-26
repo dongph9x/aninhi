@@ -2,7 +2,8 @@ import { EmbedBuilder, ComponentType } from "discord.js";
 
 import { Bot } from "@/classes";
 import type { MessageComponentProps } from "@/typings";
-import { FishingService, FISHING_RODS } from "@/utils/fishing";
+import { FishingService } from "@/utils/fishing";
+import { FISHING_RODS } from "@/config/fish-data";
 
 export default Bot.createMessageComponent<ComponentType.StringSelect, {}>({
     type: ComponentType.StringSelect,
@@ -22,7 +23,7 @@ export default Bot.createMessageComponent<ComponentType.StringSelect, {}>({
                 .setDescription(
                     `**${interaction.user.username}** đã mua:\n\n` +
                     `${rodInfo.emoji} **${rodInfo.name}**\n` +
-                    `💰 **Giá:** ${rodInfo.price} AniCoin\n` +
+                    `🐟 **Giá:** ${rodInfo.price} FishCoin\n` +
                     `🛡️ **Độ bền:** ${rodInfo.durability} lần\n` +
                     `✨ **Bonus hiếm:** +${rodInfo.rarityBonus}%\n` +
                     `📝 **Mô tả:** ${rodInfo.description}\n\n` +

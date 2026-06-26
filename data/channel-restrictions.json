@@ -1,0 +1,38 @@
+{
+  "allowedChannels": [
+    "1362234245392765201",
+    "1414192198538235915"
+  ],
+  "blockedChannels": [],
+  "allowedCategories": [],
+  "blockedCategories": [],
+  "useWhitelistMode": true,
+  "useBlacklistMode": false,
+  "checkCategories": false,
+  "exemptCommands": [
+    "help",
+    "ping",
+    "uptime",
+    "maintenance",
+    "channelrestrictions",
+    "chrestrict",
+    "chrest",
+    "restrictch"
+  ],
+  "exemptAdminCommands": [
+    "maintenance",
+    "deploy",
+    "undeploy",
+    "eval",
+    "backupdb",
+    "restoredb",
+    "syncdb",
+    "dbstatus",
+    "refreshdb",
+    "listbackups",
+    "channelrestrictions",
+    "chrestrict",
+    "chrest",
+    "restrictch"
+  ]
+}

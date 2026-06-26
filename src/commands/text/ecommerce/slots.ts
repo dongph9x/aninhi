@@ -4,7 +4,7 @@ import { Bot } from "@/classes";
 import { EcommerceService } from "@/utils/ecommerce-db";
 import { GameStatsService } from "@/utils/gameStats";
 
-const maxBet = 300000;
+const maxBet = 100000;
 const slots = ["🍆", "❤️", "🍒", "🪙", "😊", "😄"];
 const moving = "🎰";
 
@@ -63,14 +63,14 @@ export default Bot.createCommand({
             const currentBalance = await EcommerceService.getBalance(userId, guildId);
 
             if (all) {
-                amount = currentBalance;
+                amount = Number(currentBalance);
             }
 
             if (maxBet && amount > maxBet) {
                 amount = maxBet;
             }
 
-            if (currentBalance < amount || currentBalance <= 0) {
+            if (currentBalance < BigInt(amount) || currentBalance <= 0n) {
                 const errorEmbed = new EmbedBuilder()
                     .setTitle("🚫 Không Đủ Tiền")
                     .setDescription(
@@ -132,7 +132,7 @@ export default Bot.createCommand({
                 await EcommerceService.addMoney(
                     userId,
                     guildId,
-                    win - amount,
+                    BigInt(win) - BigInt(amount),
                     `Slots win - bet: ${amount}, multiplier: ${multiplier}x`,
                 );
             } else {

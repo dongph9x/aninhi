@@ -2,14 +2,14 @@
 
 ## 📋 Tổng quan
 
-Hệ thống giá cá biến động cho phép giá cá thay đổi theo thời gian thực, tạo ra một thị trường động và thú vị cho người chơi. Giá cá sẽ biến động ±10% mỗi 10 phút.
+Hệ thống giá cá biến động cho phép giá cá thay đổi theo thời gian thực, tạo ra một thị trường động và thú vị cho người chơi. Giá cá sẽ biến động ±15% mỗi 10 phút.
 
 ## ⚙️ Cách hoạt động
 
 ### **Biến động giá:**
 - **Tần suất**: Mỗi 10 phút
-- **Phạm vi**: ±10% so với giá gốc
-- **Công thức**: `newPrice = basePrice * (1 + random(-0.1, 0.1))`
+- **Phạm vi**: ±15% so với giá gốc
+- **Công thức**: `newPrice = basePrice * (1 + random(-0.15, 0.15))`
 
 ### **Giá gốc:**
 Giá gốc được tính bằng trung bình của `minValue` và `maxValue` của mỗi loại cá:
@@ -104,7 +104,7 @@ const PRICE_UPDATE_INTERVAL = 10 * 60 * 1000; // 10 phút
 ### **Thay đổi phạm vi biến động:**
 Trong `src/utils/fishing.ts`, hàm `updateFishPrices()`:
 ```typescript
-const fluctuation = (Math.random() - 0.5) * 0.2; // ±10%
+const fluctuation = (Math.random() - 0.5) * 0.3; // ±15%
 ```
 
 ## 🐛 Xử lý lỗi

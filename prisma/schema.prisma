@@ -8,19 +8,29 @@ datasource db {
 }
 
 model User {
-  id           String                  @id @default(cuid())
-  userId       String
-  guildId      String
-  balance      Int                     @default(0)
-  dailyStreak  Int                     @default(0)
-  createdAt    DateTime                @default(now())
-  updatedAt    DateTime                @updatedAt
-  dailyClaims  DailyClaim[]
-  fishingData  FishingData?
-  gameStats    GameStats[]
-  inventory    Inventory?
-  tournaments  TournamentParticipant[]
-  transactions Transaction[]
+  id                    String                  @id @default(cuid())
+  userId                String
+  guildId               String
+  balance               BigInt                  @default(0)
+  fishBalance           BigInt                  @default(0)  // FishCoin riêng cho hệ thống fish
+  dailyStreak           Int                     @default(0)
+  dailyBattleCount      Int                     @default(0)  // Số lần đấu cá trong ngày
+  lastBattleReset       DateTime                @default(now()) // Thời gian reset battle count
+  dailyFeedCount        Int                     @default(0)  // Số lần cho cá ăn trong ngày
+  lastFeedReset         DateTime                @default(now()) // Thời gian reset feed count
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  dailyClaims           DailyClaim[]
+  fishInventory         FishInventory?
+  battleFishInventory   BattleFishInventory?
+  fishingData           FishingData?
+  gameStats             GameStats[]
+  inventory             Inventory?
+  tournaments           TournamentParticipant[]
+  transactions          Transaction[]
+  fishTransactions      FishTransaction[]       // Giao dịch riêng cho FishCoin
+  fishFood              FishFood[]
+  userWeapons           UserWeapon[]
 
   @@unique([userId, guildId])
   @@index([userId])
@@ -31,7 +41,22 @@ model Transaction {
   id          String   @id @default(cuid())
   userId      String
   guildId     String
-  amount      Int
+  amount      BigInt
+  type        String
+  description String?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId, guildId], references: [userId, guildId])
+
+  @@index([userId, guildId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model FishTransaction {
+  id          String   @id @default(cuid())
+  userId      String
+  guildId     String
+  amount      BigInt
   type        String
   description String?
   createdAt   DateTime @default(now())
@@ -60,11 +85,11 @@ model GameStats {
   gameType    String
   gamesPlayed Int      @default(0)
   gamesWon    Int      @default(0)
-  totalBet    Int      @default(0)
-  totalWon    Int      @default(0)
-  totalLost   Int      @default(0)
-  biggestWin  Int      @default(0)
-  biggestLoss Int      @default(0)
+  totalBet    BigInt   @default(0)
+  totalWon    BigInt   @default(0)
+  totalLost   BigInt   @default(0)
+  biggestWin  BigInt   @default(0)
+  biggestLoss BigInt   @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   user        User     @relation(fields: [userId, guildId], references: [userId, guildId])
@@ -79,15 +104,18 @@ model FishingData {
   userId        String
   guildId       String
   totalFish     Int           @default(0)
-  totalEarnings Int           @default(0)
+  totalEarnings BigInt        @default(0)
   biggestFish   String        @default("")
-  biggestValue  Int           @default(0)
+  biggestValue  BigInt        @default(0)
   rarestFish    String        @default("")
   rarestRarity  String        @default("")
   fishingTime   Int           @default(0)
   currentRod    String        @default("basic")
   currentBait   String        @default("basic")
   lastFished    DateTime      @default(now())
+  // Pity system fields
+  legendaryPityCount Int      @default(0)  // Số lần câu không ra cá huyền thoại
+  lastLegendaryCaught DateTime? // Thời gian câu được cá huyền thoại cuối cùng
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   fish          CaughtFish[]
@@ -130,7 +158,7 @@ model CaughtFish {
   fishingDataId String
   fishName      String
   fishRarity    String
-  fishValue     Int         @default(0)
+  fishValue     BigInt      @default(0)
   quantity      Int         @default(0)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -145,8 +173,8 @@ model Tournament {
   id                  String                  @id @default(cuid())
   name                String
   description         String
-  entryFee            Int
-  prizePool           Int
+  entryFee            BigInt
+  prizePool           BigInt
   maxParticipants     Int
   currentParticipants Int                     @default(0)
   status              String
@@ -158,8 +186,8 @@ model Tournament {
   winnerId            String?
   createdAt           DateTime                @default(now())
   updatedAt           DateTime                @updatedAt
-  participants        TournamentParticipant[]
   messages            TournamentMessage[]     @relation("TournamentMessages")
+  participants        TournamentParticipant[]
 
   @@index([guildId])
   @@index([status])
@@ -182,14 +210,13 @@ model TournamentParticipant {
 }
 
 model TournamentMessage {
-  id           String   @id @default(cuid())
+  id           String     @id @default(cuid())
   tournamentId String
   messageId    String
   channelId    String
   guildId      String
-  createdAt    DateTime @default(now())
-
-  tournament   Tournament @relation(fields: [tournamentId], references: [id], name: "TournamentMessages")
+  createdAt    DateTime   @default(now())
+  tournament   Tournament @relation("TournamentMessages", fields: [tournamentId], references: [id])
 
   @@index([tournamentId])
   @@index([guildId])
@@ -243,7 +270,7 @@ model ItemTemplate {
   itemType      String
   itemRarity    String
   description   String
-  baseValue     Int      @default(0)
+  baseValue     BigInt   @default(0)
   maxStack      Int      @default(1)
   maxDurability Int?
   baseStats     String?
@@ -271,7 +298,7 @@ model ModerationLog {
   action       String
   reason       String?
   duration     Int?
-  amount       Int?
+  amount       BigInt?
   channelId    String?
   messageId    String?
   createdAt    DateTime @default(now())
@@ -312,17 +339,265 @@ model BanRecord {
   @@index([expiresAt])
 }
 
-model FishPrice {
+model WarningRecord {
   id          String   @id @default(cuid())
-  fishName    String
-  basePrice   Int
-  currentPrice Int
-  priceChange Int      @default(0) // Số tiền thay đổi so với giá gốc
-  changePercent Float  @default(0) // Phần trăm thay đổi
-  lastUpdated DateTime @default(now())
-  priceHistory String? // JSON array lưu lịch sử giá
+  userId      String
+  guildId     String
+  moderatorId String
+  warningLevel Int     @default(1) // 1, 2, 3
+  reason      String
+  message     String   // Message tùy chỉnh cho từng level
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime? // Có thể set thời gian hết hạn cảnh cáo
 
-  @@unique([fishName])
+  @@index([userId])
+  @@index([guildId])
+  @@index([moderatorId])
+  @@index([warningLevel])
+  @@index([isActive])
+  @@index([expiresAt])
+}
+
+model Fish {
+  id                    String                    @id @default(cuid())
+  userId                String
+  guildId               String
+  species               String
+  level                 Int                       @default(1)
+  experience            Int                       @default(0)
+  rarity                String
+  value                 BigInt                    @default(0)
+  generation            Int                       @default(1)
+  specialTraits         String?
+  stats                 String?                   // JSON string chứa stats: strength, agility, intelligence, defense, luck
+  status                String                    @default("growing")
+  // Cloning fields
+  isCloned              Boolean                   @default(false)
+  clonedFrom            String?                   // ID của cá gốc được nhân bản
+  clonedAt              DateTime?                 // Thời gian nhân bản
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  inventoryItem         FishInventoryItem?
+  battleInventoryItem   BattleFishInventoryItem?
+  marketListing         FishMarket?
+  fishSkills            FishSkill[]
+
+  @@index([userId])
+  @@index([guildId])
+  @@index([rarity])
+  @@index([status])
+  @@index([isCloned])
+  @@index([clonedFrom])
+}
+
+model FishInventory {
+  id        String              @id @default(cuid())
+  userId    String
+  guildId   String
+  capacity  Int                 @default(10)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  user      User                @relation(fields: [userId, guildId], references: [userId, guildId])
+  items     FishInventoryItem[]
+
+  @@unique([userId, guildId])
+  @@index([userId, guildId])
+}
+
+model BattleFishInventory {
+  id        String                    @id @default(cuid())
+  userId    String
+  guildId   String
+  capacity  Int                       @default(5)
+  createdAt DateTime                  @default(now())
+  updatedAt DateTime                  @updatedAt
+  user      User                      @relation(fields: [userId, guildId], references: [userId, guildId])
+  items     BattleFishInventoryItem[]
+
+  @@unique([userId, guildId])
+  @@index([userId, guildId])
+}
+
+model FishInventoryItem {
+  id              String        @id @default(cuid())
+  fishInventoryId String
+  fishId          String        @unique
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  fishInventory   FishInventory @relation(fields: [fishInventoryId], references: [id], onDelete: Cascade)
+  fish            Fish          @relation(fields: [fishId], references: [id], onDelete: Cascade)
+
+  @@index([fishInventoryId])
+  @@index([fishId])
+}
+
+model BattleFishInventoryItem {
+  id                    String              @id @default(cuid())
+  battleFishInventoryId String
+  fishId                String              @unique
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  battleFishInventory   BattleFishInventory @relation(fields: [battleFishInventoryId], references: [id], onDelete: Cascade)
+  fish                  Fish                @relation(fields: [fishId], references: [id], onDelete: Cascade)
+
+  @@index([battleFishInventoryId])
+  @@index([fishId])
+}
+
+
+
+model FishMarket {
+  id        String   @id @default(cuid())
+  fishId    String   @unique
+  sellerId  String
+  guildId   String
+  price     BigInt
+  listedAt  DateTime @default(now())
+  expiresAt DateTime
+  fish      Fish     @relation(fields: [fishId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId])
+  @@index([guildId])
+  @@index([price])
+  @@index([expiresAt])
+}
+
+model BreedingHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  guildId     String
+  parent1Id   String
+  parent2Id   String
+  offspringId String
+  bredAt      DateTime @default(now())
+  success     Boolean  @default(true)
+  notes       String?
+
+  @@index([userId])
+  @@index([guildId])
+  @@index([parent1Id])
+  @@index([parent2Id])
+  @@index([offspringId])
+}
+
+model FishPrice {
+  id            String   @id @default(cuid())
+  fishName      String   @unique
+  basePrice     BigInt
+  currentPrice  BigInt
+  priceChange   BigInt   @default(0)
+  changePercent Float    @default(0)
+  lastUpdated   DateTime @default(now())
+  priceHistory  String?
+
   @@index([fishName])
   @@index([lastUpdated])
+}
+
+model BattleHistory {
+  id             String   @id @default(cuid())
+  userId         String
+  guildId        String
+  fishId         String
+  opponentId     String
+  opponentUserId String
+  userPower      Int
+  opponentPower  Int
+  userWon        Boolean
+  reward         BigInt
+  battleLog      String   // JSON string chứa log trận đấu
+  battledAt      DateTime @default(now())
+
+  @@index([userId])
+  @@index([guildId])
+  @@index([fishId])
+  @@index([opponentId])
+  @@index([battledAt])
+}
+
+model FishFood {
+  id            String      @id @default(cuid())
+  userId        String
+  guildId       String
+  foodType      String
+  quantity      Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  user          User        @relation(fields: [userId, guildId], references: [userId, guildId])
+
+  @@unique([userId, guildId, foodType])
+  @@index([userId, guildId])
+  @@index([foodType])
+}
+
+model UserWeapon {
+  id              String   @id @default(cuid())
+  userId          String
+  guildId         String
+  weaponId        String
+  quantity        Int      @default(1)
+  isEquipped      Boolean  @default(false)
+  equippedOnFishId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId, guildId], references: [userId, guildId])
+
+  @@unique([userId, guildId, weaponId])
+  @@index([userId, guildId])
+  @@index([weaponId])
+  @@index([isEquipped])
+}
+
+model Achievement {
+  id        String   @id @default(cuid())
+  name      String
+  link      String
+  target    String   // user_id sẽ được nhận danh hiệu
+  type      Int      // 0: top câu cá, 1: top fishcoin, 2: top fishbattle, 3: top custom
+  active    Boolean  @default(false) // Danh hiệu có đang active hay không
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([target])
+  @@index([type])
+  @@index([active])
+}
+
+model FishSkillDefinition {
+  id                String      @id @default(cuid())
+  name              String
+  element           String      // fire, water, earth, air, light, dark
+  emoji             String
+  description       String
+  baseCost          BigInt      // Giá FishCoin cơ bản
+  baseDamage        Int         // Damage cơ bản
+  damageMultiplier  Decimal     @default(1.00) // Hệ số damage cơ bản
+  damagePerLevel    Decimal     @default(0.10) // Hệ số tăng damage mỗi cấp
+  maxLevel          Int         @default(5)
+  baseSuccessRate   Decimal     @default(0.50) // Tỷ lệ thành công cơ bản (0-1)
+  successRatePerLevel Decimal   @default(0.05) // Tỷ lệ thành công tăng mỗi level
+  cooldown          Int         @default(3) // Cooldown (rounds)
+  requirements      String?     // JSON: {level: 10, strength: 50, rarity: "legendary"}
+  effects           String?     // JSON: {burn: 0.1, stun: 0.05}
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  fishSkills        FishSkill[]
+
+  @@index([element])
+}
+
+model FishSkill {
+  id                String              @id @default(cuid())
+  fishId            String
+  skillId           String
+  level             Int                 @default(1)
+  learnedAt         DateTime            @default(now())
+  lastUsed          DateTime?
+  fish              Fish                @relation(fields: [fishId], references: [id], onDelete: Cascade)
+  skillDefinition   FishSkillDefinition @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([fishId, skillId])
+  @@index([fishId])
+  @@index([skillId])
 }

@@ -3,8 +3,12 @@ import { EmbedBuilder, Message } from "discord.js";
 import { Bot } from "@/classes";
 import { config } from "@/config";
 import { EcommerceService } from "@/utils/ecommerce-db";
-import { FishingService, FISH_LIST, FISHING_RODS, BAITS } from "@/utils/fishing";
-import { prisma } from "@/utils/database";
+import { FishingService } from "@/utils/fishing";
+import { FISH_LIST, FISHING_RODS, BAITS } from "@/config/fish-data";
+import { AchievementService } from "@/utils/achievement";
+import { SpamProtectionService } from "@/utils/spam-protection";
+import prisma from "@/utils/prisma";
+import { SeasonalFishingService } from '@/utils/seasonal-fishing';
 
 function getRarityColor(rarity: string): number {
     switch (rarity) {
@@ -42,7 +46,7 @@ export default Bot.createCommand({
         aliases: ["fish", "f"],
     },
     options: {
-        cooldown: 3000,
+        cooldown: 1000, // Giảm cooldown xuống 1 giây để tránh spam
         permissions: ["SendMessages", "EmbedLinks"],
     },
     run: async ({ message, t }) => {
@@ -87,6 +91,9 @@ export default Bot.createCommand({
             case "stats":
             case "thống kê":
                 return await showStats(message);
+            case "season":
+            case "mùa":
+                return await showSeasonInfo(message);
             case "help":
                 return await showHelp(message);
             default:
@@ -96,13 +103,71 @@ export default Bot.createCommand({
     },
 });
 
+// Map để lưu trạng thái đang câu cá của user
+const fishingInProgress = new Map<string, boolean>();
+
 async function fishWithAnimation(message: Message) {
     const userId = message.author.id;
     const guildId = message.guildId!;
 
+    // Kiểm tra spam protection
+    const spamService = SpamProtectionService.getInstance();
+    const spamCheck = spamService.checkSpam(userId, guildId, "fishing");
+    
+    if (!spamCheck.allowed) {
+        // Trả về embed lỗi từ spam protection
+        if (spamCheck.embed) {
+            return await message.reply({ embeds: [spamCheck.embed] });
+        }
+        
+        // Fallback embed nếu không có embed từ spam service
+        const errorEmbed = new EmbedBuilder()
+            .setTitle("❌ Bị Chặn Spam")
+            .setDescription("Bạn đã spam lệnh câu cá quá nhiều lần!")
+            .setColor("#ff0000")
+            .setTimestamp();
+            
+        return await message.reply({ embeds: [errorEmbed] });
+    }
+
+    // Kiểm tra xem user có đang câu cá không
+    if (fishingInProgress.get(userId)) {
+        const errorEmbed = new EmbedBuilder()
+            .setTitle("⏳ Đang Câu Cá...")
+            .setDescription("Bạn đang câu cá, vui lòng đợi hoàn thành!")
+            .setColor("#ff9900")
+            .setTimestamp();
+
+        return await message.reply({ embeds: [errorEmbed] });
+    }
+
     try {
-        // Kiểm tra điều kiện câu cá trước khi bắt đầu animation
-        const cooldownCheck = await FishingService.canFish(userId, guildId);
+        // Đánh dấu user đang câu cá
+        fishingInProgress.set(userId, true);
+
+        // Kiểm tra quyền Admin
+        const member = await message.guild?.members.fetch(userId);
+        const isAdmin = member?.permissions.has('Administrator') || false;
+
+        // Kiểm tra xem user có phải là top 1 fisher không
+        const topFisher = await FishingService.getTopFisher(guildId);
+        const isTopFisher = topFisher && topFisher.userId === userId;
+
+        // Kiểm tra xem user có phải là top 1 lose không
+        const { GameStatsService } = await import('@/utils/gameStats');
+        const topLoseUser = await GameStatsService.getTopLoseUser(guildId, message.client);
+        const isTopLose = topLoseUser && topLoseUser.userId === userId;
+
+        // Kiểm tra xem user có phải là top 1 FishCoin không
+        const topFishCoinUser = await GameStatsService.getTopFishCoinUser(guildId);
+        const isTopFishCoin = topFishCoinUser === userId;
+
+        // Kiểm tra Achievement của user (PRIORITY CAO NHẤT)
+        const userAchievement = await AchievementService.getHighestPriorityAchievement(userId);
+        const hasAchievement = userAchievement !== null;
+
+        // Kiểm tra điều kiện câu cá trước khi bắt đầu animation (Admin bypass)
+        const cooldownCheck = await FishingService.canFish(userId, guildId, isAdmin);
         if (!cooldownCheck.canFish) {
             const errorEmbed = new EmbedBuilder()
                 .setTitle("❌ Không thể câu cá")
@@ -113,15 +178,15 @@ async function fishWithAnimation(message: Message) {
             return await message.reply({ embeds: [errorEmbed] });
         }
 
-        // Kiểm tra số dư
+        // Kiểm tra số dư FishCoin
         const balance = await prisma.user.findUnique({
             where: { userId_guildId: { userId, guildId } }
         });
 
-        if (!balance || balance.balance < 10) {
+        if (!balance || balance.fishBalance < 10n) {
             const errorEmbed = new EmbedBuilder()
-                .setTitle("❌ Không đủ tiền")
-                .setDescription("Bạn cần ít nhất 10 AniCoin để câu cá!")
+                .setTitle("❌ Không đủ FishCoin")
+                .setDescription("Bạn cần ít nhất 10 FishCoin để câu cá!")
                 .setColor("#ff0000")
                 .setTimestamp();
 
@@ -133,6 +198,11 @@ async function fishWithAnimation(message: Message) {
         let rodName = "Không có";
         let baitName = "Không có";
         
+        // Lưu thông tin cần câu ban đầu để so sánh sau này
+        const originalRodName = fishingData.currentRod ? FISHING_RODS[fishingData.currentRod]?.name || 'Unknown' : 'None';
+        // Lưu thông tin mồi ban đầu để so sánh sau này
+        const originalBaitName = fishingData.currentBait ? BAITS[fishingData.currentBait]?.name || 'Unknown' : 'None';
+        
         if (fishingData.currentRod && fishingData.currentRod !== "") {
             rodName = FISHING_RODS[fishingData.currentRod]?.name || "Không xác định";
         }
@@ -141,22 +211,22 @@ async function fishWithAnimation(message: Message) {
             baitName = BAITS[fishingData.currentBait]?.name || "Không xác định";
         }
 
-        // Bắt đầu animation câu cá
-        const fishingEmbed = new EmbedBuilder()
-            .setTitle("🎣 Đang Câu Cá...")
-            .setDescription(
-                `**${message.author.username}** đang câu cá...\n\n` +
-                `🎣 **Cần câu:** ${rodName}\n` +
-                `🪱 **Mồi:** ${baitName}\n\n` +
-                `⏳ Đang chờ cá cắn câu...`
-            )
-            .setColor("#0099ff")
-            .setThumbnail(message.author.displayAvatarURL())
-            .setTimestamp();
-
-        const fishingMsg = await message.reply({ embeds: [fishingEmbed] });
-
-        // Animation 3 giây với các bước khác nhau
+        // Tối ưu: Load GIF một lần và tái sử dụng
+        const fishingGifUrl = "https://cdn.discordapp.com/attachments/1396335030216822875/1397399341475430411/fish-shark.gif?ex=6881950d&is=6880438d&hm=60523d4d9a24ab5f45a42e6fd1c8dddf28680e015cadf0e5fce617e12599f552&";
+        
+        // GIF đặc biệt cho Admin (hiển thị trên cùng)
+        const adminGifUrl = "https://cdn.discordapp.com/attachments/1396335030216822875/1398569226188619787/113_146.gif?ex=6885d697&is=68848517&hm=51f234796bc3ada147d02b4b679afe6995bc1602f98f09571de115c5854cffb0&";
+        
+        // GIF đặc biệt cho Top 1 Fisher (theo yêu cầu)
+        const topFisherGifUrl = "https://media.discordapp.net/attachments/1396335030216822875/1398568859987869696/113_137.gif?ex=6885d640&is=688484c0&hm=caa5221123afc40711c4fcfc972f92181fc6ed9fbbc2052d689e7962b6a0e55d&=&width=480&height=184";
+        
+        // GIF đặc biệt cho Top 1 Lose (theo yêu cầu)
+        const topLoseGifUrl = "https://media.discordapp.net/attachments/1396335030216822875/1398569302663368714/113_156.gif?ex=6885d6a9&is=68848529&hm=e67d702c44f4916882ea5cb64940485e0b66aed91f74b7f7f5f6e53934fcd47d&=&width=408&height=192";
+        
+        // GIF đặc biệt cho Top 1 FishCoin (theo yêu cầu)
+        const topFishCoinGifUrl = "https://media.discordapp.net/attachments/1396335030216822875/1398569226595336324/113_147.gif?ex=6885d697&is=68848517&hm=6997312ba231ae7d566ffde7a4176d509ccc9dc85d2ff312934a34508c072e1c&=&width=600&height=168";
+        
+        // Animation 3 giây với các bước khác nhau (chỉ text thay đổi, GIF giữ nguyên)
         const animationSteps = [
             "🎣 Đang thả mồi...",
             "🌊 Đang chờ cá cắn câu...",
@@ -164,27 +234,298 @@ async function fishWithAnimation(message: Message) {
             "🎣 Đang kéo cá lên..."
         ];
 
-        for (let i = 0; i < animationSteps.length; i++) {
+        // Bắt đầu animation câu cá với GIF ngay từ đầu
+        const fishingEmbed = new EmbedBuilder()
+            .setTitle("🎣 Đang Câu Cá...")
+            .setDescription(
+                `**${message.author.username}** đang câu cá...\n\n` +
+                `🎣 **Cần câu:** ${rodName}\n` +
+                `🪱 **Mồi:** ${baitName}\n\n` +
+                `⏳ ${animationSteps[0]}`
+            )
+            .setColor("#0099ff")
+            .setThumbnail(message.author.displayAvatarURL())
+            .setImage(fishingGifUrl) // Luôn giữ GIF câu cá cũ
+            .setTimestamp();
+
+        // Tạo embed cho Admin GIF (hiển thị nhỏ gọn - 100x50px equivalent)
+        let adminEmbed: EmbedBuilder | undefined = undefined;
+        if (isAdmin) {
+            adminEmbed = new EmbedBuilder()
+                .setThumbnail(adminGifUrl) // GIF đặc biệt cho Admin (nhỏ gọn)
+                .setColor("#ffd700") // Màu vàng cho Admin
+                .setTitle("👑 Admin Fishing"); // Tiêu đề nhỏ cho Admin
+        }
+
+        // Tạo embed cho Top 1 Fisher GIF (hiển thị nhỏ gọn)
+        let topFisherEmbed: EmbedBuilder | undefined = undefined;
+        if (isTopFisher && !isAdmin) {
+            topFisherEmbed = new EmbedBuilder()
+                .setThumbnail(topFisherGifUrl)
+                .setColor("#ff6b35")
+                .setTitle("🏆 Top 1 Câu Cá");
+        }
+
+        // Tạo embed cho Top 1 Lose GIF (hiển thị nhỏ gọn)
+        let topLoseEmbed: EmbedBuilder | undefined = undefined;
+        if (isTopLose && !isAdmin && !isTopFisher) {
+            topLoseEmbed = new EmbedBuilder()
+                .setThumbnail(topLoseGifUrl)
+                .setColor("#ff4757")
+                .setTitle("💸 Top 1 Thua Lỗ");
+        }
+
+        // Tạo embed cho Top 1 FishCoin GIF (hiển thị nhỏ gọn)
+        let topFishCoinEmbed: EmbedBuilder | undefined = undefined;
+        if (isTopFishCoin && !isAdmin && !isTopFisher) {
+            topFishCoinEmbed = new EmbedBuilder()
+                .setThumbnail(topFishCoinGifUrl)
+                .setColor("#00d4aa")
+                .setTitle("💰 Top 1 FishCoin");
+        }
+
+        // Tạo embed cho Achievement (PRIORITY CAO NHẤT)
+        let achievementEmbed: EmbedBuilder | undefined = undefined;
+        if (hasAchievement && userAchievement) {
+            const achievementEmoji = AchievementService.getAchievementTypeEmoji(userAchievement.type);
+            const achievementTypeName = AchievementService.getAchievementTypeName(userAchievement.type);
+            
+            achievementEmbed = new EmbedBuilder()
+                .setThumbnail(userAchievement.link) // Sử dụng link ảnh từ achievement
+                .setColor("#ff6b35") // Màu cam cho achievement
+                // .setTitle(`${achievementEmoji} ${userAchievement.name}`) // Tên achievement
+                .setTitle(`${userAchievement.name}`) // Tên achievement
+                .setDescription(`🏅 **${achievementTypeName}**`); // Type achievement
+        }
+
+        // Gửi embed(s) dựa trên vai trò - Priority: Achievement > Admin > Top Fisher > Top FishCoin > Top Lose
+        let embeds: EmbedBuilder[] = [fishingEmbed];
+        if (hasAchievement && achievementEmbed) {
+            embeds = [achievementEmbed, fishingEmbed]; // Achievement có priority cao nhất
+        } else if (isAdmin && adminEmbed) {
+            embeds = [adminEmbed, fishingEmbed];
+        } else if (isTopFisher && topFisherEmbed) {
+            embeds = [topFisherEmbed, fishingEmbed];
+        } else if (isTopFishCoin && topFishCoinEmbed) {
+            embeds = [topFishCoinEmbed, fishingEmbed];
+        } else if (isTopLose && topLoseEmbed) {
+            embeds = [topLoseEmbed, fishingEmbed];
+        }
+        const fishingMsg = await message.reply({ embeds });
+
+        // Cập nhật các bước tiếp theo (chỉ thay đổi description, không động đến image để tránh nháy GIF)
+        for (let i = 1; i < animationSteps.length; i++) {
             await new Promise(resolve => setTimeout(resolve, 750)); // 750ms mỗi bước = 3 giây tổng
             
-            const updatedEmbed = new EmbedBuilder()
-                .setTitle("🎣 Đang Câu Cá...")
-                .setDescription(
-                    `**${message.author.username}** đang câu cá...\n\n` +
-                    `🎣 **Cần câu:** ${rodName}\n` +
-                    `🪱 **Mồi:** ${baitName}\n\n` +
-                    `⏳ ${animationSteps[i]}`
-                )
-                .setColor("#0099ff")
-                .setThumbnail(message.author.displayAvatarURL())
-                .setTimestamp();
-
-            await fishingMsg.edit({ embeds: [updatedEmbed] });
+            if (hasAchievement && achievementEmbed) {
+                // Achievement: Cập nhật cả hai embed
+                const updatedFishingEmbed = EmbedBuilder.from(fishingMsg.embeds[1]) // Embed thứ 2 là fishing embed
+                    .setDescription(
+                        `**${message.author.username}** đang câu cá...\n\n` +
+                        `🎣 **Cần câu:** ${rodName}\n` +
+                        `🪱 **Mồi:** ${baitName}\n\n` +
+                        `⏳ ${animationSteps[i]}`
+                    );
+                
+                const updatedEmbeds = [achievementEmbed, updatedFishingEmbed];
+                await fishingMsg.edit({ embeds: updatedEmbeds });
+            } else if (isAdmin && adminEmbed) {
+                // Admin: Cập nhật cả hai embed
+                const updatedFishingEmbed = EmbedBuilder.from(fishingMsg.embeds[1]) // Embed thứ 2 là fishing embed
+                    .setDescription(
+                        `**${message.author.username}** đang câu cá...\n\n` +
+                        `🎣 **Cần câu:** ${rodName}\n` +
+                        `🪱 **Mồi:** ${baitName}\n\n` +
+                        `⏳ ${animationSteps[i]}`
+                    );
+                
+                const updatedEmbeds = [adminEmbed, updatedFishingEmbed];
+                await fishingMsg.edit({ embeds: updatedEmbeds });
+            } else if (isTopFisher && topFisherEmbed) {
+                // Top 1 Fisher: Cập nhật cả hai embed
+                const updatedFishingEmbed = EmbedBuilder.from(fishingMsg.embeds[1]) // Embed thứ 2 là fishing embed
+                    .setDescription(
+                        `**${message.author.username}** đang câu cá...\n\n` +
+                        `🎣 **Cần câu:** ${rodName}\n` +
+                        `🪱 **Mồi:** ${baitName}\n\n` +
+                        `⏳ ${animationSteps[i]}`
+                    );
+                
+                const updatedEmbeds = [topFisherEmbed, updatedFishingEmbed];
+                await fishingMsg.edit({ embeds: updatedEmbeds });
+            } else if (isTopFishCoin && topFishCoinEmbed) {
+                // Top 1 FishCoin: Cập nhật cả hai embed
+                const updatedFishingEmbed = EmbedBuilder.from(fishingMsg.embeds[1]) // Embed thứ 2 là fishing embed
+                    .setDescription(
+                        `**${message.author.username}** đang câu cá...\n\n` +
+                        `🎣 **Cần câu:** ${rodName}\n` +
+                        `🪱 **Mồi:** ${baitName}\n\n` +
+                        `⏳ ${animationSteps[i]}`
+                    );
+                
+                const updatedEmbeds = [topFishCoinEmbed, updatedFishingEmbed];
+                await fishingMsg.edit({ embeds: updatedEmbeds });
+            } else if (isTopLose && topLoseEmbed) {
+                // Top 1 Lose: Cập nhật cả hai embed
+                const updatedFishingEmbed = EmbedBuilder.from(fishingMsg.embeds[1]) // Embed thứ 2 là fishing embed
+                    .setDescription(
+                        `**${message.author.username}** đang câu cá...\n\n` +
+                        `🎣 **Cần câu:** ${rodName}\n` +
+                        `🪱 **Mồi:** ${baitName}\n\n` +
+                        `⏳ ${animationSteps[i]}`
+                    );
+                
+                const updatedEmbeds = [topLoseEmbed, updatedFishingEmbed];
+                await fishingMsg.edit({ embeds: updatedEmbeds });
+            } else {
+                // Normal user: Chỉ cập nhật một embed
+                const updatedEmbed = EmbedBuilder.from(fishingMsg.embeds[0])
+                    .setDescription(
+                        `**${message.author.username}** đang câu cá...\n\n` +
+                        `🎣 **Cần câu:** ${rodName}\n` +
+                        `🪱 **Mồi:** ${baitName}\n\n` +
+                        `⏳ ${animationSteps[i]}`
+                    );
+                
+                await fishingMsg.edit({ embeds: [updatedEmbed] });
+            }
         }
 
         // Thực hiện câu cá
-        const result = await FishingService.fish(userId, guildId);
-        const { fish, value, newBalance } = result;
+        const result = await FishingService.fish(userId, guildId, isAdmin);
+        const { fish, value, isPityActivated } = result;
+
+        // Kiểm tra auto-switch bait sau khi câu cá
+        let autoSwitchMessage = '';
+        try {
+            const fishingData = await FishingService.getFishingData(userId, guildId);
+            const currentBait = fishingData.baits.find((b: any) => b.baitType === fishingData.currentBait);
+            
+            // Nếu mồi hiện tại hết, thông báo đã auto-switch
+            if (!currentBait || currentBait.quantity <= 0) {
+                // Tìm mồi mới được chọn
+                const newBait = fishingData.baits.find((b: any) => b.baitType === fishingData.currentBait);
+                if (newBait) {
+                    const baitData = BAITS[newBait.baitType];
+                    autoSwitchMessage = `\n\n🔄 **Tự động chuyển sang mồi:** ${baitData.emoji} ${baitData.name} (${newBait.quantity} còn lại)`;
+                }
+            }
+        } catch (error) {
+            console.error('Error checking auto-switch bait:', error);
+        }
+
+        // Kiểm tra auto-equip bait (trang bị mồi tự động)
+        let autoEquipMessage = '';
+        try {
+            // So sánh với bait ban đầu để xem có auto-equip không
+            if (originalBaitName !== baitName) {
+                const baitData = BAITS[fishingData.currentBait];
+                const currentBait = fishingData.baits.find((b: any) => b.baitType === fishingData.currentBait);
+                if (baitData && currentBait) {
+                    autoEquipMessage = `\n\n⚡ **Tự động trang bị mồi:** ${baitData.emoji} ${baitData.name} (${currentBait.quantity} còn lại)`;
+                }
+            }
+        } catch (error) {
+            console.error('Error checking auto-equip bait:', error);
+        }
+
+        // Kiểm tra auto-switch rod sau khi câu cá
+        let autoSwitchRodMessage = '';
+        try {
+            const fishingData = await FishingService.getFishingData(userId, guildId);
+            const currentRod = fishingData.rods.find((r: any) => r.rodType === fishingData.currentRod);
+            if (!currentRod || currentRod.durability <= 0) {
+                // Tìm cần mới được chọn
+                const newRod = fishingData.rods.find((r: any) => r.rodType === fishingData.currentRod);
+                if (newRod) {
+                    const rodData = FISHING_RODS[newRod.rodType];
+                    autoSwitchRodMessage = `\n\n🔄 **Tự động chuyển sang cần câu:** ${rodData.emoji} ${rodData.name} (Độ bền: ${newRod.durability})`;
+                }
+            }
+        } catch (error) {
+            console.error('Error checking auto-switch rod:', error);
+        }
+
+        // Kiểm tra auto-equip rod (trang bị cần tự động)
+        let autoEquipRodMessage = '';
+        try {
+            if (originalRodName !== rodName) {
+                const rodData = FISHING_RODS[fishingData.currentRod];
+                const currentRod = fishingData.rods.find((r: any) => r.rodType === fishingData.currentRod);
+                if (rodData && currentRod) {
+                    autoEquipRodMessage = `\n\n⚡ **Tự động trang bị cần câu:** ${rodData.emoji} ${rodData.name} (Độ bền: ${currentRod.durability})`;
+                }
+            }
+        } catch (error) {
+            console.error('Error checking auto-equip rod:', error);
+        }
+
+        // Tự động thêm cá huyền thoại vào fish inventory
+        let fishInventoryMessage = '';
+        if (fish.rarity === 'legendary') {
+            try {
+                const { FishBreedingService } = await import('@/utils/fish-breeding');
+                const { FishInventoryService } = await import('@/utils/fish-inventory');
+                
+                // Tạo cá trong hệ thống nuôi
+                const fishData = {
+                    userId,
+                    guildId,
+                    species: fish.name,
+                    level: 1,
+                    experience: 0,
+                    rarity: 'legendary',
+                    value: value, // Sử dụng value từ kết quả câu cá
+                    generation: 1,
+                    specialTraits: JSON.stringify(['Caught']),
+                    status: 'growing',
+                    // Cloning fields (default values for new fish)
+                    isCloned: false,
+                    clonedFrom: null,
+                    clonedAt: null,
+                };
+                
+                const createdFish = await prisma.fish.create({ data: fishData });
+                
+                // Thêm vào fish inventory
+                const addResult = await FishInventoryService.addFishToInventory(userId, guildId, createdFish.id);
+                
+                if (addResult.success) {
+                    fishInventoryMessage = '\n\n🐟 **Cá huyền thoại đã được thêm vào rương nuôi!**\nDùng `n.fishbarn` để mở rương nuôi cá.';
+                } else {
+                    fishInventoryMessage = '\n\n⚠️ **Không thể thêm vào rương nuôi:** ' + addResult.error;
+                }
+            } catch (error) {
+                console.error('Error adding legendary fish to inventory:', error);
+                fishInventoryMessage = '\n\n⚠️ **Lỗi khi thêm vào rương nuôi!**';
+            }
+        }
+
+        // Lấy thông tin tổng số lần câu cá (sử dụng fishingData đã có)
+        const totalFishingCount = fishingData.totalFish;
+        
+        // Tạo hiệu ứng cho số lần câu
+        let fishingCountEffect = '';
+        if (totalFishingCount >= 1000) {
+            fishingCountEffect = '🔥 **FISHING MASTER!** 🔥';
+        } else if (totalFishingCount >= 500) {
+            fishingCountEffect = '⚡ **FISHING EXPERT!** ⚡';
+        } else if (totalFishingCount >= 100) {
+            fishingCountEffect = '🎯 **FISHING PRO!** 🎯';
+        } else if (totalFishingCount >= 50) {
+            fishingCountEffect = '🌟 **FISHING STAR!** 🌟';
+        } else if (totalFishingCount >= 10) {
+            fishingCountEffect = '⭐ **FISHING BEGINNER!** ⭐';
+        }
+
+        // Thêm thông tin mùa
+        const seasonInfo = SeasonalFishingService.getSeasonInfoText();
+
+        // Thông báo pity system nếu được kích hoạt
+        let pityMessage = '';
+        if (isPityActivated) {
+            pityMessage = '\n\n🎉 **PITY SYSTEM KÍCH HOẠT!** 🎉\nBạn đã câu được cá huyền thoại nhờ hệ thống bảo hộ!';
+        }
 
         const successEmbed = new EmbedBuilder()
             .setTitle("🎣 Câu Cá Thành Công!")
@@ -192,13 +533,37 @@ async function fishWithAnimation(message: Message) {
                 `**${message.author.username}** đã câu được:\n\n` +
                 `${fish.emoji} **${fish.name}**\n` +
                 `${getRarityEmoji(fish.rarity)} **${getRarityText(fish.rarity)}**\n` +
-                `💰 **Giá trị:** ${value} AniCoin\n\n`
+                `🐟 **Giá trị:** ${value} FishCoin\n\n` +
+                `📊 **Thống kê câu cá:**\n` +
+                `🎣 **Tổng số lần câu:** ${totalFishingCount.toLocaleString()} lần\n` +
+                (fishingCountEffect ? `${fishingCountEffect}\n` : '') +
+                `💰 **Tổng thu nhập:** ${fishingData.totalEarnings.toLocaleString()} FishCoin\n\n` +
+                `🌍 **${seasonInfo}**${fishInventoryMessage}${autoSwitchMessage}${autoEquipMessage}${autoSwitchRodMessage}${autoEquipRodMessage}${pityMessage}` +
+                (isAdmin && fish.rarity === 'legendary' ? '\n\n👑 **Admin đã câu được cá huyền thoại!**' : '')
             )
             .setColor(getRarityColor(fish.rarity))
             .setThumbnail(message.author.displayAvatarURL())
             .setTimestamp();
 
-        await fishingMsg.edit({ embeds: [successEmbed] });
+        // Gửi kết quả dựa trên vai trò - Priority: Achievement > Admin > Top Fisher > Top FishCoin > Top Lose
+        if (hasAchievement && achievementEmbed) {
+            const finalEmbeds = [achievementEmbed, successEmbed];
+            await fishingMsg.edit({ embeds: finalEmbeds });
+        } else if (isAdmin && adminEmbed) {
+            const finalEmbeds = [adminEmbed, successEmbed];
+            await fishingMsg.edit({ embeds: finalEmbeds });
+        } else if (isTopFisher && topFisherEmbed) {
+            const finalEmbeds = [topFisherEmbed, successEmbed];
+            await fishingMsg.edit({ embeds: finalEmbeds });
+        } else if (isTopFishCoin && topFishCoinEmbed) {
+            const finalEmbeds = [topFishCoinEmbed, successEmbed];
+            await fishingMsg.edit({ embeds: finalEmbeds });
+        } else if (isTopLose && topLoseEmbed) {
+            const finalEmbeds = [topLoseEmbed, successEmbed];
+            await fishingMsg.edit({ embeds: finalEmbeds });
+        } else {
+            await fishingMsg.edit({ embeds: [successEmbed] });
+        }
     } catch (error: any) {
         const errorEmbed = new EmbedBuilder()
             .setTitle("❌ Lỗi")
@@ -207,6 +572,9 @@ async function fishWithAnimation(message: Message) {
             .setTimestamp();
 
         await message.reply({ embeds: [errorEmbed] });
+    } finally {
+        // Xóa trạng thái đang câu cá
+        fishingInProgress.delete(userId);
     }
 }
 
@@ -220,12 +588,12 @@ async function showShop(message: Message) {
         .setTitle("🏪 Cửa Hàng Câu Cá")
         .setDescription(
             "**Cần câu:**\n" +
-            Object.entries(FISHING_RODS).map(([key, rod]: [string, typeof FISHING_RODS[string]]) =>
-                `${rod.emoji} **${rod.name}** - ${rod.price}₳ | Độ bền: ${rod.durability} | Bonus: +${rod.rarityBonus}%`
+            Object.entries(FISHING_RODS).map(([key, rod]) =>
+                `${rod.emoji} **${rod.name}** - ${rod.price}🐟 | Độ bền: ${rod.durability} | Bonus: +${rod.rarityBonus}%`
             ).join("\n") +
             "\n\n**Mồi:**\n" +
-            Object.entries(BAITS).map(([key, bait]: [string, typeof BAITS[string]]) =>
-                `${bait.emoji} **${bait.name}** - ${bait.price}₳ | Bonus: +${bait.rarityBonus}%`
+            Object.entries(BAITS).map(([key, bait]) =>
+                `${bait.emoji} **${bait.name}** - ${bait.price}🐟 | Bonus: +${bait.rarityBonus}%`
             ).join("\n") +
             "\n\n**Mua:** `n.fishing buy <loại> <số lượng>`\n" +
             "Ví dụ: `n.fishing buy copper 1` hoặc `n.fishing buy good 5`\n" +
@@ -277,7 +645,7 @@ async function buyItem(message: Message, args: string[]) {
                 .setDescription(
                     `**${message.author.username}** đã mua:\n\n` +
                     `${rod.emoji} **${rod.name}**\n` +
-                    `💰 **Giá:** ${rod.price} AniCoin\n` +
+                    `🐟 **Giá:** ${rod.price} FishCoin\n` +
                     `🔧 **Độ bền:** ${rod.durability}\n` +
                     `📈 **Tăng tỷ lệ hiếm:** +${rod.rarityBonus}%`
                 )
@@ -293,7 +661,7 @@ async function buyItem(message: Message, args: string[]) {
                 .setDescription(
                     `**${message.author.username}** đã mua:\n\n` +
                     `${result.bait.emoji} **${result.bait.name}** x${quantity}\n` +
-                    `💰 **Tổng giá:** ${result.totalCost} AniCoin\n` +
+                    `🐟 **Tổng giá:** ${result.totalCost} FishCoin\n` +
                     `📈 **Tăng tỷ lệ hiếm:** +${result.bait.rarityBonus}%`
                 )
                 .setColor("#00ff00")
@@ -355,8 +723,8 @@ async function sellFish(message: Message, args: string[]) {
             .setDescription(
                 `**${message.author.username}** đã bán:\n\n` +
                 `🐟 **${result.fishName}** x${result.quantity}\n` +
-                `💰 **Giá hiện tại:** ${result.currentPrice} AniCoin\n` +
-                `💵 **Tổng giá:** ${result.totalValue} AniCoin`
+                `🐟 **Giá hiện tại:** ${result.currentPrice} FishCoin\n` +
+                `💵 **Tổng giá:** ${result.totalValue} FishCoin`
             )
             .setColor("#00ff00")
             .setTimestamp();
@@ -385,7 +753,7 @@ async function showInventory(message: Message) {
         let baitInfo = "Không có";
         
         if (fishingData.currentRod && fishingData.currentRod !== "") {
-            const currentRod = fishingData.rods.find(r => r.rodType === fishingData.currentRod);
+            const currentRod = fishingData.rods.find((r: any) => r.rodType === fishingData.currentRod);
             if (currentRod) {
                 const rodData = FISHING_RODS[fishingData.currentRod];
                 rodInfo = `${rodData.emoji} **${rodData.name}** (Độ bền: ${currentRod.durability})`;
@@ -393,12 +761,23 @@ async function showInventory(message: Message) {
         }
         
         if (fishingData.currentBait && fishingData.currentBait !== "") {
-            const currentBait = fishingData.baits.find(b => b.baitType === fishingData.currentBait);
+            const currentBait = fishingData.baits.find((b: any) => b.baitType === fishingData.currentBait);
             if (currentBait) {
                 const baitData = BAITS[fishingData.currentBait];
                 baitInfo = `${baitData.emoji} **${baitData.name}** (Số lượng: ${currentBait.quantity})`;
             }
         }
+
+        // Lọc ra chỉ cá thường (không phải legendary)
+        const normalFish = fishingData.fish.filter((f: any) => {
+            const fishInfo = FISH_LIST.find(fish => fish.name === f.fishName);
+            return fishInfo && fishInfo.rarity !== 'legendary';
+        });
+
+        // Tính tổng giá trị cá
+        const totalValue = normalFish.reduce((sum: number, f: any) => {
+            return sum + (Number(f.fishValue) * f.quantity);
+        }, 0);
 
         const embed = new EmbedBuilder()
             .setTitle("🎒 Túi Đồ Câu Cá")
@@ -406,21 +785,41 @@ async function showInventory(message: Message) {
                 `🎣 **Cần câu hiện tại:** ${rodInfo}\n` +
                 `🪱 **Mồi hiện tại:** ${baitInfo}\n\n` +
                 `**Cá đã bắt:**\n` +
-                                 (fishingData.fish.length > 0 
-                     ? fishingData.fish.map((f: any) => 
-                         `${FISH_LIST.find(fish => fish.name === f.fishName)?.emoji || "🐟"} **${f.fishName}** x${f.quantity} (${f.fishValue} AniCoin)`
+                                 (normalFish.length > 0 
+                     ? normalFish.map((f: any) => 
+                         `${FISH_LIST.find(fish => fish.name === f.fishName)?.emoji || "🐟"} **${f.fishName}** x${f.quantity} (${f.fishValue} FishCoin)`
                      ).join("\n")
                      : "Chưa có cá nào"
-                 )
+                 ) +
+                (normalFish.length > 0 ? `\n\n💰 **Tổng giá trị:** ${totalValue.toLocaleString()} FishCoin` : "")
             )
             .setColor(config.embedColor)
             .setTimestamp();
 
-        // Tạo components với nút bán nhanh cho từng loại cá (giới hạn 5 components)
+        // Tạo components với nút bán nhanh cho từng loại cá và nút bán tất cả
         const components = [];
-        if (fishingData.fish.length > 0) {
-            // Chỉ hiển thị tối đa 4 loại cá để tránh vượt quá giới hạn 5 components
-            const fishToShow = fishingData.fish.slice(0, 4);
+        
+        if (normalFish.length > 0) {
+            // Thêm nút "Bán tất cả" ở đầu
+            const sellAllRow = {
+                type: 1 as const,
+                components: [
+                    {
+                        type: 2 as const,
+                        style: 1 as const, // Primary button (blue)
+                        label: "💰 Bán Tất Cả",
+                        custom_id: JSON.stringify({
+                            n: "SellAllFish",
+                            d: {}
+                        }),
+                        emoji: { name: "💰" }
+                    }
+                ]
+            };
+            components.push(sellAllRow);
+
+            // Hiển thị tối đa 3 loại cá để tránh vượt quá giới hạn 5 components
+            const fishToShow = normalFish.slice(0, 3);
             
             for (let i = 0; i < fishToShow.length; i += 2) {
                 const row = {
@@ -436,7 +835,7 @@ async function showInventory(message: Message) {
                                 fishName: f.fishName
                             }
                         }),
-                        emoji: { name: "💰" }
+                        emoji: { name: "🐟" }
                     }))
                 };
                 components.push(row);
@@ -489,8 +888,8 @@ async function showStats(message: Message) {
             .setTitle("📊 Thống Kê Câu Cá")
             .setDescription(`**${message.author.username}**\n\n` +
                 `🎣 **Tổng số lần câu:** ${fishingData.totalFish}\n` +
-                `💰 **Tổng thu nhập:** ${fishingData.totalEarnings} AniCoin\n` +
-                `🐟 **Cá lớn nhất:** ${fishingData.biggestFish || "Chưa có"} (${fishingData.biggestValue} AniCoin)\n` +
+                `🐟 **Tổng thu nhập:** ${fishingData.totalEarnings} FishCoin\n` +
+                `🐟 **Cá lớn nhất:** ${fishingData.biggestFish || "Chưa có"} (${fishingData.biggestValue} FishCoin)\n` +
                 `${getRarityEmoji(fishingData.rarestRarity)} **Cá hiếm nhất:** ${fishingData.rarestFish || "Chưa có"} (${getRarityText(fishingData.rarestRarity)})`
             )
             .setColor(config.embedColor)
@@ -508,6 +907,11 @@ async function showStats(message: Message) {
     }
 }
 
+async function showSeasonInfo(message: Message) {
+    const embed = SeasonalFishingService.createSeasonInfoEmbed();
+    return await message.reply({ embeds: [embed] });
+}
+
 async function showHelp(message: Message) {
     const embed = new EmbedBuilder()
         .setTitle("🎣 Hệ Thống Câu Cá - Hướng Dẫn")
@@ -520,7 +924,8 @@ async function showHelp(message: Message) {
             "**Set cần câu:** `n.fishing setrod <loại>`\n" +
             "**Set mồi:** `n.fishing setbait <loại>`\n" +
             "**Xem túi đồ:** `n.fishing inv` hoặc `n.fishing inventory`\n" +
-            "**Xem thống kê:** `n.fishing stats`\n\n" +
+            "**Xem thống kê:** `n.fishing stats`\n" +
+            "**Xem thông tin mùa:** `n.fishing season` hoặc `n.fishing mùa`\n\n" +
             "**Ví dụ:**\n" +
             "• `n.fishing` - Câu cá với animation\n" +
             "• `n.fishing fish` - Câu cá với animation\n" +
@@ -530,17 +935,27 @@ async function showHelp(message: Message) {
             "• `n.fishing price \"Cá rô phi\"` - Xem giá cá rô phi\n" +
             "• `n.fishing setrod copper` - Set cần câu đồng làm cần hiện tại\n" +
             "• `n.fishing setbait good` - Set mồi ngon làm mồi hiện tại\n" +
-            "• `n.fishing sell \"Cá rô phi\" 1` - Bán 1 con cá rô phi\n\n" +
+            "• `n.fishing sell \"Cá rô phi\" 1` - Bán 1 con cá rô phi\n" +
+            "• `n.fishing season` - Xem thông tin mùa hiện tại\n\n" +
+            "**🌍 Hệ Thống Câu Cá Theo Mùa:**\n" +
+            "• **Mùa Hè ☀️:** Cooldown 20s, giá cá -20%\n" +
+            "• **Mùa Thu 🍂:** Cooldown 30s, giá cá +10%\n" +
+            "• **Mùa Đông ❄️:** Cooldown 40s, giá cá +40%\n" +
+            "• **Mùa Xuân 🌸:** Cooldown 35s, giá cá +10%, may mắn +20%\n\n" +
             "**Lưu ý:**\n" +
             "• **Bạn cần mua cần câu và mồi trước khi câu cá!**\n" +
-            "• Mỗi lần câu tốn 10 AniCoin\n" +
-            "• Cooldown 30 giây giữa các lần câu\n" +
+            "• Mỗi lần câu tốn 10 FishCoin\n" +
+            "• Cooldown thay đổi theo mùa (20-40 giây)\n" +
             "• Animation câu cá kéo dài 3 giây\n" +
             "• Cần câu và mồi tốt hơn sẽ tăng tỷ lệ bắt cá hiếm\n" +
             "• Cần câu có độ bền, mồi có số lượng giới hạn\n" +
             "• Khi hết độ bền hoặc mồi, bạn cần mua mới\n" +
             "• **Giá cá thay đổi mỗi 10 phút với biến động ±10%**\n" +
-            "• Trong túi đồ có nút \"Bán tất cả\" để bán toàn bộ số lượng cá nhanh"
+            "• Trong túi đồ có nút \"Bán tất cả\" để bán toàn bộ số lượng cá nhanh\n\n" +
+            "**📋 Phân biệt các loại cá:**\n" +
+            "• **Cá thường (Common/Rare/Epic):** Hiển thị trong `n.fishing inventory`\n" +
+            "• **Cá huyền thoại (Legendary):** Chỉ hiển thị trong `n.fishbarn` (rương nuôi cá)\n" +
+            "• **Cá huyền thoại không xuất hiện trong `n.fishing inventory`**"
         )
         .setColor(config.embedColor)
         .setTimestamp();
@@ -628,6 +1043,24 @@ async function showFishPrices(message: Message, args: string[]) {
         if (args.length > 0) {
             // Xem giá của một loại cá cụ thể
             const fishName = args.join(" ");
+            
+            // Kiểm tra xem có phải cá huyền thoại không
+            const legendaryFish = FISH_LIST.find(f => f.name === fishName);
+            if (legendaryFish && legendaryFish.rarity === 'legendary') {
+                const errorEmbed = new EmbedBuilder()
+                    .setTitle("✨ Cá Huyền Thoại")
+                    .setDescription(
+                        `**${fishName}** là cá huyền thoại và chỉ có thể bán trong rương nuôi cá!\n\n` +
+                        `🐟 **Sử dụng:** \`n.fishbarn\` để mở rương nuôi cá\n` +
+                        `💰 **Giá trị:** Cá huyền thoại có giá trị cố định và không biến động\n` +
+                        `🎣 **Cách có:** Chỉ có thể câu được cá huyền thoại khi câu cá`
+                    )
+                    .setColor("#FFD700")
+                    .setTimestamp();
+
+                return await message.reply({ embeds: [errorEmbed] });
+            }
+            
             const fishPriceInfo = await FishPriceService.getFishPriceInfo(fishName);
             
             if (!fishPriceInfo) {
@@ -640,15 +1073,15 @@ async function showFishPrices(message: Message, args: string[]) {
                 return await message.reply({ embeds: [errorEmbed] });
             }
 
-            const fish = FISH_LIST.find(f => f.name === fishName);
+            const fishInfo = FISH_LIST.find(f => f.name === fishName);
             const changeEmoji = fishPriceInfo.changePercent > 0 ? "📈" : fishPriceInfo.changePercent < 0 ? "📉" : "➡️";
             const changeColor = fishPriceInfo.changePercent > 0 ? "#00ff00" : fishPriceInfo.changePercent < 0 ? "#ff0000" : "#ffff00";
 
             const embed = new EmbedBuilder()
-                .setTitle(`${fish?.emoji || "🐟"} Giá ${fishName}`)
+                .setTitle(`${fishInfo?.emoji || "🐟"} Giá ${fishName}`)
                 .setDescription(
-                    `**Giá hiện tại:** ${fishPriceInfo.currentPrice} AniCoin\n` +
-                    `**Giá gốc:** ${fishPriceInfo.basePrice} AniCoin\n` +
+                                    `**Giá hiện tại:** ${fishPriceInfo.currentPrice} FishCoin\n` +
+                `**Giá gốc:** ${fishPriceInfo.basePrice} FishCoin\n` +
                     `**Thay đổi:** ${changeEmoji} ${fishPriceInfo.priceChange > 0 ? "+" : ""}${fishPriceInfo.priceChange} (${fishPriceInfo.changePercent > 0 ? "+" : ""}${fishPriceInfo.changePercent.toFixed(1)}%)\n` +
                     `**Cập nhật lúc:** ${fishPriceInfo.lastUpdated.toLocaleString("vi-VN")}`
                 )
@@ -672,23 +1105,23 @@ async function showFishPrices(message: Message, args: string[]) {
 
             // Nhóm theo rarity
             const commonFish = allPrices.filter(p => {
-                const fish = FISH_LIST.find(f => f.name === p.fishName);
-                return fish?.rarity === "common";
+                const fishInfo = FISH_LIST.find(f => f.name === p.fishName);
+                return fishInfo?.rarity === "common";
             });
             
             const rareFish = allPrices.filter(p => {
-                const fish = FISH_LIST.find(f => f.name === p.fishName);
-                return fish?.rarity === "rare";
+                const fishInfo = FISH_LIST.find(f => f.name === p.fishName);
+                return fishInfo?.rarity === "rare";
             });
             
             const epicFish = allPrices.filter(p => {
-                const fish = FISH_LIST.find(f => f.name === p.fishName);
-                return fish?.rarity === "epic";
+                const fishInfo = FISH_LIST.find(f => f.name === p.fishName);
+                return fishInfo?.rarity === "epic";
             });
             
-            const legendaryFish = allPrices.filter(p => {
-                const fish = FISH_LIST.find(f => f.name === p.fishName);
-                return fish?.rarity === "legendary";
+            const legendaryFishPrices = allPrices.filter(p => {
+                const fishInfo = FISH_LIST.find(f => f.name === p.fishName);
+                return fishInfo?.rarity === "legendary";
             });
 
             const embed = new EmbedBuilder()
@@ -697,29 +1130,26 @@ async function showFishPrices(message: Message, args: string[]) {
                     `**Cập nhật lúc:** ${new Date().toLocaleString("vi-VN")}\n\n` +
                     `**🐟 Cá thường:**\n` +
                     commonFish.map(p => {
-                        const fish = FISH_LIST.find(f => f.name === p.fishName);
+                        const fishInfo = FISH_LIST.find(f => f.name === p.fishName);
                         const changeEmoji = p.changePercent > 0 ? "📈" : p.changePercent < 0 ? "📉" : "➡️";
-                        return `${fish?.emoji || "🐟"} **${p.fishName}:** ${p.currentPrice} (${p.changePercent > 0 ? "+" : ""}${p.changePercent.toFixed(1)}%) ${changeEmoji}`;
+                        return `${fishInfo?.emoji || "🐟"} **${p.fishName}:** ${p.currentPrice} (${p.changePercent > 0 ? "+" : ""}${p.changePercent.toFixed(1)}%) ${changeEmoji}`;
                     }).join("\n") +
                     `\n\n**🐠 Cá hiếm:**\n` +
                     rareFish.map(p => {
-                        const fish = FISH_LIST.find(f => f.name === p.fishName);
+                        const fishInfo = FISH_LIST.find(f => f.name === p.fishName);
                         const changeEmoji = p.changePercent > 0 ? "📈" : p.changePercent < 0 ? "📉" : "➡️";
-                        return `${fish?.emoji || "🐠"} **${p.fishName}:** ${p.currentPrice} (${p.changePercent > 0 ? "+" : ""}${p.changePercent.toFixed(1)}%) ${changeEmoji}`;
+                        return `${fishInfo?.emoji || "🐠"} **${p.fishName}:** ${p.currentPrice} (${p.changePercent > 0 ? "+" : ""}${p.changePercent.toFixed(1)}%) ${changeEmoji}`;
                     }).join("\n") +
                     `\n\n**🦈 Cá quý hiếm:**\n` +
                     epicFish.map(p => {
-                        const fish = FISH_LIST.find(f => f.name === p.fishName);
+                        const fishInfo = FISH_LIST.find(f => f.name === p.fishName);
                         const changeEmoji = p.changePercent > 0 ? "📈" : p.changePercent < 0 ? "📉" : "➡️";
-                        return `${fish?.emoji || "🦈"} **${p.fishName}:** ${p.currentPrice} (${p.changePercent > 0 ? "+" : ""}${p.changePercent.toFixed(1)}%) ${changeEmoji}`;
+                        return `${fishInfo?.emoji || "🦈"} **${p.fishName}:** ${p.currentPrice} (${p.changePercent > 0 ? "+" : ""}${p.changePercent.toFixed(1)}%) ${changeEmoji}`;
                     }).join("\n") +
                     `\n\n**✨ Cá huyền thoại:**\n` +
-                    legendaryFish.map(p => {
-                        const fish = FISH_LIST.find(f => f.name === p.fishName);
-                        const changeEmoji = p.changePercent > 0 ? "📈" : p.changePercent < 0 ? "📉" : "➡️";
-                        return `${fish?.emoji || "✨"} **${p.fishName}:** ${p.currentPrice} (${p.changePercent > 0 ? "+" : ""}${p.changePercent.toFixed(1)}%) ${changeEmoji}`;
-                    }).join("\n") +
-                    `\n\n**💡 Lưu ý:** Giá cá thay đổi mỗi 10 phút với biến động ±10%`
+                    `*Cá huyền thoại chỉ có thể bán trong rương nuôi cá (\`n.fishbarn\`)*\n` +
+                    `*Giá trị cố định, không biến động theo thị trường*` +
+                    `\n\n**💡 Lưu ý:** Giá cá thay đổi mỗi 10 phút với biến động ±15%`
                 )
                 .setColor("#0099ff")
                 .setTimestamp();

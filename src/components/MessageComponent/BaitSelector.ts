@@ -10,7 +10,8 @@ import {
 
 import { Bot } from "@/classes";
 import type { MessageComponentProps } from "@/typings";
-import { FishingService, BAITS } from "@/utils/fishing";
+import { FishingService } from "@/utils/fishing";
+import { BAITS } from "@/config/fish-data";
 
 export default Bot.createMessageComponent<ComponentType.Button, {}>({
     type: ComponentType.Button,
